@@ -4,6 +4,7 @@
   import { wsManager } from "$lib/ws";
   import { debounce } from "$lib/utils";
   import LiveIndicator from "$lib/components/LiveIndicator.svelte";
+  import Pagination from "$lib/components/Pagination.svelte";
 
   const MAX_LOGS = 1000;
 
@@ -18,22 +19,32 @@
   let autoScroll = $state(true);
   let logContainer = $state<HTMLDivElement | null>(null);
   let newCount = $state(0);
+  let currentPage = $state(1);
+  let perPage = $state(100);
+  let total = $state(0);
 
   async function load() {
     try {
       loading = true;
       error = null;
-      const params: Record<string, string> = { limit: "200" };
+      const offset = (currentPage - 1) * perPage;
+      const params: Record<string, string> = { limit: String(perPage), offset: String(offset) };
       if (containerFilter) params.container = containerFilter;
       if (levelFilter) params.level = levelFilter;
       if (searchQuery) params.search = searchQuery;
       const result = await getLogs(params as any);
       logs = result.logs;
+      total = result.total;
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load logs";
     } finally {
       loading = false;
     }
+  }
+
+  function onPageChange(page: number) {
+    currentPage = page;
+    load();
   }
 
   const debouncedLoad = debounce(load, 300);
@@ -206,4 +217,11 @@
       </table>
     {/if}
   </div>
+
+  <!-- Pagination -->
+  {#if total > perPage}
+    <div class="shrink-0">
+      <Pagination {page} {perPage} {total} {onPageChange} />
+    </div>
+  {/if}
 </div>

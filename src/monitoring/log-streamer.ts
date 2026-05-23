@@ -1,0 +1,203 @@
+import { randomUUID } from "crypto";
+
+export interface LogEntry {
+  id: string;
+  container_id: string;
+  container_name: string;
+  stream: "stdout" | "stderr";
+  message: string;
+  timestamp: string;
+}
+
+type LogBatchCallback = (entries: LogEntry[]) => void;
+
+const BATCH_INTERVAL_MS = 100;
+const BATCH_MAX_SIZE = 50;
+
+/**
+ * Parse a Docker multiplexed stream frame.
+ * Format: [stream_type(1)] [0 0 0] [size(4 big-endian)] [payload]
+ * Returns parsed stream type and payload string.
+ */
+export function parseDockerLogFrame(
+  buffer: Buffer
+): { stream: "stdout" | "stderr"; payload: string } | null {
+  if (buffer.length < 8) return null;
+
+  const streamType = buffer[0];
+  const size = buffer.readUInt32BE(4);
+
+  if (buffer.length < 8 + size) return null;
+
+  const payload = buffer.subarray(8, 8 + size).toString("utf-8");
+  const stream = streamType === 1 ? "stdout" : "stderr";
+
+  return { stream, payload };
+}
+
+/**
+ * Parse raw Docker log lines (non-multiplexed mode, e.g. with timestamps).
+ * Lines look like: 2026-05-22T10:00:00.123456789Z message here
+ */
+export function parseRawLogLine(line: string): {
+  timestamp: string;
+  message: string;
+} {
+  const timestampMatch = line.match(
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(.*)$/
+  );
+  if (timestampMatch) {
+    return { timestamp: timestampMatch[1]!, message: timestampMatch[2]! };
+  }
+  return { timestamp: new Date().toISOString(), message: line };
+}
+
+/**
+ * Attach to a container's log stream via Docker Engine API.
+ * Returns an abort controller to stop streaming.
+ */
+async function attachToContainerLogs(
+  containerId: string,
+  dockerSocket: string,
+  onFrame: (entry: LogEntry) => void
+): Promise<AbortController> {
+  const controller = new AbortController();
+
+  const url = `http://localhost/v1.41/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      unix: dockerSocket,
+    });
+
+    if (!response.ok || !response.body) {
+      console.error(
+        `[log-streamer] Failed to attach to ${containerId}: ${response.status}`
+      );
+      return controller;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = Buffer.alloc(0);
+
+    const containerName = containerId.substring(0, 12); // short ID
+
+    const processBuffer = () => {
+      while (buffer.length >= 8) {
+        const frameSize = buffer.readUInt32BE(4);
+        const totalSize = 8 + frameSize;
+        if (buffer.length < totalSize) break;
+
+        const frame = buffer.subarray(0, totalSize);
+        buffer = buffer.subarray(totalSize);
+
+        const parsed = parseDockerLogFrame(frame);
+        if (parsed) {
+          const { timestamp, message } = parseRawLogLine(parsed.payload);
+          onFrame({
+            id: randomUUID(),
+            container_id: containerId,
+            container_name: containerName,
+            stream: parsed.stream,
+            message,
+            timestamp,
+          });
+        }
+      }
+    };
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer = Buffer.concat([buffer, value]);
+          processBuffer();
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error(`[log-streamer] Stream error for ${containerId}:`, err.message);
+        }
+      }
+    };
+
+    pump();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name !== "AbortError") {
+      console.error(`[log-streamer] Connection error for ${containerId}:`, err.message);
+    }
+  }
+
+  return controller;
+}
+
+/**
+ * Start streaming logs from multiple containers.
+ * Collects entries in a batch and flushes every BATCH_INTERVAL_MS or BATCH_MAX_SIZE.
+ * Returns a cleanup function to stop all streams.
+ */
+export function startLogStreamer(
+  containerIds: string[],
+  onBatch: LogBatchCallback,
+  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock"
+): () => void {
+  const controllers: AbortController[] = [];
+  const batch: LogEntry[] = [];
+
+  const flush = () => {
+    if (batch.length > 0) {
+      const entries = batch.splice(0, batch.length);
+      onBatch(entries);
+    }
+  };
+
+  const interval = setInterval(flush, BATCH_INTERVAL_MS);
+
+  for (const containerId of containerIds) {
+    attachToContainerLogs(containerId, dockerSocket, (entry) => {
+      batch.push(entry);
+      if (batch.length >= BATCH_MAX_SIZE) {
+        flush();
+      }
+    }).then((controller) => {
+      controllers.push(controller);
+    });
+  }
+
+  return () => {
+    clearInterval(interval);
+    flush();
+    for (const controller of controllers) {
+      controller.abort();
+    }
+  };
+}
+
+/**
+ * List running containers via Docker Engine API.
+ */
+export async function listContainers(
+  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock"
+): Promise<Array<{ id: string; name: string }>> {
+  try {
+    const response = await fetch("http://localhost/v1.41/containers/json", {
+      unix: dockerSocket,
+    });
+
+    if (!response.ok) return [];
+
+    const containers = (await response.json()) as Array<{
+      Id: string;
+      Names: string[];
+    }>;
+
+    return containers.map((c) => ({
+      id: c.Id,
+      name: c.Names?.[0]?.replace(/^\//, "") ?? c.Id.substring(0, 12),
+    }));
+  } catch {
+    return [];
+  }
+}

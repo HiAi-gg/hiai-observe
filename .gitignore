@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+packages/*/node_modules/
+
+# Build output
+dist/
+frontend/build/
+frontend/.svelte-kit/
+packages/*/dist/
+
+# Lock files
+bun.lock
+frontend/bun.lock
+packages/*/bun.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Internal planning files (not for open-source)
+todo.md
+new.md
+
+# Drizzle
+drizzle/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Coverage
+coverage/

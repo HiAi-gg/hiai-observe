@@ -1,0 +1,175 @@
+# Contributing to HiAi Observe
+
+Thank you for your interest in contributing to HiAi Observe! This document provides guidelines and instructions for contributing.
+
+## Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) 1.3.14+
+- [Docker](https://www.docker.com/) and Docker Compose
+- [PostgreSQL](https://www.postgresql.org/) 18+ (or use Docker)
+- [Redis](https://redis.io/) 8+ (or use Docker)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/hiai-observe.git
+cd hiai-observe
+
+# Install dependencies
+bun install
+
+# Start infrastructure
+docker compose up -d postgres redis
+
+# Configure environment
+cp .env.example .env
+
+# Run migrations
+bunx drizzle-kit push
+
+# Seed demo data (optional)
+bun run seed
+
+# Start development server
+bun run dev
+```
+
+The API will be available at `http://localhost:8001`.
+
+### Frontend Development
+
+```bash
+cd frontend
+bun install
+bun run dev
+```
+
+The frontend dev server will proxy API requests to `localhost:8001`.
+
+## Development Commands
+
+| Command | Description |
+|---|---|
+| `bun run dev` | Start backend dev server with hot reload |
+| `bun run build` | Build backend for production |
+| `bun run build:frontend` | Build frontend for production |
+| `bun run build:all` | Build both backend and frontend |
+| `bun run test` | Run all tests (vitest) |
+| `bun run typecheck` | TypeScript type checking |
+| `bun run seed` | Seed demo data |
+| `bun run reset` | Reset all data |
+
+## Project Structure
+
+See [README.md](README.md#project-structure) for the full project structure overview.
+
+### Key Directories
+
+- `src/api/` — Elysia route handlers (one file per domain)
+- `src/store/` — Drizzle ORM schema and data access layer
+- `src/alerts/` — Alert rules engine and notification dispatchers
+- `src/mastra/` — Mastra trace parsing and analytics
+- `src/middleware/` — Auth, metrics, rate limiting
+- `frontend/src/routes/` — SvelteKit pages
+- `frontend/src/lib/` — Shared frontend utilities
+- `tests/` — Test files (mirrors src/ structure)
+- `packages/mastra-exporter/` — Standalone npm package
+
+## Code Guidelines
+
+### TypeScript
+
+- Strict mode enabled — no `any` types
+- Use ESM (`import`/`export`) exclusively
+- All imports must include `.js` extension (Bun/ESM requirement)
+- Use Zod for runtime schema validation
+
+### Backend (Elysia)
+
+- One plugin per file in `src/api/`
+- Use Elysia's `set.status` for error responses (not `error()`)
+- Use Drizzle ORM for all database queries (no raw SQL)
+- Use parameterized queries (Drizzle handles this)
+- Escape LIKE wildcards in user input: `search.replace(/[%_]/g, '\\$&')`
+
+### Frontend (Svelte 5)
+
+- Use Svelte 5 runes: `$state`, `$derived`, `$effect`, `$props`
+- Use `$derived.by()` for multi-line derived values
+- Use `goto()` from `$app/navigation` (not `window.location.href`)
+- Always add `<svelte:head>` with page title
+- Always show loading/error/empty states
+- Use Tailwind CSS — no custom CSS unless necessary
+- Respect `prefers-reduced-motion` for all animations
+- Interactive elements must be >= 44x44px for touch targets
+
+### Testing
+
+- Use vitest (not bun:test)
+- Mock the database module: `vi.mock("../../src/store/db.js")`
+- Integration tests require `INTEGRATION=1` env var + running server
+- Run tests: `bun run test`
+
+### Database
+
+- Use Drizzle ORM for schema definitions
+- Add compound indexes for common query patterns
+- Use foreign keys with appropriate references
+- Migration files go in `src/store/migrations/`
+
+## Git Workflow
+
+### Branches
+
+- `main` — stable, production-ready
+- `feature/<name>` — new features
+- `fix/<name>` — bug fixes
+- `docs/<name>` — documentation updates
+
+### Commits
+
+Use conventional commit messages:
+
+```
+feat: add WebSocket live streaming for logs
+fix: escape LIKE wildcards in search queries
+docs: update API reference with new endpoints
+chore: update dependencies
+```
+
+### Pull Requests
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Run `bun run typecheck` and `bun run test`
+4. Push and create a PR
+5. Ensure CI passes
+6. Request review
+
+## Architecture Decisions
+
+Key decisions are documented in the codebase:
+
+- **Single container deployment** — simplicity over microservices
+- **Sentry SDK compatibility** — drop-in replacement for error tracking
+- **OpenTelemetry native** — standard protocol for trace ingestion
+- **PostgreSQL for everything** — no ClickHouse/TimescaleDB for MVP
+- **Redis for real-time** — pub/sub, caching, rate limiting
+- **No Playwright** — browser automation uses agent-browser only
+
+## Reporting Issues
+
+When reporting bugs, please include:
+
+1. Steps to reproduce
+2. Expected behavior
+3. Actual behavior
+4. Environment (OS, Bun version, Docker version)
+5. Relevant logs or error messages
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).

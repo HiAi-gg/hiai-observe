@@ -1,0 +1,36 @@
+{
+  "name": "hiai-observe",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build:frontend": "cd frontend && bun run build",
+    "build:all": "bun run build && bun run build:frontend",
+    "start": "bun dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "seed": "bun run scripts/seed-demo.ts",
+    "reset": "bun run scripts/reset-demo.ts",
+    "gen-key": "bun run scripts/generate-api-key.ts",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up -d",
+    "docker:dev": "docker compose up -d"
+  },
+  "dependencies": {
+    "elysia": "^1.4.28",
+    "@elysiajs/cors": "^1.2.0",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "ioredis": "^5.6.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.10",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.3"
+  }
+}

@@ -1,0 +1,16 @@
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema.js";
+
+const connectionString = process.env.DATABASE_URL
+  ?? (process.env.NODE_ENV === "production"
+    ? (() => { throw new Error("DATABASE_URL is required in production"); })()
+    : "postgresql://observe:observe@localhost:5432/hiai_observe");
+
+export const client = postgres(connectionString, {
+  max: 20,
+  idle_timeout: 30,
+  connect_timeout: 5,
+});
+
+export const db = drizzle(client, { schema });

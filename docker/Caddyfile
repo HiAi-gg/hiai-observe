@@ -1,0 +1,16 @@
+{$DOMAIN:localhost} {
+    reverse_proxy app:8001
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    encode gzip
+
+    log {
+        output stdout
+        format json
+    }
+}

@@ -30,8 +30,11 @@ function createWsManager() {
     return `${base}${path}`;
   }
 
-  function connect(path: string) {
+  function connect(path: string, containerId?: string) {
     state.pendingPaths.add(path);
+    if (containerId) {
+      state.pendingPaths.add(`${path}:${containerId}`);
+    }
 
     if (state.ws?.readyState === WebSocket.OPEN) {
       sendSubscribe(path);
@@ -52,7 +55,8 @@ function createWsManager() {
       state.reconnectDelay = 1000;
 
       for (const p of state.pendingPaths) {
-        sendSubscribe(p);
+        const [pathPart, containerId] = p.split(":");
+        sendSubscribe(pathPart ?? p, containerId);
       }
 
       state.pingTimer = setInterval(() => {
@@ -100,9 +104,13 @@ function createWsManager() {
     };
   }
 
-  function sendSubscribe(path: string) {
+  function sendSubscribe(_path: string, containerId?: string) {
     if (state.ws?.readyState === WebSocket.OPEN) {
-      state.ws.send(JSON.stringify({ action: "subscribe", path }));
+      if (containerId) {
+        state.ws.send(JSON.stringify({ action: "subscribe", containerId }));
+      } else {
+        state.ws.send(JSON.stringify({ action: "subscribe_all" }));
+      }
     }
   }
 

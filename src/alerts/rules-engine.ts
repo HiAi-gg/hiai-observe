@@ -168,17 +168,18 @@ async function evaluateUptimeDown(
 
 async function evaluateResourceThreshold(
   condition: AlertCondition,
-  _projectId: string
+  _projectId: string,
+  resourceValues?: { cpu?: number; memory?: number; disk?: number }
 ): Promise<AlertEvaluationResult> {
-  // Resource thresholds are evaluated against host stats stored externally
-  // For now, return a placeholder — the worker will inject current values
-  // This is called with a context injection pattern in the worker
   const resource = condition.resource ?? "cpu";
+  const value = resourceValues?.[resource] ?? 0;
+  const triggered = compare(value, condition.operator, condition.threshold);
+
   return {
-    triggered: false,
-    currentValue: 0,
+    triggered,
+    currentValue: Math.round(value * 100) / 100,
     threshold: condition.threshold,
-    message: `Resource ${resource} check: requires host stats injection`,
+    message: `Resource ${resource}: ${value.toFixed(1)}% (threshold: ${condition.operator} ${condition.threshold}%)`,
   };
 }
 
@@ -255,7 +256,8 @@ async function evaluateTokenUsage(
  * Evaluate a single alert rule's condition against current data.
  */
 export async function checkCondition(
-  rule: AlertRule
+  rule: AlertRule,
+  resourceValues?: { cpu?: number; memory?: number; disk?: number }
 ): Promise<AlertEvaluationResult> {
   const { condition, projectId } = rule;
 
@@ -265,7 +267,7 @@ export async function checkCondition(
     case "uptime_down":
       return evaluateUptimeDown(condition, projectId);
     case "resource_threshold":
-      return evaluateResourceThreshold(condition, projectId);
+      return evaluateResourceThreshold(condition, projectId, resourceValues);
     case "trace_error":
       return evaluateTraceError(condition, projectId);
     case "token_usage":

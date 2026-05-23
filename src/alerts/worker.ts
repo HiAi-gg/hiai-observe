@@ -10,6 +10,7 @@ import { alerts } from "../store/schema.js";
 import { evaluateRules, type AlertRule, type AlertCondition, type AlertChannel } from "./rules-engine.js";
 import { shouldFireAlert } from "./dedup.js";
 import { dispatchAlert } from "./dispatcher.js";
+import { getLatestHostStats } from "../store/infra.js";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 const EVALUATION_INTERVAL_MS = 60_000; // 60 seconds
@@ -19,6 +20,20 @@ const EVALUATION_INTERVAL_MS = 60_000; // 60 seconds
  */
 async function runEvaluationCycle(): Promise<void> {
   try {
+    // Fetch current host stats for resource threshold evaluation
+    const hostStats = await getLatestHostStats();
+    const resourceValues = hostStats
+      ? {
+          cpu: hostStats.cpuPercent,
+          memory: hostStats.memoryTotalMb > 0
+            ? (hostStats.memoryUsedMb / hostStats.memoryTotalMb) * 100
+            : 0,
+          disk: hostStats.diskTotalGb > 0
+            ? (hostStats.diskUsedGb / hostStats.diskTotalGb) * 100
+            : 0,
+        }
+      : undefined;
+
     // Get all unique project IDs with active alerts
     const activeAlerts = await db.query.alerts.findMany({
       where: (alerts, { eq }) => eq(alerts.isActive, true),
@@ -28,7 +43,7 @@ async function runEvaluationCycle(): Promise<void> {
     const projectIds = [...new Set(activeAlerts.map((a) => a.projectId))];
 
     for (const projectId of projectIds) {
-      const triggered = await evaluateRules(projectId);
+      const triggered = await evaluateRules(projectId, resourceValues);
 
       for (const { rule, result } of triggered) {
         // Check cooldown before dispatching

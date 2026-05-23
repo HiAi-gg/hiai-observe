@@ -1,7 +1,10 @@
 import { getMonitors, insertCheck } from "../store/uptime.js";
 
 const CHECK_TIMEOUT_MS = 10_000;
-const POLL_INTERVAL_MS = 30_000;
+const TICK_INTERVAL_MS = 10_000; // Check every 10s which monitors are due
+
+// Track next check time per monitor
+const nextCheckAt = new Map<string, { nextAt: number; intervalSeconds: number }>();
 
 async function runCheck(
   url: string
@@ -25,30 +28,78 @@ async function runCheck(
       error: null,
       success: res.status >= 200 && res.status < 400,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeout);
+    const message = err instanceof Error ? err.message : "Unknown error";
     return {
       statusCode: null,
       responseTimeMs: Date.now() - start,
-      error: err?.message ?? "Unknown error",
+      error: message,
       success: false,
     };
   }
 }
 
-async function pollMonitors() {
-  const monitors = await getMonitors();
-  const activeMonitors = monitors.filter((m: any) => m.active);
+async function tick() {
+  const now = Date.now();
 
-  await Promise.allSettled(
-    activeMonitors.map(async (monitor: any) => {
-      const result = await runCheck(monitor.url);
-      await insertCheck({
-        monitorId: monitor.id,
-        ...result,
-      });
-    })
-  );
+  try {
+    // Refresh monitor list each tick to pick up new/removed monitors
+    const monitors = await getMonitors();
+    const activeMonitors = monitors.filter((m: { active: boolean }) => m.active);
+
+    // Update schedule map with current monitors
+    const activeIds = new Set(activeMonitors.map((m: { id: string }) => m.id));
+
+    // Remove deleted/inactive monitors from schedule
+    for (const id of nextCheckAt.keys()) {
+      if (!activeIds.has(id)) {
+        nextCheckAt.delete(id);
+      }
+    }
+
+    // Add new monitors or update intervals
+    for (const monitor of activeMonitors) {
+      const existing = nextCheckAt.get(monitor.id);
+      if (!existing) {
+        // New monitor — schedule immediately
+        nextCheckAt.set(monitor.id, {
+          nextAt: now,
+          intervalSeconds: monitor.intervalSeconds,
+        });
+      } else if (existing.intervalSeconds !== monitor.intervalSeconds) {
+        // Interval changed — update
+        existing.intervalSeconds = monitor.intervalSeconds;
+      }
+    }
+
+    // Find monitors due for check
+    const dueMonitors = activeMonitors.filter((m: { id: string }) => {
+      const schedule = nextCheckAt.get(m.id);
+      return schedule && now >= schedule.nextAt;
+    });
+
+    if (dueMonitors.length === 0) return;
+
+    // Run checks in parallel
+    await Promise.allSettled(
+      dueMonitors.map(async (monitor: { id: string; url: string; intervalSeconds: number }) => {
+        const result = await runCheck(monitor.url);
+        await insertCheck({
+          monitorId: monitor.id,
+          ...result,
+        });
+
+        // Schedule next check
+        const schedule = nextCheckAt.get(monitor.id);
+        if (schedule) {
+          schedule.nextAt = now + monitor.intervalSeconds * 1000;
+        }
+      })
+    );
+  } catch (err) {
+    console.error("[uptime-worker] Tick error:", err);
+  }
 }
 
 let running = false;
@@ -59,13 +110,13 @@ export function startUptimeWorker() {
   running = true;
 
   // Run immediately on start
-  pollMonitors().catch(console.error);
+  tick().catch(console.error);
 
   timer = setInterval(() => {
-    pollMonitors().catch(console.error);
-  }, POLL_INTERVAL_MS);
+    tick().catch(console.error);
+  }, TICK_INTERVAL_MS);
 
-  console.log("[uptime-worker] Started — polling every 30s");
+  console.log("[uptime-worker] Started — checking monitors per their intervals");
 }
 
 export function stopUptimeWorker() {
@@ -73,6 +124,7 @@ export function stopUptimeWorker() {
     clearInterval(timer);
     timer = null;
   }
+  nextCheckAt.clear();
   running = false;
   console.log("[uptime-worker] Stopped");
 }

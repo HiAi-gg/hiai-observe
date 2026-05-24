@@ -15,21 +15,32 @@ COPY src/ src/
 COPY tsconfig.json ./
 RUN bun build src/index.ts --outdir dist --target bun
 
-# ── Stage 3: Runtime ───────────────────────────────────────────────────
+# ── Stage 3: Production deps only ─────────────────────────────────────
+FROM oven/bun:1-alpine AS deps-production
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install --production --frozen-lockfile 2>/dev/null || bun install --production
+
+# ── Stage 4: Runtime ──────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runtime
 WORKDIR /app
 RUN apk add --no-cache curl
 
+# Copy production dependencies only (no devDependencies)
+COPY --from=deps-production /app/node_modules ./node_modules
+
 # Copy built backend
 COPY --from=backend-build /app/dist ./dist
-COPY --from=backend-build /app/node_modules ./node_modules
 COPY --from=backend-build /app/package.json ./
 
-# Copy built frontend (served by Elysia static handler or Caddy)
+# Copy built frontend (served by Caddy or reverse proxy)
 COPY --from=frontend-build /app/build ./frontend/build
 
 # Copy migrations
 COPY drizzle/ ./drizzle/ 2>/dev/null || true
+
+# Copy scripts
+COPY scripts/ ./scripts/ 2>/dev/null || true
 
 ENV NODE_ENV=production
 ENV PORT=8001

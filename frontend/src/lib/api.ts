@@ -1,4 +1,4 @@
-import { apiKey } from "./stores.svelte";
+import { apiKey, currentProject } from "./stores.svelte";
 
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "http://localhost:8001";
 const DEFAULT_TIMEOUT = 10_000;
@@ -24,6 +24,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Append projectId from store to search params when set */
+function withProject(qs: URLSearchParams): URLSearchParams {
+  const pid = currentProject.current;
+  if (pid) qs.set("projectId", pid);
+  return qs;
+}
+
 async function fetchWithTimeout(path: string, init?: RequestInit, timeout = DEFAULT_TIMEOUT): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -35,11 +42,12 @@ async function fetchWithTimeout(path: string, init?: RequestInit, timeout = DEFA
 }
 
 export async function getDashboard() {
-  return apiFetch<DashboardData>("/api/dashboard");
+  const qs = withProject(new URLSearchParams());
+  return apiFetch<DashboardData>(`/api/dashboard?${qs}`);
 }
 
 export async function getIssues(params?: { status?: string; search?: string; limit?: number; offset?: number }) {
-  const qs = new URLSearchParams();
+  const qs = withProject(new URLSearchParams());
   if (params?.status) qs.set("status", params.status);
   if (params?.search) qs.set("search", params.search);
   if (params?.limit) qs.set("limit", String(params.limit));
@@ -55,8 +63,22 @@ export async function updateIssue(id: string, data: { status: string }) {
   return apiFetch<Issue>(`/api/issues/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
+export async function getEvents(params?: { issueId?: string; projectId?: string; limit?: string; offset?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.issueId) qs.set("issueId", params.issueId);
+  if (params?.projectId) qs.set("projectId", params.projectId);
+  if (params?.limit) qs.set("limit", params.limit);
+  if (params?.offset) qs.set("offset", params.offset);
+  const pid = currentProject.current;
+  if (pid) qs.set("projectId", pid);
+  return apiFetch<{ data: IssueEvent[]; total: number }>(`/api/events?${qs}`);
+}
+
 export async function getMonitors() {
-  return apiFetch<{ monitors: Monitor[] }>("/api/monitors");
+  const pid = currentProject.current;
+  const qs = new URLSearchParams();
+  if (pid) qs.set("project_id", pid);
+  return apiFetch<{ monitors: Monitor[] }>(`/api/monitors?${qs}`);
 }
 
 export async function getContainerStats() {
@@ -67,21 +89,35 @@ export async function getHostStats() {
   return apiFetch<HostStats>("/api/infrastructure/host");
 }
 
-export async function getLogs(params?: { container?: string; level?: string; search?: string; limit?: number }) {
+export async function getLogs(params?: { container?: string; level?: string; search?: string; limit?: number; offset?: number }) {
   const qs = new URLSearchParams();
   if (params?.container) qs.set("container", params.container);
   if (params?.level) qs.set("level", params.level);
   if (params?.search) qs.set("search", params.search);
   if (params?.limit) qs.set("limit", String(params.limit));
-  return apiFetch<{ logs: LogEntry[] }>(`/api/logs?${qs}`);
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ data: { logs: LogEntry[]; total: number } }>(`/api/logs?${qs}`);
 }
 
-export async function getTraces(params?: { workflow?: string; agent?: string; limit?: number; offset?: number }) {
-  const qs = new URLSearchParams();
+export interface LogStats {
+  total24h: number;
+  byLevel: Record<string, number>;
+  byContainer: Array<{ name: string; count: number }>;
+  byHour: Array<{ hour: string; count: number }>;
+}
+
+export async function getLogStats() {
+  return apiFetch<LogStats>("/api/logs/stats");
+}
+
+export async function getTraces(params?: { workflow?: string; agent?: string; limit?: number; offset?: number; from?: string; to?: string }) {
+  const qs = withProject(new URLSearchParams());
   if (params?.workflow) qs.set("workflow", params.workflow);
   if (params?.agent) qs.set("agent", params.agent);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
   return apiFetch<{ traces: Trace[]; total: number }>(`/api/traces?${qs}`);
 }
 
@@ -90,7 +126,8 @@ export async function getTrace(id: string) {
 }
 
 export async function getAlerts() {
-  return apiFetch<{ alerts: AlertRule[] }>("/api/alerts");
+  const qs = withProject(new URLSearchParams());
+  return apiFetch<{ alerts: AlertRule[] }>(`/api/alerts?${qs}`);
 }
 
 export async function createAlert(data: Omit<AlertRule, "id" | "created_at">) {
@@ -125,6 +162,37 @@ export async function getNotificationChannels() {
   }>("/api/alerts/channels");
 }
 
+// --- Projects ---
+
+export async function getProjects() {
+  return apiFetch<{ projects: Project[] }>("/api/projects");
+}
+
+export async function createProject(name: string) {
+  return apiFetch<{ project: Project; apiKey: string }>("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteProject(id: string) {
+  return apiFetch<void>(`/api/projects/${id}`, { method: "DELETE" });
+}
+
+export async function rotateApiKey(id: string) {
+  return apiFetch<{ apiKey: string }>(`/api/projects/${id}/rotate-key`, { method: "POST" });
+}
+
+// --- Alert History ---
+
+export async function getAlertHistory(params?: { alertId?: string; limit?: number; offset?: number }) {
+  const qs = withProject(new URLSearchParams());
+  if (params?.alertId) qs.set("alertId", params.alertId);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ items: AlertHistoryEntry[]; total: number; limit: number; offset: number }>(`/api/alerts/history?${qs}`);
+}
+
 // ---
 
 export interface DashboardData {
@@ -135,6 +203,18 @@ export interface DashboardData {
   recentIssues: Issue[];
   monitorStatuses: { id: string; name: string; url: string; active: boolean; isUp: boolean }[];
   alertCount: number;
+}
+
+export interface IssueEvent {
+  id: string;
+  message?: string;
+  exception_type?: string;
+  stack_trace?: string;
+  level?: string;
+  tags?: Record<string, string>;
+  context?: Record<string, unknown>;
+  sdk?: string;
+  created_at: string;
 }
 
 export interface Issue {
@@ -150,6 +230,7 @@ export interface Issue {
   tags?: Record<string, string>;
   sdk?: string;
   metadata?: Record<string, unknown>;
+  events?: IssueEvent[];
 }
 
 export interface Monitor {
@@ -169,9 +250,15 @@ export interface ContainerStats {
   cpu_percent: number;
   memory_usage_mb: number;
   memory_limit_mb: number;
+  memory_percent: number;
   network_rx_bytes: number;
   network_tx_bytes: number;
+  block_read_bytes: number;
+  block_write_bytes: number;
   status: string;
+  uptime_seconds: number;
+  restart_count: number;
+  health_status: string | null;
 }
 
 export interface HostStats {
@@ -184,6 +271,8 @@ export interface HostStats {
   load_avg_1m: number;
   load_avg_5m: number;
   load_avg_15m: number;
+  network_rx_bytes: number;
+  network_tx_bytes: number;
 }
 
 export interface LogEntry {
@@ -232,4 +321,20 @@ export interface AlertRule {
   cooldown_seconds: number;
   last_triggered?: string;
   created_at: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+export interface AlertHistoryEntry {
+  id: string;
+  alertId: string;
+  alertName?: string;
+  triggeredAt: string;
+  resolvedAt?: string;
+  context?: Record<string, unknown>;
 }

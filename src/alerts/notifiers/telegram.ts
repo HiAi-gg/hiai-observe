@@ -59,9 +59,10 @@ function formatMessage(msg: TelegramMessage): string {
  */
 export async function sendTelegramAlert(
   chatId: string,
-  message: TelegramMessage
+  message: TelegramMessage,
+  config?: { botToken?: string }
 ): Promise<{ ok: boolean; error?: string }> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken = config?.botToken || process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     return { ok: false, error: "TELEGRAM_BOT_TOKEN not configured" };
   }

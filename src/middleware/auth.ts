@@ -15,6 +15,31 @@ function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
 }
 
+// ── In-memory auth cache (API key → projectId) ────────────────────────────
+const CACHE_TTL_MS = 60_000; // 60 seconds
+const CACHE_MAX = 1_000;
+const authCache = new Map<string, { projectId: string; expiresAt: number }>();
+
+function cacheGet(key: string): string | null {
+  const entry = authCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    authCache.delete(key);
+    return null;
+  }
+  return entry.projectId;
+}
+
+function cacheSet(key: string, projectId: string): void {
+  // Evict oldest entries if at capacity
+  if (authCache.size >= CACHE_MAX) {
+    const oldest = authCache.keys().next().value;
+    if (oldest) authCache.delete(oldest);
+  }
+  authCache.set(key, { projectId, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+// ── Auth middleware ────────────────────────────────────────────────────────
 export const authMiddleware = new Elysia()
   .derive(async ({ request, set }) => {
     const url = new URL(request.url);
@@ -59,6 +84,13 @@ export const authMiddleware = new Elysia()
       return { error: "Invalid Authorization format" } as never;
     }
 
+    // Check cache first
+    const cached = cacheGet(apiKey);
+    if (cached) {
+      return { projectId: cached };
+    }
+
+    // Cache miss — query DB
     const [project] = await db
       .select({ id: projects.id })
       .from(projects)
@@ -69,6 +101,9 @@ export const authMiddleware = new Elysia()
       set.status = 401;
       return { error: "Invalid API key" } as never;
     }
+
+    // Cache the result
+    cacheSet(apiKey, project.id);
 
     return { projectId: project.id };
   });

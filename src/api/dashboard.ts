@@ -12,23 +12,31 @@ import { desc, eq, and, gte, count } from "drizzle-orm";
 import { getUptimePercentages } from "../store/uptime.js";
 
 export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
-  .get("/", async () => {
+  .get("/", async ({ query }) => {
+    const projectId = (query as Record<string, string | undefined>).projectId;
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const fiveMinsAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Build optional projectId filter
+    const projectFilter = projectId ? eq(events.projectId, projectId) : undefined;
+    const issueProjectFilter = projectId ? eq(issues.projectId, projectId) : undefined;
+    const traceProjectFilter = projectId ? eq(traces.projectId, projectId) : undefined;
+    const monitorProjectFilter = projectId ? eq(uptimeMonitors.projectId, projectId) : undefined;
+    const alertProjectFilter = projectId ? eq(alerts.projectId, projectId) : undefined;
 
     const [errorCountRow, traceCountRow, recentIssues, monitors, activeAlerts] = await Promise.all([
       // errorCount24h
       db
         .select({ value: count() })
         .from(events)
-        .where(and(eq(events.level, "error"), gte(events.createdAt, twentyFourHoursAgo))),
+        .where(and(eq(events.level, "error"), gte(events.createdAt, twentyFourHoursAgo), projectFilter)),
 
       // traceCount24h
       db
         .select({ value: count() })
         .from(traces)
-        .where(gte(traces.startTime, twentyFourHoursAgo)),
+        .where(and(gte(traces.startTime, twentyFourHoursAgo), traceProjectFilter)),
 
       // recentIssues — last 5 (select only needed columns)
       db
@@ -41,6 +49,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
           lastSeen: issues.lastSeen,
         })
         .from(issues)
+        .where(issueProjectFilter)
         .orderBy(desc(issues.lastSeen))
         .limit(5),
 
@@ -53,13 +62,13 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
           active: uptimeMonitors.active,
         })
         .from(uptimeMonitors)
-        .where(eq(uptimeMonitors.active, true)),
+        .where(and(eq(uptimeMonitors.active, true), monitorProjectFilter)),
 
       // activeAlerts count
       db
         .select({ value: count() })
         .from(alerts)
-        .where(eq(alerts.isActive, true)),
+        .where(and(eq(alerts.isActive, true), alertProjectFilter)),
     ]);
 
     // Batch uptime percentage (single query instead of N)

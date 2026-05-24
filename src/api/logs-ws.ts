@@ -9,6 +9,7 @@ interface WsClient {
 }
 
 const clients = new Map<string, WsClient>();
+const MAX_WS_CLIENTS = 100;
 
 export const logsWsPlugin = new Elysia()
   .ws("/ws/logs", {
@@ -17,6 +18,10 @@ export const logsWsPlugin = new Elysia()
       containerId: t.Optional(t.String()),
     }),
     open(ws) {
+      if (clients.size >= MAX_WS_CLIENTS) {
+        ws.close(1013, "Too many WebSocket connections");
+        return;
+      }
       const id = randomUUID();
       clients.set(id, { ws: { send: (d) => ws.send(d) }, unsubscribes: [] });
       (ws as unknown as { _clientId: string })._clientId = id;

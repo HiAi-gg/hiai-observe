@@ -12,13 +12,21 @@ export interface ContainerStats {
   cpu_percent: number;
   memory_usage_mb: number;
   memory_limit_mb: number;
+  memory_percent: number;
   network_rx_bytes: number;
   network_tx_bytes: number;
+  network_rx_rate: number; // bytes/sec
+  network_tx_rate: number; // bytes/sec
   block_read_bytes: number;
   block_write_bytes: number;
   status: string;
   uptime_seconds: number;
+  restart_count: number;
+  health_status: string | null;
 }
+
+// Track previous network stats for rate calculation
+const prevNetStats = new Map<string, { rx: number; tx: number; time: number }>();
 
 interface DockerContainer {
   Id: string;
@@ -27,6 +35,7 @@ interface DockerContainer {
   State: string;
   Status: string;
   StartedAt: string;
+  RestartCount?: number;
 }
 
 interface DockerStats {
@@ -137,21 +146,43 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
         const net = calculateNetworkIo(stats);
         const blk = calculateBlockIo(stats);
 
+        const memUsageMb = Math.round(((stats.memory_stats.usage || 0) / 1024 / 1024) * 100) / 100;
+        const memLimitMb = Math.round(((stats.memory_stats.limit || 0) / 1024 / 1024) * 100) / 100;
+        const memPct = memLimitMb > 0 ? Math.round((memUsageMb / memLimitMb) * 10000) / 100 : 0;
+
+        // Calculate network rates
+        const containerId = container.Id.slice(0, 12);
+        const now = Date.now();
+        const prev = prevNetStats.get(containerId);
+        let rxRate = 0;
+        let txRate = 0;
+        if (prev) {
+          const timeDelta = (now - prev.time) / 1000; // seconds
+          if (timeDelta > 0) {
+            rxRate = Math.round(Math.max(0, (net.rx - prev.rx)) / timeDelta);
+            txRate = Math.round(Math.max(0, (net.tx - prev.tx)) / timeDelta);
+          }
+        }
+        prevNetStats.set(containerId, { rx: net.rx, tx: net.tx, time: now });
+
         return {
-          id: container.Id.slice(0, 12),
+          id: containerId,
           name,
           image: container.Image,
           cpu_percent: calculateCpuPercent(stats),
-          memory_usage_mb:
-            Math.round(((stats.memory_stats.usage || 0) / 1024 / 1024) * 100) / 100,
-          memory_limit_mb:
-            Math.round(((stats.memory_stats.limit || 0) / 1024 / 1024) * 100) / 100,
+          memory_usage_mb: memUsageMb,
+          memory_limit_mb: memLimitMb,
+          memory_percent: memPct,
           network_rx_bytes: net.rx,
           network_tx_bytes: net.tx,
+          network_rx_rate: rxRate,
+          network_tx_rate: txRate,
           block_read_bytes: blk.read,
           block_write_bytes: blk.write,
           status: container.State,
           uptime_seconds: parseUptime(container.StartedAt),
+          restart_count: container.RestartCount ?? 0,
+          health_status: null,
         };
       } catch {
         return null;

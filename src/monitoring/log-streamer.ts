@@ -59,7 +59,8 @@ export function parseRawLogLine(line: string): {
 async function attachToContainerLogs(
   containerId: string,
   dockerSocket: string,
-  onFrame: (entry: LogEntry) => void
+  onFrame: (entry: LogEntry) => void,
+  containerNames?: Map<string, string>
 ): Promise<AbortController> {
   const controller = new AbortController();
 
@@ -82,7 +83,7 @@ async function attachToContainerLogs(
     const decoder = new TextDecoder();
     let buffer = Buffer.alloc(0);
 
-    const containerName = containerId.substring(0, 12); // short ID
+    const containerName = containerNames?.get(containerId) ?? containerId.substring(0, 12);
 
     const processBuffer = () => {
       while (buffer.length >= 8) {
@@ -141,7 +142,8 @@ async function attachToContainerLogs(
 export function startLogStreamer(
   containerIds: string[],
   onBatch: LogBatchCallback,
-  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock"
+  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock",
+  containerNames?: Map<string, string>
 ): () => void {
   const controllers: AbortController[] = [];
   const batch: LogEntry[] = [];
@@ -161,7 +163,7 @@ export function startLogStreamer(
       if (batch.length >= BATCH_MAX_SIZE) {
         flush();
       }
-    }).then((controller) => {
+    }, containerNames).then((controller) => {
       controllers.push(controller);
     });
   }

@@ -9,6 +9,11 @@ import type { ParsedEvent } from "./sentry-parser.js";
  * Falls back to message-based fingerprint if no exception.
  */
 export function buildFingerprint(event: ParsedEvent): string {
+  // If the SDK sent a custom fingerprint, use it directly
+  if (event.fingerprint && event.fingerprint.length > 0) {
+    return event.fingerprint.join("::");
+  }
+
   if (event.exception) {
     const inAppFrame = event.exception.stacktrace.find((f) => f.inApp);
     const frame = inAppFrame ?? event.exception.stacktrace[0];

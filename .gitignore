@@ -23,6 +23,9 @@ packages/*/bun.lock
 todo.md
 new.md
 
+# Local dev overrides (docker-compose.dev.yml uses local infra)
+docker-compose.dev.yml
+
 # Drizzle
 drizzle/
 

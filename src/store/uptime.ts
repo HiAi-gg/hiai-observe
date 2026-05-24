@@ -2,15 +2,16 @@ import { db } from "./db.js";
 import { uptimeMonitors, uptimeChecks } from "./schema.js";
 import { eq, and, gte, count, sql, inArray } from "drizzle-orm";
 
-export async function getMonitors(projectId?: string) {
-  const conditions = projectId
-    ? eq(uptimeMonitors.projectId, projectId)
-    : undefined;
+export async function getMonitors(projectId?: string, group?: string) {
+  const conditions = [];
+  if (projectId) conditions.push(eq(uptimeMonitors.projectId, projectId));
+  if (group) conditions.push(eq(uptimeMonitors.monitorGroup, group));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   return db
     .select()
     .from(uptimeMonitors)
-    .where(conditions)
+    .where(where)
     .orderBy(uptimeMonitors.createdAt);
 }
 
@@ -38,18 +39,39 @@ export async function createMonitor(data: {
   url: string;
   intervalSeconds: number;
   projectId: string;
+  type?: string;
+  monitorGroup?: string;
 }) {
   const [monitor] = await db
     .insert(uptimeMonitors)
     .values({
       name: data.name,
       url: data.url,
+      type: data.type ?? "http",
+      monitorGroup: data.monitorGroup ?? null,
       intervalSeconds: data.intervalSeconds,
       projectId: data.projectId,
     })
     .returning();
 
   return monitor;
+}
+
+export async function getMonitorGroups(projectId?: string) {
+  const conditions = projectId ? [eq(uptimeMonitors.projectId, projectId)] : [];
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = await db
+    .select({
+      group: uptimeMonitors.monitorGroup,
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(uptimeMonitors)
+    .where(and(where, sql`${uptimeMonitors.monitorGroup} IS NOT NULL`))
+    .groupBy(uptimeMonitors.monitorGroup)
+    .orderBy(uptimeMonitors.monitorGroup);
+
+  return rows.filter(r => r.group !== null);
 }
 
 export async function updateMonitor(

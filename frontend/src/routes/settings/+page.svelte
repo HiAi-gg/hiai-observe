@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { apiKey } from "$lib/stores.svelte";
-  import { getAlerts, createAlert, deleteAlert, type AlertRule } from "$lib/api";
+  import { apiKey, currentProject, showToast } from "$lib/stores.svelte";
+  import { getAlerts, createAlert, deleteAlert, getProjects, createProject, deleteProject, rotateApiKey, type AlertRule, type Project } from "$lib/api";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   let alerts = $state<AlertRule[]>([]);
+  let projects = $state<Project[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let apiKeyInput = $state(apiKey.current);
@@ -13,6 +15,11 @@
   let newAlertDuration = $state(300);
   let newAlertChannel = $state<"telegram" | "discord" | "email">("telegram");
   let newAlertTarget = $state("");
+  let newProjectName = $state("");
+  let newProjectKey = $state<string | null>(null);
+  let rotatedKey = $state<string | null>(null);
+  let confirmDelete = $state<string | null>(null);
+  let confirmDeleteAlert = $state<string | null>(null);
 
   async function loadAlerts() {
     try {
@@ -31,6 +38,7 @@
 
   function saveApiKey() {
     apiKey.current = apiKeyInput;
+    showToast("API key saved", "success");
   }
 
   async function handleCreateAlert() {
@@ -46,12 +54,60 @@
     newAlertName = "";
     newAlertTarget = "";
     await loadAlerts();
+    showToast("Alert rule created", "success");
   }
 
   async function handleDeleteAlert(id: string) {
     await deleteAlert(id);
     await loadAlerts();
+    showToast("Alert rule deleted", "success");
   }
+
+  async function loadProjects() {
+    try {
+      const result = await getProjects();
+      projects = result.projects ?? [];
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleCreateProject() {
+    if (!newProjectName.trim()) return;
+    try {
+      const result = await createProject(newProjectName.trim());
+      newProjectKey = result.apiKey;
+      newProjectName = "";
+      await loadProjects();
+      showToast("Project created", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to create project";
+    }
+  }
+
+  async function handleDeleteProject(id: string) {
+    try {
+      await deleteProject(id);
+      confirmDelete = null;
+      if (currentProject.current === id) currentProject.current = "";
+      await loadProjects();
+      showToast("Project deleted", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to delete project";
+    }
+  }
+
+  async function handleRotateKey(id: string) {
+    try {
+      const result = await rotateApiKey(id);
+      rotatedKey = result.apiKey;
+      showToast("API key rotated", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to rotate key";
+    }
+  }
+
+  $effect(() => { loadProjects(); });
 </script>
 
 <svelte:head><title>Settings | HiAi Observe</title></svelte:head>
@@ -66,6 +122,91 @@
       <button onclick={() => loadAlerts()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
+
+  <!-- Projects -->
+  <section id="projects" class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+    <h2 class="mb-3 text-lg font-semibold">Projects</h2>
+
+    <!-- Create form -->
+    <div class="mb-4 flex items-center gap-3">
+      <input
+        type="text"
+        bind:value={newProjectName}
+        placeholder="New project name..."
+        class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+      />
+      <button
+        onclick={handleCreateProject}
+        disabled={!newProjectName.trim()}
+        class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40"
+      >
+        Create
+      </button>
+    </div>
+
+    {#if newProjectKey}
+      <div class="mb-4 rounded-md border border-[var(--color-success)]/30 bg-[var(--color-success-bg)] p-3">
+        <p class="text-sm font-medium text-[var(--color-success)]">Project created! Save this API key:</p>
+        <code class="mt-1 block break-all text-xs text-[var(--color-text-primary)]">{newProjectKey}</code>
+        <button onclick={() => { newProjectKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
+      </div>
+    {/if}
+
+    {#if rotatedKey}
+      <div class="mb-4 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-bg)] p-3">
+        <p class="text-sm font-medium text-[var(--color-warning)]">New API key (save it now, it won't be shown again):</p>
+        <code class="mt-1 block break-all text-xs text-[var(--color-text-primary)]">{rotatedKey}</code>
+        <button onclick={() => { rotatedKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
+      </div>
+    {/if}
+
+    <!-- Project list -->
+    {#if projects.length === 0}
+      <p class="text-sm text-[var(--color-text-muted)]">No projects yet</p>
+    {:else}
+      <div class="space-y-2">
+        {#each projects as project (project.id)}
+          <div class="flex items-center justify-between rounded-md border border-[var(--color-border)] p-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium">{project.name}</p>
+              <p class="text-xs text-[var(--color-text-muted)]">
+                {project.slug} &middot; created {new Date(project.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick={() => handleRotateKey(project.id)}
+                class="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]"
+              >
+                Rotate Key
+              </button>
+              {#if confirmDelete === project.id}
+                <button
+                  onclick={() => handleDeleteProject(project.id)}
+                  class="rounded bg-[var(--color-danger)] px-2 py-1 text-xs text-white"
+                >
+                  Confirm
+                </button>
+                <button
+                  onclick={() => { confirmDelete = null; }}
+                  class="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
+                >
+                  Cancel
+                </button>
+              {:else}
+                <button
+                  onclick={() => { confirmDelete = project.id; }}
+                  class="text-xs text-[var(--color-danger)] hover:underline"
+                >
+                  Delete
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </section>
 
   <!-- API Key -->
   <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
@@ -208,3 +349,25 @@
     </div>
   </section>
 </div>
+
+<!-- Confirm delete project dialog -->
+<ConfirmDialog
+  bind:open={confirmDelete !== null}
+  title="Delete Project"
+  message="Are you sure you want to delete this project? All associated data (issues, traces, alerts) will be permanently removed."
+  confirmLabel="Delete Project"
+  variant="danger"
+  onconfirm={() => { if (confirmDelete) { handleDeleteProject(confirmDelete); } }}
+  oncancel={() => { confirmDelete = null; }}
+/>
+
+<!-- Confirm delete alert dialog -->
+<ConfirmDialog
+  bind:open={confirmDeleteAlert !== null}
+  title="Delete Alert Rule"
+  message="Are you sure you want to delete this alert rule? You will no longer receive notifications for this condition."
+  confirmLabel="Delete Alert"
+  variant="danger"
+  onconfirm={() => { if (confirmDeleteAlert) { handleDeleteAlert(confirmDeleteAlert); confirmDeleteAlert = null; } }}
+  oncancel={() => { confirmDeleteAlert = null; }}
+/>

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, timestamp, uuid, varchar, jsonb, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, bigint, timestamp, uuid, varchar, jsonb, boolean, index } from "drizzle-orm/pg-core";
 
 export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -74,18 +74,22 @@ export const uptimeMonitors = pgTable("uptime_monitors", {
   projectId: uuid("project_id").references(() => projects.id).notNull(),
   name: text("name").notNull(),
   url: text("url").notNull(),
+  type: text("type").default("http").notNull(), // 'http' | 'tcp'
+  monitorGroup: text("monitor_group"), // monitor group for organizing
   intervalSeconds: integer("interval_seconds").default(60).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 }, (t) => [
   index("uptime_monitors_project_idx").on(t.projectId),
+  index("uptime_monitors_group_idx").on(t.projectId, t.monitorGroup),
 ]);
 
 export const uptimeChecks = pgTable("uptime_checks", {
   id: uuid("id").primaryKey().defaultRandom(),
   monitorId: uuid("monitor_id").references(() => uptimeMonitors.id).notNull(),
   statusCode: integer("status_code"),
+  certExpiry: timestamp("cert_expiry"),
   responseTimeMs: integer("response_time_ms").notNull(),
   error: text("error"),
   success: boolean("success").notNull(),
@@ -105,8 +109,13 @@ export const containerStats = pgTable("container_stats", {
   memoryLimitMb: real("memory_limit_mb").notNull(),
   networkRxBytes: integer("network_rx_bytes").default(0).notNull(),
   networkTxBytes: integer("network_tx_bytes").default(0).notNull(),
+  networkRxRate: integer("network_rx_rate").default(0).notNull(),
+  networkTxRate: integer("network_tx_rate").default(0).notNull(),
   blockReadBytes: integer("block_read_bytes").default(0).notNull(),
   blockWriteBytes: integer("block_write_bytes").default(0).notNull(),
+  memoryPercent: real("memory_percent").default(0).notNull(),
+  restartCount: integer("restart_count").default(0).notNull(),
+  healthStatus: text("health_status"),
   status: text("status").notNull(),
   uptimeSeconds: integer("uptime_seconds").default(0).notNull(),
   collectedAt: timestamp("collected_at").defaultNow().notNull(),
@@ -119,14 +128,20 @@ export const containerStats = pgTable("container_stats", {
 export const hostStats = pgTable("host_stats", {
   id: uuid("id").primaryKey().defaultRandom(),
   cpuPercent: real("cpu_percent").notNull(),
+  cpuCores: jsonb("cpu_cores").$type<Array<{ core: number; percent: number }>>(),
   memoryUsedMb: real("memory_used_mb").notNull(),
   memoryTotalMb: real("memory_total_mb").notNull(),
   memoryAvailableMb: real("memory_available_mb").notNull(),
+  swapUsedMb: real("swap_used_mb").default(0).notNull(),
+  swapTotalMb: real("swap_total_mb").default(0).notNull(),
   diskUsedGb: real("disk_used_gb").notNull(),
   diskTotalGb: real("disk_total_gb").notNull(),
+  disks: jsonb("disks").$type<Array<{ mount: string; usedGb: number; totalGb: number }>>(),
   loadAvg1m: real("load_avg_1m").notNull(),
   loadAvg5m: real("load_avg_5m").notNull(),
   loadAvg15m: real("load_avg_15m").notNull(),
+  networkRxBytes: integer("network_rx_bytes").default(0).notNull(),
+  networkTxBytes: integer("network_tx_bytes").default(0).notNull(),
   collectedAt: timestamp("collected_at").defaultNow().notNull(),
 }, (t) => [
   index("host_stats_time_idx").on(t.collectedAt),
@@ -140,6 +155,7 @@ export const alerts = pgTable("alerts", {
   channels: jsonb("channels").$type<Array<{ type: string; target: string }>>(),
   isActive: boolean("is_active").default(true).notNull(),
   cooldownSeconds: integer("cooldown_seconds").default(300).notNull(),
+  escalationMinutes: integer("escalation_minutes"), // re-notify after N minutes if still down
   lastTriggered: timestamp("last_triggered"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
@@ -171,6 +187,29 @@ export const logs = pgTable("logs", {
   index("logs_container_id_idx").on(t.containerId),
   index("logs_timestamp_idx").on(t.timestamp),
   index("logs_container_timestamp_idx").on(t.containerId, t.timestamp),
+]);
+
+export const notificationConfig = pgTable("notification_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").references(() => projects.id).notNull(),
+  channel: text("channel").notNull(), // "telegram" | "discord" | "email"
+  config: jsonb("config").$type<Record<string, string>>().notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (t) => [
+  index("notif_config_project_idx").on(t.projectId),
+  index("notif_config_channel_idx").on(t.channel),
+]);
+
+export const retentionConfig = pgTable("retention_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tableName: text("table_name").notNull().unique(),
+  retentionDays: integer("retention_days").notNull().default(30),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (t) => [
+  index("retention_config_table_idx").on(t.tableName),
 ]);
 
 export type LogEntry = typeof logs.$inferSelect;

@@ -16,7 +16,8 @@ export type AlertConditionType =
   | "uptime_down"
   | "resource_threshold"
   | "trace_error"
-  | "token_usage";
+  | "token_usage"
+  | "recovery";
 
 export type ComparisonOperator = "gt" | "lt" | "eq" | "gte" | "lte";
 
@@ -34,8 +35,8 @@ export interface AlertCondition {
 }
 
 export interface AlertChannel {
-  type: "telegram" | "discord" | "email";
-  target: string; // chatId, webhookUrl, or email address
+  type: "telegram" | "discord" | "email" | "slack";
+  target: string; // chatId, webhookUrl, email address, or slack webhook URL
 }
 
 export interface AlertRule {
@@ -46,6 +47,7 @@ export interface AlertRule {
   channels: AlertChannel[];
   isActive: boolean;
   cooldownSeconds: number;
+  escalationMinutes?: number;
   createdAt: Date;
 }
 

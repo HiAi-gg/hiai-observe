@@ -61,6 +61,13 @@ export interface SentryEvent {
   server_name?: string;
 }
 
+export interface ExceptionChainEntry {
+  type: string;
+  value: string;
+  stacktrace: StackFrame[];
+  mechanism?: string;
+}
+
 export interface ParsedEvent {
   eventId: string;
   message: string | null;
@@ -70,6 +77,8 @@ export interface ParsedEvent {
     value: string;
     stacktrace: StackFrame[];
   } | null;
+  exceptionChain: ExceptionChainEntry[];
+  fingerprint: string[] | null;
   breadcrumbs: Array<{
     type: string;
     category: string;
@@ -104,9 +113,21 @@ function mapFrames(frames: Array<Record<string, unknown>>): StackFrame[] {
   }));
 }
 
+function parseExceptionChain(event: SentryEvent): ExceptionChainEntry[] {
+  const values = event.exception?.values ?? [];
+  return values.map((exc) => ({
+    type: exc.type ?? "Error",
+    value: exc.value ?? "",
+    stacktrace: exc.stacktrace?.frames ? mapFrames(exc.stacktrace.frames) : [],
+    mechanism: undefined,
+  }));
+}
+
 function parseException(event: SentryEvent): ParsedEvent["exception"] {
-  const exc = event.exception?.values?.[0];
-  if (!exc) return null;
+  const values = event.exception?.values ?? [];
+  if (values.length === 0) return null;
+  // Pick the LAST exception as primary (outermost, most relevant)
+  const exc = values[values.length - 1]!;
   return {
     type: exc.type ?? "Error",
     value: exc.value ?? "",
@@ -139,6 +160,8 @@ export function parseSentryEvent(raw: SentryEvent): ParsedEvent {
     message: buildMessage(raw),
     type: raw.exception?.values ? "exception" : "message",
     exception: parseException(raw),
+    exceptionChain: parseExceptionChain(raw),
+    fingerprint: (raw as Record<string, unknown>).fingerprint as string[] ?? null,
     breadcrumbs: parseBreadcrumbs(raw),
     user: raw.user
       ? {

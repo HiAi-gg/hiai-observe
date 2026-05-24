@@ -26,3 +26,54 @@ export function timeAgo(date: string): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
 }
+
+// Strip ANSI escape codes from log messages
+export function stripAnsi(str: string): string {
+  return str.replace(
+    /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><~]/g,
+    "",
+  );
+}
+
+// Detect if a string is valid JSON
+export function isJson(str: string): boolean {
+  if (!str || typeof str !== "string") return false;
+  const trimmed = str.trim();
+  return (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+}
+
+// Syntax-highlight a JSON value for HTML display
+export function highlightJson(value: unknown, indent = 2): string {
+  const json = JSON.stringify(value, null, indent);
+  if (!json) return "";
+  return json
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Keys
+    .replace(/"([^"]+)":/g, '<span class="text-[var(--color-accent)]">"$1"</span>:')
+    // String values
+    .replace(/: "([^"]*)"(,?)/g, ': <span class="text-[var(--color-success)]">"$1"</span>$2')
+    // Numbers
+    .replace(/: (\d+\.?\d*)(,?)/g, ': <span class="text-[var(--color-warning)]">$1</span>$2')
+    // Booleans/null
+    .replace(/: (true|false|null)(,?)/g, ': <span class="text-[var(--color-violet)]">$1</span>$2');
+}
+
+// Detect stack trace lines
+export function isStackTrace(message: string): boolean {
+  const lines = message.split("\n");
+  if (lines.length < 2) return false;
+  const stackPatterns = [
+    /^\s+at\s+/,              // Node/Bun: "at functionName (file:line:col)"
+    /^Traceback \(most recent/, // Python
+    /^File "/,                  // Python file lines
+    /^\s+File "/,               // Python nested file lines
+    /^\[ERROR\]/,               // Generic error prefix with stack
+  ];
+  let matchCount = 0;
+  for (const line of lines) {
+    if (stackPatterns.some((p) => p.test(line))) matchCount++;
+  }
+  return matchCount >= 2;
+}

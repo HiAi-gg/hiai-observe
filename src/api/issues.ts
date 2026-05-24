@@ -77,12 +77,60 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
       body: t.Object({ status: t.String() }),
     },
   )
+  // Merge issues: move events from source issues to target, delete sources
+  .post(
+    "/issues/merge",
+    async ({ body, set }) => {
+      const { targetIssueId, sourceIssueIds } = body;
+
+      // Verify target exists
+      const target = await db.select().from(issues).where(eq(issues.id, targetIssueId)).limit(1);
+      if (!target[0]) { set.status = 404; return { error: "Target issue not found" }; }
+
+      // Verify sources exist
+      for (const srcId of sourceIssueIds) {
+        if (srcId === targetIssueId) { set.status = 400; return { error: "Cannot merge issue with itself" }; }
+        const src = await db.select({ id: issues.id }).from(issues).where(eq(issues.id, srcId)).limit(1);
+        if (!src[0]) { set.status = 404; return { error: `Source issue ${srcId} not found` }; }
+      }
+
+      // Move events from sources to target
+      for (const srcId of sourceIssueIds) {
+        await db.update(events).set({ issueId: targetIssueId }).where(eq(events.issueId, srcId));
+      }
+
+      // Update target count
+      const totalResult = await db
+        .select({ value: count() })
+        .from(events)
+        .where(eq(events.issueId, targetIssueId));
+
+      const totalEvents = totalResult[0]?.value ?? 1;
+      await db.update(issues).set({ count: totalEvents }).where(eq(issues.id, targetIssueId));
+
+      // Delete source issues
+      for (const srcId of sourceIssueIds) {
+        await db.delete(issues).where(eq(issues.id, srcId));
+      }
+
+      return { merged: sourceIssueIds.length, targetIssueId, totalEvents: totalEvents ?? 0 };
+    },
+    {
+      body: t.Object({
+        targetIssueId: t.String({ format: "uuid" }),
+        sourceIssueIds: t.Array(t.String({ format: "uuid" }), { minItems: 1 }),
+      }),
+    },
+  )
+
+  // Delete
   .delete(
     "/issues/:id",
     async ({ params, set }) => {
       const existing = await db.select({ id: issues.id }).from(issues).where(eq(issues.id, params.id)).limit(1);
       if (!existing[0]) { set.status = 404; return { error: "Issue not found" }; }
 
+      await db.delete(events).where(eq(events.issueId, params.id));
       await db.delete(issues).where(eq(issues.id, params.id));
       return { deleted: true };
     },

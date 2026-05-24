@@ -1,34 +1,68 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
-import { events, traces, logs, containerStats, hostStats, uptimeChecks, alertHistory } from "../store/schema.js";
-import { lt } from "drizzle-orm";
+import { events, traces, logs, containerStats, hostStats, uptimeChecks, alertHistory, retentionConfig } from "../store/schema.js";
+import { lt, sql, eq } from "drizzle-orm";
 
-const RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 30;
+const DEFAULT_RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 30;
+const BATCH_SIZE = 5000;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
+const TABLE_DEFS: Array<{ tableName: string; timeColumn: string }> = [
+  { tableName: "events", timeColumn: "created_at" },
+  { tableName: "traces", timeColumn: "start_time" },
+  { tableName: "logs", timeColumn: "timestamp" },
+  { tableName: "container_stats", timeColumn: "collected_at" },
+  { tableName: "host_stats", timeColumn: "collected_at" },
+  { tableName: "uptime_checks", timeColumn: "checked_at" },
+  { tableName: "alert_history", timeColumn: "triggered_at" },
+];
+
+async function getRetentionDays(tableName: string): Promise<number> {
+  const [config] = await db.select().from(retentionConfig).where(eq(retentionConfig.tableName, tableName)).limit(1);
+  return config?.retentionDays ?? DEFAULT_RETENTION_DAYS;
+}
+
+async function batchDelete(tableName: string, timeColumn: string, cutoff: Date): Promise<number> {
+  let totalDeleted = 0;
+  while (true) {
+    const result = await db.execute(
+      sql`DELETE FROM ${sql.raw(tableName)} WHERE id IN (SELECT id FROM ${sql.raw(tableName)} WHERE ${sql.raw(timeColumn)} < ${cutoff.toISOString()} LIMIT ${BATCH_SIZE})`
+    );
+    const deleted = result.length;
+    totalDeleted += deleted;
+    if (deleted < BATCH_SIZE) break;
+  }
+  return totalDeleted;
+}
+
 async function cleanupOldData() {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000);
-  console.log(`[retention] Cleaning data older than ${cutoff.toISOString()} (${RETENTION_DAYS} days)`);
+  let totalCleaned = 0;
+  for (const { tableName, timeColumn } of TABLE_DEFS) {
+    try {
+      const days = await getRetentionDays(tableName);
+      const cutoff = new Date(Date.now() - days * 86400000);
+      const deleted = await batchDelete(tableName, timeColumn, cutoff);
+      if (deleted > 0) {
+        console.log(`[retention] ${tableName}: deleted ${deleted} rows (retention=${days}d)`);
+      }
+      totalCleaned += deleted;
+    } catch (err) {
+      console.error(`[retention] ${tableName}: error —`, err instanceof Error ? err.message : err);
+    }
+  }
 
-  const results = await Promise.allSettled([
-    db.delete(events).where(lt(events.createdAt, cutoff)),
-    db.delete(traces).where(lt(traces.startTime, cutoff)),
-    db.delete(logs).where(lt(logs.timestamp, cutoff)),
-    db.delete(containerStats).where(lt(containerStats.collectedAt, cutoff)),
-    db.delete(hostStats).where(lt(hostStats.collectedAt, cutoff)),
-    db.delete(uptimeChecks).where(lt(uptimeChecks.checkedAt, cutoff)),
-    db.delete(alertHistory).where(lt(alertHistory.triggeredAt, cutoff)),
-  ]);
-
-  const deleted = results.filter((r) => r.status === "fulfilled").length;
-  console.log(`[retention] Cleaned ${deleted}/7 tables`);
+  if (totalCleaned > 0) {
+    console.log(`[retention] Cleanup complete: ${totalCleaned} total rows deleted`);
+  } else {
+    console.log(`[retention] No old data to clean`);
+  }
 }
 
 export function startRetentionWorker(): void {
   if (intervalId) return;
-  const intervalMs = 24 * 60 * 60 * 1000; // Daily
-  console.log(`[retention] Started — cleaning every 24h, retention=${RETENTION_DAYS} days`);
+  const intervalMs = 24 * 60 * 60 * 1000;
+  console.log(`[retention] Started — cleaning every 24h, default retention=${DEFAULT_RETENTION_DAYS} days`);
   intervalId = setInterval(cleanupOldData, intervalMs);
 }
 
@@ -56,18 +90,36 @@ function requireAdminKey(headers: Record<string, string | undefined>): { ok: tru
 export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .post("/cleanup", async ({ headers, set }) => {
     const check = requireAdminKey(headers as Record<string, string | undefined>);
-    if (!check.ok) {
-      set.status = check.status;
-      return { error: check.error };
-    }
+    if (!check.ok) { set.status = check.status; return { error: check.error }; }
     await cleanupOldData();
-    return { message: `Cleaned data older than ${RETENTION_DAYS} days` };
+    return { message: "Cleanup complete" };
   })
-  .get("/retention", ({ headers, set }) => {
+  .get("/retention", async ({ headers, set }) => {
     const check = requireAdminKey(headers as Record<string, string | undefined>);
-    if (!check.ok) {
-      set.status = check.status;
-      return { error: check.error };
+    if (!check.ok) { set.status = check.status; return { error: check.error }; }
+    const configs = await db.select().from(retentionConfig);
+    const configMap = new Map(configs.map(c => [c.tableName, c.retentionDays]));
+    return {
+      defaultDays: DEFAULT_RETENTION_DAYS,
+      tables: TABLE_DEFS.map(t => ({
+        tableName: t.tableName,
+        retentionDays: configMap.get(t.tableName) ?? DEFAULT_RETENTION_DAYS,
+      })),
+    };
+  })
+  .put("/retention/:table", async ({ params, body, headers, set }) => {
+    const check = requireAdminKey(headers as Record<string, string | undefined>);
+    if (!check.ok) { set.status = check.status; return { error: check.error }; }
+    const validTable = TABLE_DEFS.find(t => t.tableName === params.table);
+    if (!validTable) { set.status = 400; return { error: `Invalid table. Valid: ${TABLE_DEFS.map(t => t.tableName).join(", ")}` }; }
+    const [existing] = await db.select().from(retentionConfig).where(eq(retentionConfig.tableName, params.table)).limit(1);
+    if (existing) {
+      await db.update(retentionConfig).set({ retentionDays: body.retentionDays, updatedAt: new Date() }).where(eq(retentionConfig.tableName, params.table));
+    } else {
+      await db.insert(retentionConfig).values({ tableName: params.table, retentionDays: body.retentionDays });
     }
-    return { retentionDays: RETENTION_DAYS };
+    return { tableName: params.table, retentionDays: body.retentionDays };
+  }, {
+    params: t.Object({ table: t.String() }),
+    body: t.Object({ retentionDays: t.Number({ minimum: 1 }) }),
   });

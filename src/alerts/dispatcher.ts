@@ -1,15 +1,17 @@
 /**
  * Alert Dispatcher
  *
- * Routes triggered alerts to configured notification channels
- * and records delivery in alert_history.
+ * Routes triggered alerts to configured notification channels.
+ * Loads channel config from DB first, falls back to .env.
  */
 
 import { db } from "../store/db.js";
-import { alertHistory } from "../store/schema.js";
+import { alertHistory, notificationConfig } from "../store/schema.js";
+import { eq, and } from "drizzle-orm";
 import { sendTelegramAlert } from "./notifiers/telegram.js";
 import { sendDiscordAlert } from "./notifiers/discord.js";
 import { sendEmailAlert } from "./notifiers/email.js";
+import { sendSlackAlert } from "./notifiers/slack.js";
 import { markAlertFired } from "./dedup.js";
 import type { AlertRule, AlertChannel, AlertEvaluationResult } from "./rules-engine.js";
 
@@ -18,9 +20,19 @@ export interface DispatchResult {
   channels: Array<{ type: string; target: string; ok: boolean; error?: string }>;
 }
 
-/**
- * Dispatch a triggered alert to all configured channels.
- */
+async function getChannelConfig(projectId: string, channel: string): Promise<Record<string, string> | null> {
+  const [row] = await db.select()
+    .from(notificationConfig)
+    .where(and(
+      eq(notificationConfig.projectId, projectId),
+      eq(notificationConfig.channel, channel),
+      eq(notificationConfig.enabled, true),
+    ))
+    .limit(1);
+
+  return row?.config ?? null;
+}
+
 export async function dispatchAlert(
   rule: AlertRule,
   result: AlertEvaluationResult
@@ -32,6 +44,8 @@ export async function dispatchAlert(
     result.currentValue > result.threshold * 2 ? "critical" : "warning";
 
   for (const channel of rule.channels) {
+    const dbConfig = await getChannelConfig(rule.projectId, channel.type);
+
     const delivery = await deliverToChannel(channel, {
       title: rule.name,
       status,
@@ -40,7 +54,7 @@ export async function dispatchAlert(
       threshold: result.threshold,
       ruleName: rule.name,
       timestamp,
-    });
+    }, dbConfig);
 
     channelResults.push({
       type: channel.type,
@@ -49,10 +63,8 @@ export async function dispatchAlert(
     });
   }
 
-  // Mark alert as fired for cooldown tracking
   await markAlertFired(rule.id, rule.cooldownSeconds);
 
-  // Record in alert_history
   await db.insert(alertHistory).values({
     alertId: rule.id,
     triggeredAt: timestamp,
@@ -89,7 +101,8 @@ interface DeliveryPayload {
 
 async function deliverToChannel(
   channel: AlertChannel,
-  payload: DeliveryPayload
+  payload: DeliveryPayload,
+  dbConfig: Record<string, string> | null
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     switch (channel.type) {
@@ -97,13 +110,16 @@ async function deliverToChannel(
         return sendTelegramAlert(channel.target, {
           chatId: channel.target,
           ...payload,
-        });
+        }, { botToken: dbConfig?.botToken });
 
       case "discord":
-        return sendDiscordAlert(channel.target, payload);
+        return sendDiscordAlert(channel.target, payload, dbConfig ?? undefined);
 
       case "email":
-        return sendEmailAlert({ to: channel.target, ...payload });
+        return sendEmailAlert({ to: channel.target, ...payload }, dbConfig ?? undefined);
+
+      case "slack":
+        return sendSlackAlert(channel.target, payload, dbConfig ?? undefined);
 
       default:
         return {
@@ -117,9 +133,6 @@ async function deliverToChannel(
   }
 }
 
-/**
- * Send a test alert to verify channel configuration.
- */
 export async function testAlert(
   rule: AlertRule
 ): Promise<DispatchResult> {

@@ -3,6 +3,7 @@
   import { getTraces, type Trace } from "$lib/api";
   import { formatDuration, timeAgo } from "$lib/utils";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
+  import Pagination from "$lib/components/Pagination.svelte";
 
   let traces = $state<Trace[]>([]);
   let total = $state(0);
@@ -11,14 +12,14 @@
   let workflowFilter = $state("");
   let agentFilter = $state("");
   let statusFilter = $state("");
-  let offset = $state(0);
-  const limit = 25;
+  let page = $state(1);
+  const perPage = 25;
 
   async function load() {
     try {
       loading = true;
       error = null;
-      const params: Record<string, string | number> = { limit, offset };
+      const params: Record<string, string | number> = { limit: perPage, offset: (page - 1) * perPage };
       if (workflowFilter) params.workflow = workflowFilter;
       if (agentFilter) params.agent = agentFilter;
       if (statusFilter) params.status = statusFilter;
@@ -36,7 +37,7 @@
     workflowFilter;
     agentFilter;
     statusFilter;
-    offset = 0;
+    page = 1;
     load();
   });
 
@@ -45,9 +46,6 @@
     if (ms < 5000) return "text-[var(--color-warning)]";
     return "text-[var(--color-danger)]";
   }
-
-  const totalPages = $derived(Math.ceil(total / limit));
-  const currentPage = $derived(Math.floor(offset / limit) + 1);
 </script>
 
 <svelte:head><title>Traces | HiAi Observe</title></svelte:head>
@@ -167,36 +165,6 @@
       </table>
     </div>
 
-    <!-- Pagination -->
-    {#if total > limit}
-      <div class="flex items-center justify-between pt-2">
-        <span class="text-sm text-[var(--color-text-muted)]">
-          Showing {offset + 1}&#8211;{Math.min(offset + limit, total)} of {total}
-        </span>
-        <div class="flex items-center gap-1">
-          <button
-            onclick={() => offset = Math.max(0, offset - limit)}
-            disabled={offset === 0}
-            class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >Previous</button>
-          {#each Array(Math.min(totalPages, 5)) as _, i (i)}
-            {@const pg = i + 1}
-            <button
-              onclick={() => offset = (pg - 1) * limit}
-              class="h-8 w-8 rounded-md text-sm font-medium transition-all"
-              class:bg-[var(--color-accent)]={currentPage === pg}
-              class:text-white={currentPage === pg}
-              class:text-[var(--color-text-secondary)]={currentPage !== pg}
-              class:hover:bg-[var(--color-surface-overlay)]={currentPage !== pg}
-            >{pg}</button>
-          {/each}
-          <button
-            onclick={() => offset += limit}
-            disabled={offset + limit >= total}
-            class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >Next</button>
-        </div>
-      </div>
-    {/if}
+    <Pagination {page} {perPage} {total} onPageChange={(p) => { page = p; load(); }} />
   {/if}
 </div>

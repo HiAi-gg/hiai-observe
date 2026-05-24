@@ -90,13 +90,14 @@ function escapeHtml(text: string): string {
  * or falls back to a configurable SMTP relay.
  */
 export async function sendEmailAlert(
-  alert: EmailAlert
+  alert: EmailAlert,
+  config?: Record<string, string>
 ): Promise<{ ok: boolean; error?: string }> {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM ?? user;
+  const host = config?.host || process.env.SMTP_HOST;
+  const port = Number(config?.port || process.env.SMTP_PORT || 587);
+  const user = config?.user || process.env.SMTP_USER;
+  const pass = config?.pass || process.env.SMTP_PASS;
+  const from = config?.from || process.env.SMTP_FROM || user;
 
   if (!host || !user || !pass) {
     return {

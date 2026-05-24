@@ -6,14 +6,38 @@
  */
 
 import { db } from "../store/db.js";
-import { alerts } from "../store/schema.js";
+import { alerts, alertHistory } from "../store/schema.js";
 import { evaluateRules, type AlertRule, type AlertCondition, type AlertChannel } from "./rules-engine.js";
 import { shouldFireAlert } from "./dedup.js";
 import { dispatchAlert } from "./dispatcher.js";
 import { getLatestHostStats } from "../store/infra.js";
+import { desc, and, eq, sql } from "drizzle-orm";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 const EVALUATION_INTERVAL_MS = 60_000; // 60 seconds
+
+/**
+ * Check if an alert with escalation should re-fire.
+ * If escalationMinutes is set and the last trigger was > escalationMinutes ago,
+ * re-notify even if cooldown hasn't expired.
+ */
+async function checkEscalation(rule: AlertRule): Promise<boolean> {
+  if (!rule.escalationMinutes) return false;
+
+  const [lastHistory] = await db
+    .select({ triggeredAt: alertHistory.triggeredAt })
+    .from(alertHistory)
+    .where(eq(alertHistory.alertId, rule.id))
+    .orderBy(desc(alertHistory.triggeredAt))
+    .limit(1);
+
+  if (!lastHistory) return false;
+
+  const elapsed = Date.now() - new Date(lastHistory.triggeredAt).getTime();
+  const escalationMs = rule.escalationMinutes * 60 * 1000;
+
+  return elapsed >= escalationMs;
+}
 
 /**
  * Run one evaluation cycle for all projects.
@@ -48,11 +72,19 @@ async function runEvaluationCycle(): Promise<void> {
       for (const { rule, result } of triggered) {
         // Check cooldown before dispatching
         const canFire = await shouldFireAlert(rule.id);
-        if (!canFire) {
+        const isEscalation = !canFire && await checkEscalation(rule);
+
+        if (!canFire && !isEscalation) {
           console.log(
             `[Alert Worker] ${rule.name}: in cooldown, skipping`
           );
           continue;
+        }
+
+        if (isEscalation) {
+          console.log(
+            `[Alert Worker] ${rule.name}: ESCALATION re-notify after ${rule.escalationMinutes}min`
+          );
         }
 
         await dispatchAlert(rule, result);

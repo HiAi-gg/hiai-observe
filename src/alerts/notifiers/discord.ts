@@ -43,7 +43,8 @@ function getStatusEmoji(status: DiscordAlert["status"]): string {
  */
 export async function sendDiscordAlert(
   webhookUrl: string,
-  alert: DiscordAlert
+  alert: DiscordAlert,
+  _config?: Record<string, string>
 ): Promise<{ ok: boolean; error?: string }> {
   const color = getStatusColor(alert.status);
   const emoji = getStatusEmoji(alert.status);

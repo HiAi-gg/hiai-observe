@@ -1,7 +1,26 @@
 import { Elysia, t } from "elysia";
 import { searchLogs, getLogContainers, clearLogs } from "../store/logs.js";
+import { db } from "../store/db.js";
+import { logs } from "../store/schema.js";
+import { sql, gte } from "drizzle-orm";
 
 export const logsPlugin = new Elysia({ prefix: "/api/logs" })
+  .get("/stats", async () => {
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [totalResult, byLevel, byContainer, byHour] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)),
+      db.select({ level: logs.level, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(logs.level),
+      db.select({ container: logs.containerName, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(logs.containerName).orderBy(sql`count(*) desc`).limit(10),
+      db.select({ hour: sql<string>`date_trunc('hour', ${logs.timestamp})::text`, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(sql`date_trunc('hour', ${logs.timestamp})`).orderBy(sql`date_trunc('hour', ${logs.timestamp})`),
+    ]);
+
+    return {
+      total24h: totalResult[0]?.count ?? 0,
+      byLevel: Object.fromEntries(byLevel.map(r => [r.level ?? "unknown", r.count])),
+      byContainer: byContainer.map(r => ({ name: r.container, count: r.count })),
+      byHour: byHour.map(r => ({ hour: r.hour, count: r.count })),
+    };
+  })
   .get(
     "/",
     async ({ query }) => {

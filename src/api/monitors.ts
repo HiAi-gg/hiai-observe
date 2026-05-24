@@ -8,11 +8,12 @@ import {
   getChecks,
   getUptimePercentage,
   getUptimePercentages,
+  getMonitorGroups,
 } from "../store/uptime.js";
 
 export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
   .get("/", async ({ query }) => {
-    const monitors = await getMonitors(query.project_id);
+    const monitors = await getMonitors(query.project_id, query.group);
 
     const ids = monitors.map((m) => m.id);
     const uptimeMap = await getUptimePercentages(ids, 24);
@@ -23,6 +24,16 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     }));
 
     return { monitors: withUptime };
+  }, {
+    query: t.Object({
+      project_id: t.Optional(t.String()),
+      group: t.Optional(t.String()),
+    }),
+  })
+
+  .get("/groups", async ({ query }) => {
+    const groups = await getMonitorGroups(query.project_id);
+    return { groups };
   }, {
     query: t.Object({
       project_id: t.Optional(t.String()),
@@ -44,6 +55,8 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
         url: body.url,
         intervalSeconds: body.interval_seconds ?? 60,
         projectId: body.project_id,
+        type: body.type,
+        monitorGroup: body.group,
       });
       return { monitor };
     } catch (err: unknown) {
@@ -54,6 +67,8 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     body: t.Object({
       name: t.String({ minLength: 1 }),
       url: t.String({ format: "uri" }),
+      type: t.Optional(t.String()),
+      group: t.Optional(t.String()),
       interval_seconds: t.Optional(t.Number({ minimum: 10 })),
       project_id: t.String(),
     }),

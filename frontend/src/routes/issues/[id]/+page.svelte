@@ -1,13 +1,16 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { getIssue, updateIssue, type Issue } from "$lib/api";
-  import { timeAgo, formatDuration } from "$lib/utils";
+  import { getIssue, updateIssue, getEvents, type Issue, type IssueEvent } from "$lib/api";
+  import { timeAgo } from "$lib/utils";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
 
   let issue = $state<Issue | null>(null);
+  let events = $state<IssueEvent[]>([]);
+  let selectedEventIdx = $state(0);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let actionLoading = $state(false);
+  let occurrenceData = $state<Array<{ time: Date; value: number }>>([]);
 
   const issueId = $derived(page.params.id ?? "");
 
@@ -17,6 +20,21 @@
       error = null;
       if (!issueId) { error = "Missing issue ID"; loading = false; return; }
       issue = await getIssue(issueId);
+
+      // Load events for this issue
+      const evResult = await getEvents({ issueId, limit: "20" });
+      events = evResult.data;
+      selectedEventIdx = 0;
+
+      // Build occurrence sparkline from events grouped by day
+      const dayMap = new Map<string, number>();
+      for (const ev of events) {
+        const day = new Date(ev.createdAt).toISOString().slice(0, 10);
+        dayMap.set(day, (dayMap.get(day) ?? 0) + 1);
+      }
+      occurrenceData = [...dayMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([day, count]) => ({ time: new Date(day + "T12:00:00Z"), value: count }));
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load issue";
     } finally {
@@ -40,9 +58,9 @@
   function parseStackTrace(raw: unknown): string | null {
     if (!raw) return null;
     if (typeof raw === "string") return raw;
-    if (Array.isArray(raw)) return raw.map((f: any) => {
-      const loc = f.filename || f.abs_path || "?";
-      const fn = f.function || "<anonymous>";
+    if (Array.isArray(raw)) return raw.map((f: Record<string, unknown>) => {
+      const loc = (f.filename as string) || (f.abs_path as string) || "?";
+      const fn = (f.function as string) || "<anonymous>";
       const line = f.lineno ? `:${f.lineno}` : "";
       const col = f.colno ? `:${f.colno}` : "";
       return `  at ${fn} (${loc}${line}${col})`;
@@ -65,24 +83,80 @@
     return [];
   }
 
-  function getMetadata(issue: Issue | null): Record<string, unknown> {
-    return (issue?.metadata ?? {}) as Record<string, unknown>;
-  }
+  const selectedEvent = $derived(events[selectedEventIdx]);
+  const rawPayload = $derived((selectedEvent?.context?.rawPayload as Record<string, unknown>) ?? selectedEvent?.context);
 
   const stackTrace = $derived.by(() => {
-    const meta = getMetadata(issue);
-    const rawPayload = meta.rawPayload as Record<string, unknown> | undefined;
+    if (!selectedEvent) return null;
+    if (selectedEvent.stack_trace) return parseStackTrace(selectedEvent.stack_trace);
     const exception = rawPayload?.exception as Record<string, unknown> | undefined;
     const values = exception?.values as Array<Record<string, unknown>> | undefined;
-    const frames = values?.[0]?.stacktrace as Record<string, unknown> | undefined;
+    const exc = values?.[values.length! - 1];
+    const frames = exc?.stacktrace as Record<string, unknown> | undefined;
     const frameArray = frames?.frames as unknown[] | undefined;
-    return parseStackTrace(meta.stack_trace ?? frameArray);
+    return parseStackTrace(frameArray ?? null);
+  });
+
+  const exceptionChain = $derived.by(() => {
+    const exception = rawPayload?.exception as Record<string, unknown> | undefined;
+    const values = exception?.values as Array<Record<string, unknown>> | undefined;
+    if (!values || values.length <= 1) return [];
+    // Return all except the last (primary) in reverse order (caused by...)
+    return values.slice(0, -1).reverse().map((v) => ({
+      type: (v.type as string) ?? "Error",
+      value: (v.value as string) ?? "",
+      stacktrace: parseStackTrace((v.stacktrace as Record<string, unknown>)?.frames ?? null),
+    }));
   });
 
   const breadcrumbs = $derived.by(() => {
-    const meta = getMetadata(issue);
-    const rawPayload = meta.rawPayload as Record<string, unknown> | undefined;
-    return parseBreadcrumbs(rawPayload?.breadcrumbs);
+    if (!selectedEvent) return [];
+    const rp = rawPayload;
+    if (rp?.breadcrumbs) return parseBreadcrumbs(rp.breadcrumbs);
+    if (selectedEvent?.context?.breadcrumbs) return parseBreadcrumbs(selectedEvent.context.breadcrumbs);
+    return [];
+  });
+
+  const requestContext = $derived.by(() => {
+    const rp = rawPayload;
+    return (rp?.request as Record<string, unknown>) ?? null;
+  });
+
+  const userContext = $derived.by(() => {
+    const rp = rawPayload;
+    return (rp?.user as Record<string, unknown>) ?? null;
+  });
+
+  // Affected users: collect unique users from all events
+  const affectedUsers = $derived.by(() => {
+    const userMap = new Map<string, { id?: string; email?: string; username?: string }>();
+    for (const ev of events) {
+      const ctx = (ev.context?.rawPayload as Record<string, unknown>) ?? ev.context;
+      const u = ctx?.user as Record<string, unknown> | undefined;
+      if (u) {
+        const key = (u.id as string) ?? (u.email as string) ?? (u.username as string) ?? JSON.stringify(u);
+        if (!userMap.has(key)) {
+          userMap.set(key, { id: u.id as string | undefined, email: u.email as string | undefined, username: u.username as string | undefined });
+        }
+      }
+    }
+    return [...userMap.values()];
+  });
+
+  // Raw JSON toggle
+  let showRaw = $state(false);
+
+  // Sparkline SVG helper
+  const sparklinePath = $derived.by(() => {
+    if (occurrenceData.length < 2) return "";
+    const w = 200, h = 40, pad = 4;
+    const maxVal = Math.max(...occurrenceData.map(d => d.value), 1);
+    const points = occurrenceData.map((d, i) => {
+      const x = pad + (i / (occurrenceData.length - 1)) * (w - 2 * pad);
+      const y = h - pad - ((d.value / maxVal) * (h - 2 * pad));
+      return `${x},${y}`;
+    });
+    return `M ${points.join(" L ")}`;
   });
 </script>
 
@@ -95,7 +169,6 @@
     Back to Issues
   </a>
 
-  <!-- Error banner -->
   {#if error}
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -129,54 +202,96 @@
       </div>
       <div class="flex items-center gap-2">
         {#if issue.status !== "resolved"}
-          <button
-            onclick={() => setStatus("resolved")}
-            disabled={actionLoading}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-success)]/50 bg-[var(--color-success-bg)] px-4 py-2 text-sm font-medium text-[var(--color-success)] transition-all hover:bg-[var(--color-success-bg)] hover:border-[var(--color-success)] disabled:opacity-50"
-          >
+          <button onclick={() => setStatus("resolved")} disabled={actionLoading}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-success)]/50 bg-[var(--color-success-bg)] px-4 py-2 text-sm font-medium text-[var(--color-success)] transition-all hover:bg-[var(--color-success-bg)] hover:border-[var(--color-success)] disabled:opacity-50">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
             Resolve
           </button>
         {/if}
         {#if issue.status !== "ignored"}
-          <button
-            onclick={() => setStatus("ignored")}
-            disabled={actionLoading}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-text-muted)] disabled:opacity-50"
-          >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+          <button onclick={() => setStatus("ignored")} disabled={actionLoading}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-text-muted)] disabled:opacity-50">
             Ignore
           </button>
         {/if}
         {#if issue.status !== "unresolved"}
-          <button
-            onclick={() => setStatus("unresolved")}
-            disabled={actionLoading}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-warning)]/50 bg-[var(--color-warning-bg)] px-4 py-2 text-sm font-medium text-[var(--color-warning)] transition-all hover:bg-[var(--color-warning-bg)] hover:border-[var(--color-warning)] disabled:opacity-50"
-          >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <button onclick={() => setStatus("unresolved")} disabled={actionLoading}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-warning)]/50 bg-[var(--color-warning-bg)] px-4 py-2 text-sm font-medium text-[var(--color-warning)] transition-all hover:bg-[var(--color-warning-bg)] hover:border-[var(--color-warning)] disabled:opacity-50">
             Reopen
           </button>
         {/if}
       </div>
     </div>
 
+    <!-- Occurrence sparkline -->
+    {#if occurrenceData.length > 1}
+      <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Occurrence Trend</h3>
+          <span class="text-xs text-[var(--color-text-muted)]">{events.length} events in sample</span>
+        </div>
+        <svg width="200" height="40" class="mt-2 w-full" viewBox="0 0 200 40" preserveAspectRatio="none">
+          <path d={sparklinePath} fill="none" stroke="var(--color-danger)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          {#each occurrenceData as point, i}
+            {@const x = 4 + (i / (occurrenceData.length - 1)) * 192}
+            {@const y = 40 - 4 - ((point.value / Math.max(...occurrenceData.map(d => d.value), 1)) * 32)}
+            <circle cx={x} cy={y} r="2" fill="var(--color-danger)" />
+          {/each}
+        </svg>
+      </div>
+    {/if}
+
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
       <!-- Main content -->
       <div class="space-y-6">
-        <!-- Stack trace -->
+        <!-- Stack trace with chained exceptions -->
         <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
           <div class="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-overlay)]/50 px-4 py-2.5">
             <svg class="h-4 w-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
             <h2 class="text-sm font-semibold text-[var(--color-text-secondary)]">Stack Trace</h2>
+            <button onclick={() => { showRaw = !showRaw; }}
+              class="ml-auto rounded px-2 py-0.5 text-[10px] font-medium transition-colors {showRaw ? 'bg-[var(--color-accent-bg)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)]'}">
+              {showRaw ? "Stack Trace" : "View Raw"}
+            </button>
+            {#if events.length > 1}
+              <span class="flex items-center gap-2">
+                <button onclick={() => { selectedEventIdx = Math.max(0, selectedEventIdx - 1); }} disabled={selectedEventIdx === 0}
+                  class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span class="text-xs text-[var(--color-text-muted)]">{selectedEventIdx + 1}/{events.length}</span>
+                <button onclick={() => { selectedEventIdx = Math.min(events.length - 1, selectedEventIdx + 1); }} disabled={selectedEventIdx >= events.length - 1}
+                  class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </span>
+            {/if}
           </div>
-          {#if stackTrace}
+          {#if showRaw && selectedEvent}
+            <!-- Raw JSON view -->
+            <div class="relative">
+              <pre class="overflow-x-auto bg-[var(--color-surface)] p-5 text-xs leading-relaxed"><code class="text-[var(--color-text-secondary)]">{JSON.stringify(rawPayload ?? selectedEvent, null, 2)}</code></pre>
+            </div>
+          {:else if stackTrace}
             <pre class="overflow-x-auto bg-[var(--color-surface)] p-5 text-xs leading-relaxed"><code class="text-[var(--color-success)]">{stackTrace}</code></pre>
           {:else}
             <div class="flex flex-col items-center justify-center py-12">
-              <svg class="mb-3 h-8 w-8 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
               <p class="text-sm text-[var(--color-text-muted)]">No stack trace available</p>
             </div>
+          {/if}
+
+          <!-- Chained exceptions ("Caused by:") -->
+          {#if exceptionChain.length > 0}
+            {#each exceptionChain as chainExc, i}
+              <div class="border-t border-[var(--color-border)]">
+                <div class="px-4 py-2 text-xs font-semibold text-[var(--color-warning)]">
+                  Caused by: {chainExc.type}: {chainExc.value}
+                </div>
+                {#if chainExc.stacktrace}
+                  <pre class="overflow-x-auto bg-[var(--color-surface)] px-5 pb-4 text-xs leading-relaxed"><code class="text-[var(--color-text-muted)]">{chainExc.stacktrace}</code></pre>
+                {/if}
+              </div>
+            {/each}
           {/if}
         </div>
 
@@ -189,7 +304,6 @@
               <span class="ml-auto text-xs text-[var(--color-text-muted)]">{breadcrumbs.length} events</span>
             </div>
             <div class="relative p-4">
-              <!-- Vertical line -->
               <div class="absolute left-[27px] top-4 bottom-4 w-px bg-[var(--color-border)]"></div>
               <div class="space-y-3">
                 {#each breadcrumbs as crumb, i (i)}
@@ -210,10 +324,94 @@
             </div>
           </div>
         {/if}
+
+        <!-- Event list (navigator) -->
+        {#if events.length > 1}
+          <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
+            <div class="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-overlay)]/50 px-4 py-2.5">
+              <h2 class="text-sm font-semibold text-[var(--color-text-secondary)]">Events ({events.length})</h2>
+            </div>
+            <div class="max-h-64 overflow-y-auto">
+              {#each events as ev, i (ev.id)}
+                <button
+                  onclick={() => { selectedEventIdx = i; }}
+                  class="flex w-full items-center gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-overlay)]/50"
+                  class:bg-[var(--color-accent-bg)]={i === selectedEventIdx}
+                >
+                  <span class="h-2 w-2 shrink-0 rounded-full" style="background: {i === selectedEventIdx ? 'var(--color-accent)' : 'var(--color-border)'}"></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-[var(--color-text-primary)]">{ev.message ?? ev.exception_type ?? "Event"}</p>
+                    <p class="text-[10px] text-[var(--color-text-muted)]">{timeAgo(ev.created_at)}</p>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Sidebar -->
       <div class="space-y-4">
+        <!-- Request context -->
+        {#if requestContext}
+          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Request</h3>
+            <dl class="space-y-2">
+              {#if requestContext.method}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Method</dt>
+                  <dd class="mt-0.5 text-xs font-mono text-[var(--color-secondary)]">{requestContext.method}</dd>
+                </div>
+              {/if}
+              {#if requestContext.url}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">URL</dt>
+                  <dd class="mt-0.5 break-all text-xs font-mono text-[var(--color-text-secondary)]">{requestContext.url}</dd>
+                </div>
+              {/if}
+              {#if requestContext.query_string}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Query</dt>
+                  <dd class="mt-0.5 break-all text-xs font-mono text-[var(--color-text-secondary)]">{requestContext.query_string}</dd>
+                </div>
+              {/if}
+            </dl>
+          </div>
+        {/if}
+
+        <!-- User context -->
+        {#if userContext}
+          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">User</h3>
+            <dl class="space-y-2">
+              {#if userContext.id}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">ID</dt>
+                  <dd class="mt-0.5 text-xs font-mono text-[var(--color-text-secondary)]">{userContext.id}</dd>
+                </div>
+              {/if}
+              {#if userContext.email}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Email</dt>
+                  <dd class="mt-0.5 text-xs text-[var(--color-text-secondary)]">{userContext.email}</dd>
+                </div>
+              {/if}
+              {#if userContext.ip_address}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">IP</dt>
+                  <dd class="mt-0.5 text-xs font-mono text-[var(--color-text-secondary)]">{userContext.ip_address}</dd>
+                </div>
+              {/if}
+              {#if userContext.username}
+                <div>
+                  <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Username</dt>
+                  <dd class="mt-0.5 text-xs text-[var(--color-text-secondary)]">{userContext.username}</dd>
+                </div>
+              {/if}
+            </dl>
+          </div>
+        {/if}
+
         <!-- Timing -->
         <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Timing</h3>
@@ -229,7 +427,7 @@
           </div>
         </div>
 
-        <!-- Context / Tags -->
+        <!-- Tags -->
         {#if issue.tags && typeof issue.tags === "object" && Object.keys(issue.tags).length > 0}
           <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Tags</h3>
@@ -240,6 +438,29 @@
                   <span class="font-medium text-[var(--color-text-secondary)]">{value}</span>
                 </span>
               {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Affected Users -->
+        {#if affectedUsers.length > 0}
+          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+              Affected Users ({affectedUsers.length})
+            </h3>
+            <div class="space-y-1.5">
+              {#each affectedUsers.slice(0, 10) as u, i (i)}
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-warning)]"></span>
+                  <span class="font-mono text-[var(--color-text-secondary)]">{u.id ?? u.email ?? u.username ?? "unknown"}</span>
+                  {#if u.email && u.id}
+                    <span class="text-[var(--color-text-muted)]">({u.email})</span>
+                  {/if}
+                </div>
+              {/each}
+              {#if affectedUsers.length > 10}
+                <p class="text-[10px] text-[var(--color-text-muted)]">+{affectedUsers.length - 10} more</p>
+              {/if}
             </div>
           </div>
         {/if}

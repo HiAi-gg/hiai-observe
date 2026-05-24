@@ -10,14 +10,22 @@ import {
   getLatestContainerStats,
   getHostStatsHistory,
   getLatestHostStats,
+  getContainerLogCounts,
 } from "../store/infra.js";
 
 export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" })
 
   .get("/containers", async ({ set }) => {
     try {
-      const stats = await collectDockerStats();
-      return { containers: stats, count: stats.length };
+      const [stats, logCounts] = await Promise.all([
+        collectDockerStats(),
+        getContainerLogCounts().catch(() => new Map()),
+      ]);
+      const containersWithLogs = stats.map((s) => ({
+        ...s,
+        log_count_24h: logCounts.get(s.id) ?? 0,
+      }));
+      return { containers: containersWithLogs, count: stats.length };
     } catch (err) {
       set.status = 503;
       return { error: "Docker unavailable", details: String(err) };
@@ -30,7 +38,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       const from = query.from ? new Date(query.from) : new Date(Date.now() - 3600_000);
       const to = query.to ? new Date(query.to) : new Date();
       const stats = await getContainerStatsByContainer(params.id, from, to);
-      return { containerId: params.id, stats, count: stats.length };
+      return { containerId: params.id, data: stats, count: stats.length };
     },
     {
       query: t.Object({
@@ -56,7 +64,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       const from = query.from ? new Date(query.from) : new Date(Date.now() - 3600_000);
       const to = query.to ? new Date(query.to) : new Date();
       const stats = await getHostStatsHistory(from, to);
-      return { stats, count: stats.length };
+      return { data: stats, count: stats.length };
     },
     {
       query: t.Object({

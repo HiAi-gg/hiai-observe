@@ -4,19 +4,51 @@
   let monitors = $state<Monitor[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let selectedPeriod = $state<"24h" | "7d" | "30d" | "90d">("24h");
+  let selectedGroup = $state<string>("");
+  let groups = $state<Array<{ group: string; count: number }>>([]);
 
   // Sparkline data per monitor
   let sparklineData = $state<Map<string, number[]>>(new Map());
+
+  const periods = [
+    { label: "24h", hours: 24 },
+    { label: "7d", hours: 168 },
+    { label: "30d", hours: 720 },
+    { label: "90d", hours: 2160 },
+  ] as const;
+
+  function periodHours(): number {
+    return periods.find(p => p.label === selectedPeriod)?.hours ?? 24;
+  }
+
+  async function loadGroups() {
+    try {
+      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+      const res = await fetch("/api/monitors/groups", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (res.ok) {
+        const data = await res.json() as { groups: Array<{ group: string; count: number }> };
+        groups = data.groups;
+      }
+    } catch { /* optional */ }
+  }
 
   async function load() {
     try {
       loading = true;
       error = null;
-      const result = await getMonitors();
+      const groupParam = selectedGroup ? `&group=${encodeURIComponent(selectedGroup)}` : "";
+      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+      const res = await fetch(`/api/monitors?hours=${periodHours()}${groupParam}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) throw new Error("Failed to load monitors");
+      const result = await res.json() as { monitors: Monitor[] };
       monitors = result.monitors;
 
       // Fetch response time history for sparklines
-      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
       const dataMap = new Map<string, number[]>();
       for (const m of monitors) {
         try {
@@ -39,8 +71,15 @@
 
   $effect(() => {
     load();
+    loadGroups();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
+  });
+
+  $effect(() => {
+    selectedPeriod;
+    selectedGroup;
+    load();
   });
 
   function statusDot(monitor: Monitor) {
@@ -87,7 +126,32 @@
 <svelte:head><title>Uptime | HiAi Observe</title></svelte:head>
 
 <div class="space-y-4">
-  <h1 class="text-2xl font-bold">Uptime Monitoring</h1>
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Uptime Monitoring</h1>
+    <div class="flex items-center gap-2">
+      <!-- Period tabs -->
+      <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
+        {#each periods as period (period.label)}
+          <button
+            onclick={() => { selectedPeriod = period.label; }}
+            class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {selectedPeriod === period.label ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'}"
+          >{period.label}</button>
+        {/each}
+      </div>
+      <!-- Group filter -->
+      {#if groups.length > 0}
+        <select
+          bind:value={selectedGroup}
+          class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)]"
+        >
+          <option value="">All groups</option>
+          {#each groups as g (g.group)}
+            <option value={g.group}>{g.group} ({g.count})</option>
+          {/each}
+        </select>
+      {/if}
+    </div>
+  </div>
 
   {#if error}
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
@@ -103,10 +167,12 @@
       {/each}
     </div>
   {:else if monitors.length === 0}
-    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-8 text-center">
-      <p class="text-[var(--color-text-muted)]">No monitors configured yet.</p>
-      <a href="/settings" class="mt-2 inline-block text-sm text-[var(--color-accent)] hover:underline">
-        Set up monitors in Settings
+    <div class="flex flex-col items-center justify-center py-16">
+      <svg class="mb-4 h-12 w-12 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      <p class="text-sm font-medium text-[var(--color-text-secondary)]">No monitors configured yet</p>
+      <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add uptime monitors to track your services</p>
+      <a href="/settings" class="mt-3 inline-block rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors">
+        Set up monitors
       </a>
     </div>
   {:else}
@@ -137,7 +203,7 @@
 
           <div class="mt-3 flex items-end justify-between">
             <div>
-              <p class="text-xs text-[var(--color-text-muted)]">Uptime 24h</p>
+              <p class="text-xs text-[var(--color-text-muted)]">Uptime {selectedPeriod}</p>
               <p class="text-xl font-bold {uptimeColor(monitor.uptime24h)}">
                 {monitor.uptime24h !== undefined ? `${monitor.uptime24h.toFixed(2)}%` : "N/A"}
               </p>

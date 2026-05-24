@@ -102,7 +102,26 @@
   {/if}
 
   {#if loading && !host}
-    <p class="text-[var(--color-text-muted)]">Loading...</p>
+    <div class="space-y-6">
+      <!-- Skeleton host gauges -->
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+        <div class="mb-4 h-6 w-40 animate-pulse rounded bg-[var(--color-surface-overlay)]"></div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          {#each Array(3) as _, i (i)}
+            <div class="space-y-2 animate-pulse" style="opacity: {1 - i * 0.15}">
+              <div class="h-4 w-16 rounded bg-[var(--color-surface-overlay)]"></div>
+              <div class="h-2 w-full rounded-full bg-[var(--color-surface-overlay)]"></div>
+            </div>
+          {/each}
+        </div>
+      </div>
+      <!-- Skeleton container cards -->
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {#each Array(4) as _, i (i)}
+          <div class="h-48 animate-pulse rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)]" style="opacity: {1 - i * 0.15}"></div>
+        {/each}
+      </div>
+    </div>
   {:else}
     <!-- Host stats gauges -->
     {#if host}
@@ -207,7 +226,11 @@
     <div>
       <h2 class="mb-3 text-lg font-semibold">Docker Containers ({containers.length})</h2>
       {#if containers.length === 0}
-        <p class="text-[var(--color-text-muted)]">No containers detected</p>
+        <div class="flex flex-col items-center justify-center py-12">
+          <svg class="mb-4 h-12 w-12 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          <p class="text-sm font-medium text-[var(--color-text-secondary)]">No containers detected</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Mount the Docker socket to enable container monitoring</p>
+        </div>
       {:else}
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           {#each containers as container (container.id)}

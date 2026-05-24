@@ -20,6 +20,8 @@
   let rotatedKey = $state<string | null>(null);
   let confirmDelete = $state<string | null>(null);
   let confirmDeleteAlert = $state<string | null>(null);
+  let showDeleteProject = $state(false);
+  let showDeleteAlert = $state(false);
 
   async function loadAlerts() {
     try {
@@ -180,27 +182,12 @@
               >
                 Rotate Key
               </button>
-              {#if confirmDelete === project.id}
-                <button
-                  onclick={() => handleDeleteProject(project.id)}
-                  class="rounded bg-[var(--color-danger)] px-2 py-1 text-xs text-white"
-                >
-                  Confirm
-                </button>
-                <button
-                  onclick={() => { confirmDelete = null; }}
-                  class="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
-                >
-                  Cancel
-                </button>
-              {:else}
-                <button
-                  onclick={() => { confirmDelete = project.id; }}
-                  class="text-xs text-[var(--color-danger)] hover:underline"
-                >
-                  Delete
-                </button>
-              {/if}
+              <button
+                onclick={() => { confirmDelete = project.id; showDeleteProject = true; }}
+                class="text-xs text-[var(--color-danger)] hover:underline"
+              >
+                Delete
+              </button>
             </div>
           </div>
         {/each}
@@ -301,7 +288,7 @@
             <div class="flex items-center gap-2">
               <span class="h-2 w-2 rounded-full {alert.is_active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'}"></span>
               <button
-                onclick={() => handleDeleteAlert(alert.id)}
+                onclick={() => { confirmDeleteAlert = alert.id; showDeleteAlert = true; }}
                 class="text-xs text-[var(--color-danger)] hover:underline"
               >
                 Delete
@@ -352,7 +339,7 @@
 
 <!-- Confirm delete project dialog -->
 <ConfirmDialog
-  bind:open={confirmDelete !== null}
+  bind:open={showDeleteProject}
   title="Delete Project"
   message="Are you sure you want to delete this project? All associated data (issues, traces, alerts) will be permanently removed."
   confirmLabel="Delete Project"
@@ -363,7 +350,7 @@
 
 <!-- Confirm delete alert dialog -->
 <ConfirmDialog
-  bind:open={confirmDeleteAlert !== null}
+  bind:open={showDeleteAlert}
   title="Delete Alert Rule"
   message="Are you sure you want to delete this alert rule? You will no longer receive notifications for this condition."
   confirmLabel="Delete Alert"

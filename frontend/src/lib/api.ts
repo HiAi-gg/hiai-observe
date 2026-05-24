@@ -215,6 +215,7 @@ export interface IssueEvent {
   context?: Record<string, unknown>;
   sdk?: string;
   created_at: string;
+  createdAt?: string;
 }
 
 export interface Issue {
@@ -240,7 +241,8 @@ export interface Monitor {
   interval_seconds: number;
   is_active: boolean;
   uptime_percent?: number;
-  last_check?: { status_code: number; response_time_ms: number; checked_at: string };
+  uptime24h?: number;
+  last_check?: { status_code: number; response_time_ms: number; checked_at: string; success: boolean };
 }
 
 export interface ContainerStats {
@@ -253,6 +255,8 @@ export interface ContainerStats {
   memory_percent: number;
   network_rx_bytes: number;
   network_tx_bytes: number;
+  network_rx_rate: number;
+  network_tx_rate: number;
   block_read_bytes: number;
   block_write_bytes: number;
   status: string;
@@ -263,11 +267,15 @@ export interface ContainerStats {
 
 export interface HostStats {
   cpu_percent: number;
+  cpu_cores?: Array<{ core: number; percent: number }>;
   memory_used_mb: number;
   memory_total_mb: number;
   memory_available_mb: number;
+  swap_used_mb?: number;
+  swap_total_mb?: number;
   disk_used_gb: number;
   disk_total_gb: number;
+  disks?: Array<{ mount: string; usedGb: number; totalGb: number }>;
   load_avg_1m: number;
   load_avg_5m: number;
   load_avg_15m: number;

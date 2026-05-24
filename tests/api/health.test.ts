@@ -19,6 +19,9 @@ describe("health endpoint", () => {
     const body = await res.json();
     expect(body.status).toBe("ok");
     expect(body.version).toBe("0.1.0");
-    expect(typeof body.uptime).toBe("number");
+    expect(typeof body.uptime).toBe("string");
+    expect(typeof body.uptimeSeconds).toBe("number");
+    expect(body.memory).toBeDefined();
+    expect(typeof body.memory.rss).toBe("string");
   });
 });

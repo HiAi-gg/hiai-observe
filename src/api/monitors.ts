@@ -16,7 +16,8 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     const monitors = await getMonitors(query.project_id, query.group);
 
     const ids = monitors.map((m) => m.id);
-    const uptimeMap = await getUptimePercentages(ids, 24);
+    const hours = query.hours ?? 24;
+    const uptimeMap = await getUptimePercentages(ids, hours);
 
     const withUptime = monitors.map((m) => ({
       ...m,
@@ -28,6 +29,7 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     query: t.Object({
       project_id: t.Optional(t.String()),
       group: t.Optional(t.String()),
+      hours: t.Optional(t.Number({ minimum: 1, maximum: 8760 })),
     }),
   })
 

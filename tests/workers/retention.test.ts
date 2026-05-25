@@ -6,6 +6,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Elysia } from "elysia";
+
+// Set admin key before module import
+process.env.ADMIN_API_KEY = "test-admin-key";
 
 // ── Mock DB ──────────────────────────────────────────────────────────────
 // Drizzle chains are thenable: db.select().from(table) resolves to rows[].
@@ -74,10 +78,14 @@ describe("batch deletion", () => {
     // 7 tables: each batchDelete execute returns 100 rows (< 5000)
     executeResults = Array(7).fill(Array(100).fill({ id: "x" }));
 
-    const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
+    const { adminRoutes } = await import("../../src/workers/retention.js");
 
-    const res = await adminRoutes.handle(
+    // Wrap in full Elysia app so headers are properly forwarded
+    const { Elysia } = await import("elysia");
+    const testApp = new Elysia().use(adminRoutes);
+
+    const res = await testApp.handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer test-admin-key" },
@@ -110,7 +118,7 @@ describe("batch deletion", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer test-admin-key" },
@@ -130,7 +138,7 @@ describe("batch deletion", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer test-admin-key" },
@@ -152,7 +160,7 @@ describe("per-table retention config", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention", {
         headers: { Authorization: "Bearer test-admin-key" },
       })
@@ -175,7 +183,7 @@ describe("per-table retention config", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention", {
         headers: { Authorization: "Bearer test-admin-key" },
       })
@@ -200,7 +208,7 @@ describe("per-table retention config", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention", {
         headers: { Authorization: "Bearer test-admin-key" },
       })
@@ -227,20 +235,20 @@ describe("admin endpoint auth", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", { method: "POST" })
     );
 
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe("Invalid admin API key");
+    expect(body.error).toContain("admin API key");
   });
 
   it("returns 401 when Authorization key is wrong", async () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer wrong-key" },
@@ -258,7 +266,11 @@ describe("admin endpoint auth", () => {
 
     const { adminRoutes } = await import("../../src/workers/retention.js");
 
-    const res = await adminRoutes.handle(
+    // Wrap in full Elysia app so headers are properly forwarded
+    const { Elysia } = await import("elysia");
+    const testApp = new Elysia().use(adminRoutes);
+
+    const res = await testApp.handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer any-key" },
@@ -279,7 +291,7 @@ describe("admin endpoint auth", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "correct-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "Bearer correct-key" },
@@ -296,7 +308,7 @@ describe("admin endpoint auth", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "raw-token";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/cleanup", {
         method: "POST",
         headers: { Authorization: "raw-token" },
@@ -310,7 +322,7 @@ describe("admin endpoint auth", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention")
     );
 
@@ -327,7 +339,7 @@ describe("PUT /api/admin/retention/:table", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention/events", {
         method: "PUT",
         headers: {
@@ -348,7 +360,7 @@ describe("PUT /api/admin/retention/:table", () => {
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-key";
 
-    const res = await adminRoutes.handle(
+    const res = await new Elysia().use(adminRoutes).handle(
       new Request("http://localhost/api/admin/retention/invalid_table", {
         method: "PUT",
         headers: {

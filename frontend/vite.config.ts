@@ -15,7 +15,15 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
-    environmentMatchGlobs: [["src/lib/components/**", "jsdom"]],
+    workspace: [
+      {
+        extends: true,
+        test: {
+          include: ["src/lib/components/**/*.test.ts"],
+          environment: "jsdom",
+        },
+      },
+    ],
     globals: true,
   },
 });

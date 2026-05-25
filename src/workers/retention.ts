@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia";
+import { timingSafeEqual } from "node:crypto";
 import { db, client } from "../store/db.js";
 import { events, traces, logs, containerStats, hostStats, uptimeChecks, alertHistory, retentionConfig } from "../store/schema.js";
 import { lt, sql, eq } from "drizzle-orm";
@@ -93,7 +94,7 @@ function requireAdminKey(headers: Record<string, string | undefined>): { ok: tru
   try {
     const tokenBuf = Buffer.from(token, "utf-8");
     const keyBuf = Buffer.from(adminKey, "utf-8");
-    if (tokenBuf.length !== keyBuf.length || !crypto.timingSafeEqual(tokenBuf, keyBuf)) {
+    if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
       return { ok: false, status: 401, error: "Invalid admin API key" };
     }
   } catch {

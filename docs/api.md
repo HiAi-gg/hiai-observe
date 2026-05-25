@@ -989,3 +989,402 @@ Alert trigger history.
 ```bash
 curl "http://localhost:8001/api/alerts/history?alertId=ALERT_UUID&limit=10"
 ```
+
+---
+
+## Maintenance Windows
+
+### GET /api/maintenance
+
+List maintenance windows with optional filtering.
+
+**Query params:**
+- `projectId` (string, optional) — filter by project
+- `status` (string, optional) — `active`, `upcoming`, `past`
+- `limit` (string, optional, default "50")
+- `offset` (string, optional, default "0")
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "projectId": "uuid",
+      "name": "Database upgrade",
+      "description": "Upgrading to PostgreSQL 18",
+      "startsAt": "2026-01-15T02:00:00Z",
+      "endsAt": "2026-01-15T04:00:00Z",
+      "monitorIds": ["monitor-uuid-1", "monitor-uuid-2"],
+      "createdAt": "2026-01-10T00:00:00Z"
+    }
+  ],
+  "total": 5,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+```bash
+curl "http://localhost:8001/api/maintenance?status=active"
+```
+
+### GET /api/maintenance/active/now
+
+Get currently active maintenance windows.
+
+**Query params:**
+- `projectId` (string, optional) — filter by project
+
+**Response:**
+```json
+{
+  "items": [...]
+}
+```
+
+```bash
+curl http://localhost:8001/api/maintenance/active/now
+```
+
+### GET /api/maintenance/:id
+
+Get single maintenance window.
+
+**Response (200):** Maintenance window object
+**Response (404):** `{ "error": "Maintenance window not found" }`
+
+```bash
+curl http://localhost:8001/api/maintenance/WINDOW_UUID
+```
+
+### POST /api/maintenance
+
+Create a maintenance window.
+
+**Body:**
+```json
+{
+  "projectId": "PROJECT_UUID",
+  "name": "Database upgrade",
+  "description": "Upgrading to PostgreSQL 18",
+  "startsAt": "2026-01-15T02:00:00Z",
+  "endsAt": "2026-01-15T04:00:00Z",
+  "monitorIds": ["monitor-uuid-1"]
+}
+```
+- `projectId` (string, required)
+- `name` (string, required, min 1)
+- `description` (string, optional)
+- `startsAt` (string, required, ISO datetime)
+- `endsAt` (string, required, ISO datetime, must be after startsAt)
+- `monitorIds` (array of strings, optional) — empty = suppresses all alerts for project
+
+**Response (200):** Created maintenance window
+**Response (400):** Validation error
+
+```bash
+curl -X POST http://localhost:8001/api/maintenance \
+  -H "Content-Type: application/json" \
+  -d '{"projectId":"PROJECT_UUID","name":"DB upgrade","startsAt":"2026-01-15T02:00:00Z","endsAt":"2026-01-15T04:00:00Z"}'
+```
+
+### PUT /api/maintenance/:id
+
+Update a maintenance window (partial update).
+
+**Body (all optional):**
+```json
+{
+  "name": "New name",
+  "description": "Updated description",
+  "startsAt": "2026-01-15T03:00:00Z",
+  "endsAt": "2026-01-15T05:00:00Z",
+  "monitorIds": ["monitor-uuid-1", "monitor-uuid-3"]
+}
+```
+
+**Response (200):** Updated maintenance window
+**Response (404):** Not found
+
+```bash
+curl -X PUT http://localhost:8001/api/maintenance/WINDOW_UUID \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Extended maintenance"}'
+```
+
+### DELETE /api/maintenance/:id
+
+Delete a maintenance window.
+
+**Response (200):** `{ "deleted": true }`
+**Response (404):** Not found
+
+```bash
+curl -X DELETE http://localhost:8001/api/maintenance/WINDOW_UUID
+```
+
+---
+
+## Incidents
+
+### GET /api/incidents
+
+List incidents with optional filtering.
+
+**Query params:**
+- `projectId` (string, optional) — filter by project
+- `status` (string, optional) — `investigating`, `identified`, `monitoring`, `resolved`
+- `limit` (string, optional, default "50")
+- `offset` (string, optional, default "0")
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "projectId": "uuid",
+      "monitorId": "uuid",
+      "title": "API response time degradation",
+      "status": "investigating",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-01-15T10:30:00Z",
+      "resolvedAt": null
+    }
+  ],
+  "total": 3,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+```bash
+curl "http://localhost:8001/api/incidents?status=investigating"
+```
+
+### GET /api/incidents/active
+
+Get active (non-resolved) incidents.
+
+**Query params:**
+- `projectId` (string, optional) — filter by project
+
+**Response:**
+```json
+{
+  "items": [...]
+}
+```
+
+```bash
+curl http://localhost:8001/api/incidents/active
+```
+
+### GET /api/incidents/:id
+
+Get single incident.
+
+**Response (200):** Incident object
+**Response (404):** `{ "error": "Incident not found" }`
+
+```bash
+curl http://localhost:8001/api/incidents/INCIDENT_UUID
+```
+
+### POST /api/incidents
+
+Create an incident.
+
+**Body:**
+```json
+{
+  "projectId": "PROJECT_UUID",
+  "monitorId": "MONITOR_UUID",
+  "title": "API response time degradation",
+  "status": "investigating"
+}
+```
+- `projectId` (string, required)
+- `monitorId` (string, optional) — associated monitor
+- `title` (string, required, min 1)
+- `status` (string, optional, default "investigating") — one of: `investigating`, `identified`, `monitoring`, `resolved`
+
+**Response (200):** Created incident
+
+```bash
+curl -X POST http://localhost:8001/api/incidents \
+  -H "Content-Type: application/json" \
+  -d '{"projectId":"PROJECT_UUID","title":"API degradation"}'
+```
+
+### PUT /api/incidents/:id
+
+Update incident status or title. Status transitions are validated:
+- `investigating` -> `identified`, `monitoring`, `resolved`
+- `identified` -> `investigating`, `monitoring`, `resolved`
+- `monitoring` -> `investigating`, `identified`, `resolved`
+- `resolved` -> (terminal, no transitions)
+
+**Body (all optional):**
+```json
+{
+  "title": "Updated title",
+  "status": "identified",
+  "monitorId": "MONITOR_UUID"
+}
+```
+
+**Response (200):** Updated incident
+**Response (400):** Invalid status transition
+**Response (404):** Not found
+
+```bash
+curl -X PUT http://localhost:8001/api/incidents/INCIDENT_UUID \
+  -H "Content-Type: application/json" \
+  -d '{"status":"resolved"}'
+```
+
+### DELETE /api/incidents/:id
+
+Delete an incident.
+
+**Response (200):** `{ "deleted": true }`
+**Response (404):** Not found
+
+```bash
+curl -X DELETE http://localhost:8001/api/incidents/INCIDENT_UUID
+```
+
+---
+
+## Admin
+
+### GET /api/admin/retention
+
+Get retention configuration for all tables.
+
+**Auth:** Admin API key (`Authorization: Bearer ADMIN_API_KEY`)
+
+**Response:**
+```json
+{
+  "defaultDays": 30,
+  "tables": [
+    { "tableName": "events", "retentionDays": 30 },
+    { "tableName": "traces", "retentionDays": 30 },
+    { "tableName": "logs", "retentionDays": 30 },
+    { "tableName": "container_stats", "retentionDays": 30 },
+    { "tableName": "host_stats", "retentionDays": 30 },
+    { "tableName": "uptime_checks", "retentionDays": 30 },
+    { "tableName": "alert_history", "retentionDays": 30 }
+  ]
+}
+```
+
+```bash
+curl http://localhost:8001/api/admin/retention \
+  -H "Authorization: Bearer ADMIN_API_KEY"
+```
+
+### PUT /api/admin/retention/:table
+
+Set retention days for a specific table.
+
+**Auth:** Admin API key
+
+**Body:**
+```json
+{ "retentionDays": 90 }
+```
+
+**Valid tables:** `events`, `traces`, `logs`, `container_stats`, `host_stats`, `uptime_checks`, `alert_history`
+
+**Response (200):**
+```json
+{ "tableName": "traces", "retentionDays": 90 }
+```
+
+```bash
+curl -X PUT http://localhost:8001/api/admin/retention/traces \
+  -H "Authorization: Bearer ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"retentionDays":90}'
+```
+
+### POST /api/admin/cleanup
+
+Trigger immediate retention cleanup.
+
+**Auth:** Admin API key
+
+**Response (200):**
+```json
+{ "message": "Cleanup complete" }
+```
+
+```bash
+curl -X POST http://localhost:8001/api/admin/cleanup \
+  -H "Authorization: Bearer ADMIN_API_KEY"
+```
+
+---
+
+## WebSocket Authentication
+
+### WS /ws/logs
+
+WebSocket for real-time log streaming with API key authentication.
+
+**Connect:** `ws://localhost:8001/ws/logs?key=YOUR_API_KEY`
+
+**Authentication methods:**
+
+1. **Query parameter** (recommended): Append `?key=YOUR_API_KEY` to the WebSocket URL
+2. **First message**: Send `{ "action": "auth", "key": "YOUR_API_KEY" }` as the first message
+
+If no API key is provided in the query parameter, the server sends `{ "type": "auth_required" }` and waits for an auth message. Unauthenticated connections are closed with code 4001.
+
+**After authentication:**
+
+**Send (JSON):**
+```json
+{ "action": "subscribe", "containerId": "abc123" }
+```
+```json
+{ "action": "subscribe_all" }
+```
+```json
+{ "action": "unsubscribe" }
+```
+
+**Receive (JSON):**
+```json
+{ "type": "authenticated", "projectId": "uuid" }
+```
+```json
+{ "type": "log", "data": { "container_id": "abc123", "message": "...", "stream": "stdout", "timestamp": "..." } }
+```
+```json
+{ "type": "recent", "data": [...] }
+```
+```json
+{ "type": "ping" }
+```
+
+```javascript
+// With query param auth
+const ws = new WebSocket("ws://localhost:8001/ws/logs?key=YOUR_API_KEY");
+ws.onopen = () => ws.send(JSON.stringify({ action: "subscribe_all" }));
+ws.onmessage = (e) => console.log(JSON.parse(e.data));
+
+// With first-message auth
+const ws2 = new WebSocket("ws://localhost:8001/ws/logs");
+ws2.onopen = () => ws2.send(JSON.stringify({ action: "auth", key: "YOUR_API_KEY" }));
+ws2.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.type === "authenticated") {
+    ws2.send(JSON.stringify({ action: "subscribe_all" }));
+  }
+};
+```

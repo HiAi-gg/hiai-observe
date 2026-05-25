@@ -90,16 +90,20 @@ After ingestion, data goes through processing:
 | Table | Purpose | Retention |
 |---|---|---|
 | `projects` | API keys, project config | Permanent |
-| `events` | Error events with context | Permanent |
+| `events` | Error events with context | Configurable (default 30d) |
 | `issues` | Grouped errors with status | Permanent |
-| `traces` | OpenTelemetry spans | Configurable |
+| `traces` | OpenTelemetry spans | Configurable (default 30d) |
 | `uptime_monitors` | Monitor definitions | Permanent |
-| `uptime_checks` | Check results | Configurable |
-| `container_stats` | Docker container metrics | Configurable |
-| `host_stats` | Server resource metrics | Configurable |
-| `alerts` | Alert rule definitions | Permanent |
-| `alert_history` | Alert trigger log | Configurable |
-| `logs` | Container log entries | Configurable |
+| `uptime_checks` | Check results | Configurable (default 30d) |
+| `container_stats` | Docker container metrics | Configurable (default 30d) |
+| `host_stats` | Server resource metrics | Configurable (default 30d) |
+| `alerts` | Alert rule definitions with severity | Permanent |
+| `alert_history` | Alert trigger log | Configurable (default 30d) |
+| `logs` | Container log entries | Configurable (default 30d) |
+| `notification_config` | Per-project notification channel config | Permanent |
+| `retention_config` | Per-table retention policy overrides | Permanent |
+| `maintenance_windows` | Scheduled downtime windows | Permanent |
+| `incidents` | Incident lifecycle tracking | Permanent |
 
 **Redis** (real-time layer):
 
@@ -147,10 +151,24 @@ SvelteKit frontend with 9 pages:
 
 | Worker | Interval | Purpose |
 |---|---|---|
-| Uptime Worker | 30s | HTTP checks on configured monitors |
+| Uptime Worker | 10s tick | HTTP/TCP checks on configured monitors, recovery detection |
 | Alert Evaluator | 60s | Evaluate alert rules, fire notifications |
 | Log Streamer | Continuous | Attach to Docker containers, stream stdout/stderr |
 | Stats Collector | 30s | Collect Docker + host resource metrics |
+| Retention Worker | 24h | Batch-delete old data per retention config |
+
+### Worker Health Monitoring
+
+Each worker calls `recordWorkerRun(name)` after every cycle. The `/health` endpoint reads status via `getWorkerHealth()` and reports:
+- `lastRunAt` — epoch timestamp of last successful run
+- `status` — "ok" if within 2x expected interval, "stale" if overdue, "unknown" if never run
+
+Expected intervals:
+- `uptime`: 10s
+- `alert`: 60s
+- `infra`: 30s
+- `log`: 15s
+- `retention`: 24h
 
 ---
 
@@ -164,10 +182,14 @@ projects (1) ──► (N) issues
 projects (1) ──► (N) traces
 projects (1) ──► (N) uptime_monitors
 projects (1) ──► (N) alerts
+projects (1) ──► (N) notification_config
+projects (1) ──► (N) maintenance_windows
+projects (1) ──► (N) incidents
 
 issues   (1) ──► (N) events
 
 uptime_monitors (1) ──► (N) uptime_checks
+uptime_monitors (1) ──► (N) incidents
 alerts          (1) ──► (N) alert_history
 ```
 
@@ -307,6 +329,46 @@ alerts          (1) ──► (N) alert_history
 - `raw` JSONB — original log entry
 - Indexes: container_id, timestamp, (container_id, timestamp)
 
+**notification_config**
+- `id` UUID PK
+- `project_id` UUID FK → projects
+- `channel` TEXT — "telegram", "discord", "email", "slack"
+- `config` JSONB — channel-specific configuration (botToken, webhookUrl, etc.)
+- `enabled` BOOLEAN (default true)
+- `created_at` TIMESTAMPTZ
+- `updated_at` TIMESTAMPTZ
+- Indexes: project_id, channel
+
+**retention_config**
+- `id` UUID PK
+- `table_name` TEXT UNIQUE — name of the table to configure
+- `retention_days` INTEGER (default 30)
+- `created_at` TIMESTAMPTZ
+- `updated_at` TIMESTAMPTZ
+- Indexes: table_name
+
+**maintenance_windows**
+- `id` UUID PK
+- `project_id` UUID FK → projects
+- `name` TEXT — display name for the window
+- `description` TEXT — optional details
+- `starts_at` TIMESTAMPTZ — window start
+- `ends_at` TIMESTAMPTZ — window end
+- `monitor_ids` JSONB — array of monitor UUIDs (empty = all monitors)
+- `created_at` TIMESTAMPTZ
+- Indexes: project_id, (starts_at, ends_at)
+
+**incidents**
+- `id` UUID PK
+- `project_id` UUID FK → projects
+- `monitor_id` UUID FK → uptime_monitors (nullable)
+- `title` TEXT — incident description
+- `status` TEXT — "investigating", "identified", "monitoring", "resolved"
+- `created_at` TIMESTAMPTZ
+- `updated_at` TIMESTAMPTZ
+- `resolved_at` TIMESTAMPTZ (nullable)
+- Indexes: project_id, status, (project_id, status)
+
 ---
 
 ## Tech Stack
@@ -341,3 +403,77 @@ alerts          (1) ──► (N) alert_history
 7. **Mastra first-class** — Native parsing of Mastra workflow/tool/agent attributes. Token cost calculation with per-model pricing. Latency percentiles.
 
 8. **No external dependencies for MVP** — No Grafana, Prometheus, Loki, or Sentry. Everything in one stack. Integration with external tools via OTLP export if needed later.
+
+---
+
+## Structured Logging
+
+The application uses a custom structured logger (`src/lib/logger.ts`) instead of `console.log`:
+
+- **Production**: JSON-lines output to stdout/stderr
+- **Development**: Colored, human-readable output
+- **Levels**: debug, info, warn, error (configurable via `LOG_LEVEL` env var)
+- **Context**: Each log entry can include structured key-value pairs
+
+```json
+{"timestamp":"2026-01-15T10:00:00.000Z","level":"info","msg":"Uptime worker started","tickIntervalMs":10000}
+```
+
+### Request ID Correlation
+
+Every HTTP request gets a UUID (`X-Request-ID` header) via `src/middleware/request-id.ts`. The ID is:
+- Generated fresh or reused from incoming `X-Request-ID` header
+- Set on the response header for client-side correlation
+- Available via Elysia's `requestId` derive for use in log entries
+
+---
+
+## Backup Strategy
+
+### Backup Script
+
+`scripts/backup.sh` performs:
+1. `pg_dump` of the database with gzip compression
+2. Stores in configurable `BACKUP_DIR` (default: `./backups/`)
+3. Rotates old backups, keeping last `BACKUP_KEEP` (default: 7)
+
+### Recommended Cron
+
+```bash
+# Daily at 2 AM
+0 2 * * * /app/scripts/backup.sh
+```
+
+### Restore
+
+```bash
+gunzip -c backups/hiai_observe_2026-01-15_02-00.sql.gz | psql -U observe -d hiai_observe
+```
+
+### What to Back Up
+
+- **PostgreSQL database** — all observability data (events, traces, logs, monitors, alerts)
+- **Redis** — ephemeral (rate limits, pub/sub, alert cooldowns). No backup needed.
+- **Docker volumes** — `pg_data` is the critical volume
+
+---
+
+## Retention Management
+
+Data retention is configurable per-table via the admin API:
+
+- **Default**: 30 days (configurable via `RETENTION_DAYS` env var)
+- **Per-table override**: `PUT /api/admin/retention/:table` with `{ "retentionDays": N }`
+- **Tables**: events, traces, logs, container_stats, host_stats, uptime_checks, alert_history
+- **Cleanup worker**: Runs every 24 hours, batch-deletes in chunks of 5000 rows
+- **Manual trigger**: `POST /api/admin/cleanup` for immediate cleanup
+
+---
+
+## Alert Severity & Escalation
+
+Alerts have three severity levels: `critical`, `warning`, `info`.
+
+Auto-escalation: if the current metric value exceeds 2x the threshold, severity is bumped to `critical` regardless of the configured level.
+
+Recovery notifications are dispatched when a previously-down monitor comes back online, using the same channels as the original alert.

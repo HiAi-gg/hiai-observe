@@ -13,7 +13,7 @@ import { sendTelegramAlert } from "../alerts/notifiers/telegram.js";
 import { sendDiscordAlert } from "../alerts/notifiers/discord.js";
 import { sendEmailAlert } from "../alerts/notifiers/email.js";
 
-const VALID_CHANNELS = ["telegram", "discord", "email"] as const;
+const VALID_CHANNELS = ["telegram", "discord", "email", "slack", "webhook", "pagerduty", "teams", "ntfy", "gotify", "pushover"] as const;
 
 export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
 
@@ -187,6 +187,55 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
         result = await sendEmailAlert({ to, ...testPayload }, config ?? undefined);
         break;
       }
+      case "slack": {
+        const webhookUrl = config?.webhookUrl || process.env.SLACK_WEBHOOK_URL;
+        if (!webhookUrl) { set.status = 400; return { error: "No webhook URL configured" }; }
+        const { sendSlackAlert } = await import("../alerts/notifiers/slack.js");
+        result = await sendSlackAlert(webhookUrl, testPayload, config ?? undefined);
+        break;
+      }
+      case "webhook": {
+        const webhookUrl = config?.url || process.env.WEBHOOK_URL;
+        if (!webhookUrl) { set.status = 400; return { error: "No webhook URL configured" }; }
+        const { sendWebhookAlert } = await import("../alerts/notifiers/webhook.js");
+        result = await sendWebhookAlert(webhookUrl, testPayload, config ?? undefined);
+        break;
+      }
+      case "pagerduty": {
+        const routingKey = config?.routingKey || process.env.PAGERDUTY_ROUTING_KEY;
+        if (!routingKey) { set.status = 400; return { error: "No routing key configured" }; }
+        const { sendPagerdutyAlert } = await import("../alerts/notifiers/pagerduty.js");
+        result = await sendPagerdutyAlert(routingKey, testPayload, config ?? undefined);
+        break;
+      }
+      case "teams": {
+        const webhookUrl = config?.webhookUrl || process.env.TEAMS_WEBHOOK_URL;
+        if (!webhookUrl) { set.status = 400; return { error: "No webhook URL configured" }; }
+        const { sendTeamsAlert } = await import("../alerts/notifiers/teams.js");
+        result = await sendTeamsAlert(webhookUrl, testPayload, config ?? undefined);
+        break;
+      }
+      case "ntfy": {
+        const topic = config?.topic || process.env.NTFY_TOPIC;
+        if (!topic) { set.status = 400; return { error: "No topic configured" }; }
+        const { sendNtfyAlert } = await import("../alerts/notifiers/ntfy.js");
+        result = await sendNtfyAlert(topic, testPayload, config ?? undefined);
+        break;
+      }
+      case "gotify": {
+        const server = config?.server || process.env.GOTIFY_SERVER;
+        if (!server) { set.status = 400; return { error: "No server URL configured" }; }
+        const { sendGotifyAlert } = await import("../alerts/notifiers/gotify.js");
+        result = await sendGotifyAlert(server, testPayload, config ?? undefined);
+        break;
+      }
+      case "pushover": {
+        const userKey = config?.userKey || process.env.PUSHOVER_USER_KEY;
+        if (!userKey) { set.status = 400; return { error: "No user key configured" }; }
+        const { sendPushoverAlert } = await import("../alerts/notifiers/pushover.js");
+        result = await sendPushoverAlert(userKey, testPayload, config ?? undefined);
+        break;
+      }
       default:
         result = { ok: false, error: "Unknown channel" };
     }
@@ -221,6 +270,13 @@ function isConfigured(config: Record<string, string> | null, channel: string): b
     case "telegram": return !!(config.botToken && config.chatId);
     case "discord": return !!config.webhookUrl;
     case "email": return !!(config.host && config.from);
+    case "slack": return !!config.webhookUrl;
+    case "webhook": return !!config.url;
+    case "pagerduty": return !!config.routingKey;
+    case "teams": return !!config.webhookUrl;
+    case "ntfy": return !!config.topic;
+    case "gotify": return !!(config.server && config.token);
+    case "pushover": return !!(config.userKey && config.token);
     default: return false;
   }
 }
@@ -241,6 +297,32 @@ function getEnvConfig(channel: string): Record<string, string> {
         user: process.env.SMTP_USER || "",
         pass: process.env.SMTP_PASS || "",
         from: process.env.SMTP_FROM || "",
+      };
+    case "slack":
+      return { webhookUrl: process.env.SLACK_WEBHOOK_URL || "" };
+    case "webhook":
+      return {
+        url: process.env.WEBHOOK_URL || "",
+        secret: process.env.WEBHOOK_SECRET || "",
+      };
+    case "pagerduty":
+      return { routingKey: process.env.PAGERDUTY_ROUTING_KEY || "" };
+    case "teams":
+      return { webhookUrl: process.env.TEAMS_WEBHOOK_URL || "" };
+    case "ntfy":
+      return {
+        topic: process.env.NTFY_TOPIC || "",
+        server: process.env.NTFY_SERVER || "",
+      };
+    case "gotify":
+      return {
+        server: process.env.GOTIFY_SERVER || "",
+        token: process.env.GOTIFY_TOKEN || "",
+      };
+    case "pushover":
+      return {
+        userKey: process.env.PUSHOVER_USER_KEY || "",
+        token: process.env.PUSHOVER_TOKEN || "",
       };
     default:
       return {};

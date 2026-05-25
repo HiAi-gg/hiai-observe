@@ -12,6 +12,8 @@ import { shouldFireAlert } from "./dedup.js";
 import { dispatchAlert } from "./dispatcher.js";
 import { getLatestHostStats } from "../store/infra.js";
 import { desc, and, eq, sql } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+import { recordWorkerRun } from "../workers/health.js";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 const EVALUATION_INTERVAL_MS = 60_000; // 60 seconds
@@ -75,23 +77,21 @@ async function runEvaluationCycle(): Promise<void> {
         const isEscalation = !canFire && await checkEscalation(rule);
 
         if (!canFire && !isEscalation) {
-          console.log(
-            `[Alert Worker] ${rule.name}: in cooldown, skipping`
-          );
+          logger.debug("Alert in cooldown, skipping", { alertName: rule.name, alertId: rule.id });
           continue;
         }
 
         if (isEscalation) {
-          console.log(
-            `[Alert Worker] ${rule.name}: ESCALATION re-notify after ${rule.escalationMinutes}min`
-          );
+          logger.warn("Alert escalation re-notify", { alertName: rule.name, alertId: rule.id, escalationMinutes: rule.escalationMinutes });
         }
 
         await dispatchAlert(rule, result);
       }
     }
+
+    recordWorkerRun("alert");
   } catch (err) {
-    console.error("[Alert Worker] Evaluation cycle error:", err);
+    logger.error("Evaluation cycle error", { error: String(err) });
   }
 }
 
@@ -101,13 +101,11 @@ async function runEvaluationCycle(): Promise<void> {
  */
 export function startAlertWorker(): void {
   if (intervalId) {
-    console.warn("[Alert Worker] Already running");
+    logger.warn("Alert worker already running");
     return;
   }
 
-  console.log(
-    `[Alert Worker] Starting with ${EVALUATION_INTERVAL_MS / 1000}s interval`
-  );
+  logger.info("Alert worker starting", { intervalSeconds: EVALUATION_INTERVAL_MS / 1000 });
 
   // Run immediately on start
   runEvaluationCycle();
@@ -123,7 +121,7 @@ export function stopAlertWorker(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log("[Alert Worker] Stopped");
+    logger.info("Alert worker stopped");
   }
 }
 

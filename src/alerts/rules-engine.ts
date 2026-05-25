@@ -6,8 +6,9 @@
  */
 
 import { db } from "../store/db.js";
-import { events, issues, traces, uptimeChecks } from "../store/schema.js";
-import { eq, and, gte, sql, count } from "drizzle-orm";
+import { events, issues, traces, uptimeChecks, maintenanceWindows } from "../store/schema.js";
+import { eq, and, gte, lte, sql, count } from "drizzle-orm";
+import { castDbRows } from "../lib/db-types.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,8 @@ export type AlertConditionType =
   | "resource_threshold"
   | "trace_error"
   | "token_usage"
-  | "recovery";
+  | "recovery"
+  | "cert_expiry";
 
 export type ComparisonOperator = "gt" | "lt" | "eq" | "gte" | "lte";
 
@@ -32,17 +34,23 @@ export interface AlertCondition {
   resource?: "cpu" | "memory" | "disk";
   // token_usage: model filter
   model?: string;
+  // cert_expiry: host to check
+  host?: string;
+  port?: number;
 }
 
 export interface AlertChannel {
-  type: "telegram" | "discord" | "email" | "slack";
+  type: "telegram" | "discord" | "email" | "slack" | "webhook" | "pagerduty" | "teams" | "ntfy" | "gotify" | "pushover";
   target: string; // chatId, webhookUrl, email address, or slack webhook URL
 }
+
+export type AlertSeverity = "critical" | "warning" | "info";
 
 export interface AlertRule {
   id: string;
   name: string;
   projectId: string;
+  severity: AlertSeverity;
   condition: AlertCondition;
   channels: AlertChannel[];
   isActive: boolean;
@@ -121,7 +129,7 @@ async function evaluateUptimeDown(
   // Get monitors for this project — we need the uptime_monitors table
   // Query recent checks grouped by monitor, check for consecutive failures
   const recentChecks = await db.execute(
-    sql`SELECT uc.monitor_id, uc.status_code
+    sql`SELECT uc.monitor_id, uc.status_code, uc.success
         FROM uptime_checks uc
         JOIN uptime_monitors um ON uc.monitor_id = um.id
         WHERE um.project_id = ${projectId}
@@ -130,22 +138,23 @@ async function evaluateUptimeDown(
   );
 
   // Group by monitor and count consecutive failures
-  const monitorChecks = new Map<string, number[]>();
-  const checkRows = recentChecks as unknown as Array<{
-    monitor_id: string;
-    status_code: number;
-  }>;
+  const monitorChecks = new Map<string, Array<{ status_code: number | null; success: boolean }>>();
+  const checkRows = castDbRows<{ monitor_id: string; status_code: number | null; success: boolean }>(recentChecks);
   for (const check of checkRows) {
     const checks = monitorChecks.get(check.monitor_id) ?? [];
-    checks.push(check.status_code);
+    checks.push({ status_code: check.status_code, success: check.success });
     monitorChecks.set(check.monitor_id, checks);
   }
 
   let worstConsecutive = 0;
-  for (const [, codes] of monitorChecks) {
+  for (const [, checks] of monitorChecks) {
     let consecutive = 0;
-    for (const code of codes) {
-      if (code < 200 || code >= 400) {
+    for (const check of checks) {
+      // Detect failure: either bad status code, or (for DNS/Ping) success === false
+      const isFailure =
+        (check.status_code !== null && (check.status_code < 200 || check.status_code >= 400)) ||
+        (check.status_code === null && !check.success);
+      if (isFailure) {
         consecutive++;
         worstConsecutive = Math.max(worstConsecutive, consecutive);
       } else {
@@ -236,7 +245,7 @@ async function evaluateTokenUsage(
           AND attributes ? 'usage.total_tokens'`
   );
 
-  const resultRows = result as unknown as Array<{ total: number }>;
+  const resultRows = castDbRows<{ total: number }>(result);
   const totalTokens = Number(resultRows[0]?.total ?? 0);
   const triggered = compare(
     totalTokens,
@@ -250,6 +259,90 @@ async function evaluateTokenUsage(
     threshold: condition.threshold,
     message: `Token usage in window: ${totalTokens} (threshold: ${condition.operator} ${condition.threshold})`,
   };
+}
+
+async function evaluateCertExpiry(
+  condition: AlertCondition,
+  _projectId: string
+): Promise<AlertEvaluationResult> {
+  const host = condition.host;
+  if (!host) {
+    return {
+      triggered: false,
+      currentValue: 0,
+      threshold: condition.threshold,
+      message: "cert_expiry condition requires 'host' field",
+    };
+  }
+
+  try {
+    const { checkCert } = await import("../monitoring/checks/cert-check.js");
+    const certInfo = await checkCert(host, condition.port ?? 443);
+    const triggered = compare(certInfo.daysRemaining, condition.operator, condition.threshold);
+
+    return {
+      triggered,
+      currentValue: certInfo.daysRemaining,
+      threshold: condition.threshold,
+      message: `SSL cert for ${host} expires in ${certInfo.daysRemaining} days (threshold: ${condition.operator} ${condition.threshold} days, issuer: ${certInfo.issuer})`,
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return {
+      triggered: false,
+      currentValue: 0,
+      threshold: condition.threshold,
+      message: `Cert check failed for ${host}: ${errorMessage}`,
+    };
+  }
+}
+
+// ─── Maintenance Window Check ─────────────────────────────────────────────────
+
+/**
+ * Check if a project currently has an active maintenance window.
+ * If monitorIds is empty on the window, it suppresses ALL alerts for the project.
+ * If monitorIds is non-empty, it only suppresses alerts for those specific monitors.
+ */
+export async function isInMaintenanceWindow(
+  projectId: string,
+  monitorIds?: string[]
+): Promise<boolean> {
+  const now = new Date();
+
+  const activeWindows = await db
+    .select()
+    .from(maintenanceWindows)
+    .where(
+      and(
+        eq(maintenanceWindows.projectId, projectId),
+        lte(maintenanceWindows.startsAt, now),
+        gte(maintenanceWindows.endsAt, now)
+      )
+    );
+
+  if (activeWindows.length === 0) return false;
+
+  // If any window has empty monitorIds, it covers all monitors
+  const coversAll = activeWindows.some(
+    (w) => !w.monitorIds || (w.monitorIds as string[]).length === 0
+  );
+  if (coversAll) return true;
+
+  // If specific monitors provided, check if any window covers them
+  if (monitorIds && monitorIds.length > 0) {
+    const suppressedIds = new Set<string>();
+    for (const w of activeWindows) {
+      for (const id of (w.monitorIds as string[]) ?? []) {
+        suppressedIds.add(id);
+      }
+    }
+    return monitorIds.some((id) => suppressedIds.has(id));
+  }
+
+  // No specific monitors to check, but windows exist with specific monitor IDs
+  // Since we don't know which monitors this alert covers, be conservative: suppress
+  return true;
 }
 
 // ─── Main Evaluation ──────────────────────────────────────────────────────────
@@ -274,6 +367,15 @@ export async function checkCondition(
       return evaluateTraceError(condition, projectId);
     case "token_usage":
       return evaluateTokenUsage(condition, projectId);
+    case "recovery":
+      return {
+        triggered: true,
+        currentValue: 1,
+        threshold: 0,
+        message: "Service recovered — back online",
+      };
+    case "cert_expiry":
+      return evaluateCertExpiry(condition, projectId);
     default:
       return {
         triggered: false,
@@ -292,6 +394,12 @@ export async function evaluateRules(
   projectId: string,
   resourceValues?: { cpu?: number; memory?: number; disk?: number }
 ): Promise<Array<{ rule: AlertRule; result: AlertEvaluationResult }>> {
+  // Skip evaluation if project is in an active maintenance window
+  const inMaintenance = await isInMaintenanceWindow(projectId);
+  if (inMaintenance) {
+    return [];
+  }
+
   const rules = await db.query.alerts.findMany({
     where: (alerts, { and, eq }) =>
       and(eq(alerts.projectId, projectId), eq(alerts.isActive, true)),
@@ -303,10 +411,13 @@ export async function evaluateRules(
   }> = [];
 
   for (const rule of rules) {
+    const baseSeverity: AlertSeverity = (rule.severity as AlertSeverity) ?? "warning";
+
     const alertRule: AlertRule = {
       id: rule.id,
       name: rule.name,
       projectId: rule.projectId,
+      severity: baseSeverity,
       condition: rule.condition as AlertCondition,
       channels: rule.channels as AlertChannel[],
       isActive: rule.isActive,
@@ -332,14 +443,19 @@ export async function evaluateRules(
         message: `Resource ${resource}: ${value}% (threshold: ${alertRule.condition.operator} ${alertRule.condition.threshold}%)`,
       };
       if (result.triggered) {
-        triggered.push({ rule: alertRule, result });
+        // Auto-escalate: if currentValue > 2x threshold, bump to critical
+        const effectiveSeverity: AlertSeverity =
+          result.currentValue > result.threshold * 2 ? "critical" : baseSeverity;
+        triggered.push({ rule: { ...alertRule, severity: effectiveSeverity }, result });
       }
       continue;
     }
 
     const result = await checkCondition(alertRule);
     if (result.triggered) {
-      triggered.push({ rule: alertRule, result });
+      const effectiveSeverity: AlertSeverity =
+        result.currentValue > result.threshold * 2 ? "critical" : baseSeverity;
+      triggered.push({ rule: { ...alertRule, severity: effectiveSeverity }, result });
     }
   }
 

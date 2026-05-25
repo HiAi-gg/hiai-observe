@@ -8,6 +8,7 @@
 import { db } from "../store/db.js";
 import { traces } from "../store/schema.js";
 import { eq, and, gte, lte, sql, between } from "drizzle-orm";
+import { castDbRows } from "../lib/db-types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export async function getTokenUsage(
     ORDER BY total_tokens DESC
   `);
 
-  return (rows as unknown as Array<Record<string, unknown>>).map((row) => {
+  return castDbRows<Record<string, unknown>>(rows).map((row) => {
     const promptTokens = Number(row.prompt_tokens ?? 0);
     const completionTokens = Number(row.completion_tokens ?? 0);
     const totalTokens = Number(row.total_tokens ?? 0);

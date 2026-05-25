@@ -81,3 +81,108 @@ export async function clearLogs(before?: Date): Promise<number> {
   const result = await db.delete(logs).returning({ id: logs.id });
   return result.length;
 }
+
+interface SearchLogsRegexParams {
+  pattern: string;
+  container?: string;
+  level?: string;
+  from?: Date;
+  to?: Date;
+  limit?: number;
+  offset?: number;
+}
+
+export async function searchLogsRegex(params: SearchLogsRegexParams) {
+  const { pattern, container, level, from, to, limit = 100, offset = 0 } = params;
+
+  const conditions = [];
+  // Use PostgreSQL ~ operator for regex matching
+  conditions.push(sql`${logs.message} ~ ${pattern}`);
+  if (container) conditions.push(eq(logs.containerId, container));
+  if (level) conditions.push(eq(logs.level, level));
+  if (from) conditions.push(gte(logs.timestamp, from));
+  if (to) conditions.push(lte(logs.timestamp, to));
+
+  const where = and(...conditions);
+
+  const [rows, countResult] = await Promise.all([
+    db.select().from(logs).where(where).orderBy(desc(logs.timestamp)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(logs).where(where),
+  ]);
+
+  return { logs: rows, total: countResult[0]?.count ?? 0, limit, offset };
+}
+
+interface SearchLogsFuzzyParams {
+  term: string;
+  container?: string;
+  level?: string;
+  from?: Date;
+  to?: Date;
+  limit?: number;
+  offset?: number;
+  threshold?: number;
+}
+
+export async function searchLogsFuzzy(params: SearchLogsFuzzyParams) {
+  const { term, container, level, from, to, limit = 100, offset = 0, threshold = 0.1 } = params;
+
+  const conditions = [];
+  // Use pg_trgm similarity() for fuzzy matching — requires CREATE EXTENSION IF NOT EXISTS pg_trgm
+  conditions.push(sql`similarity(${logs.message}, ${term}) > ${threshold}`);
+  if (container) conditions.push(eq(logs.containerId, container));
+  if (level) conditions.push(eq(logs.level, level));
+  if (from) conditions.push(gte(logs.timestamp, from));
+  if (to) conditions.push(lte(logs.timestamp, to));
+
+  const where = and(...conditions);
+
+  const [rows, countResult] = await Promise.all([
+    db.select().from(logs).where(where).orderBy(sql`similarity(${logs.message}, ${term}) desc`).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(logs).where(where),
+  ]);
+
+  return { logs: rows, total: countResult[0]?.count ?? 0, limit, offset };
+}
+
+interface LogVolumeParams {
+  interval?: string;
+  containerId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+export async function getLogVolume(params: LogVolumeParams) {
+  const { interval = "1h", containerId, from, to } = params;
+
+  // Map shorthand to PostgreSQL interval for date_trunc
+  const truncUnit: Record<string, string> = {
+    "5m": "minute", "15m": "minute", "30m": "minute",
+    "1h": "hour", "6h": "hour", "12h": "hour", "1d": "day",
+  };
+  const unit = truncUnit[interval] ?? "hour";
+
+  const conditions = [];
+  const effectiveFrom = from ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const effectiveTo = to ?? new Date();
+  conditions.push(gte(logs.timestamp, effectiveFrom));
+  conditions.push(lte(logs.timestamp, effectiveTo));
+  if (containerId) conditions.push(eq(logs.containerId, containerId));
+
+  const where = and(...conditions);
+
+  // Use raw SQL for date_trunc with the validated unit
+  const truncExpr = sql.raw(`date_trunc('${unit}', "timestamp")`);
+
+  const rows = await db
+    .select({
+      bucket: sql<string>`${truncExpr}::text`,
+      count: sql<number>`count(*)`,
+    })
+    .from(logs)
+    .where(where)
+    .groupBy(truncExpr)
+    .orderBy(truncExpr);
+
+  return rows.map(r => ({ time: r.bucket, count: r.count }));
+}

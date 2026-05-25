@@ -16,6 +16,13 @@ const metrics: MetricsData = {
   startTime: Date.now(),
 };
 
+/** DB pool stats — updated externally via `setDbPoolStats`. */
+let dbPoolStats = { active: 0, idle: 0, waiting: 0 };
+
+export function setDbPoolStats(stats: { active: number; idle: number; waiting: number }) {
+  dbPoolStats = stats;
+}
+
 const BUCKET_BOUNDARIES = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 
 function recordLatency(ms: number) {
@@ -75,6 +82,18 @@ export const metricsPlugin = new Elysia()
     lines.push("# HELP hiai_observe_uptime_seconds Process uptime in seconds");
     lines.push("# TYPE hiai_observe_uptime_seconds gauge");
     lines.push(`hiai_observe_uptime_seconds ${uptimeSeconds}`);
+
+    lines.push("# HELP hiai_observe_db_pool_active Active DB connections");
+    lines.push("# TYPE hiai_observe_db_pool_active gauge");
+    lines.push(`hiai_observe_db_pool_active ${dbPoolStats.active}`);
+
+    lines.push("# HELP hiai_observe_db_pool_idle Idle DB connections");
+    lines.push("# TYPE hiai_observe_db_pool_idle gauge");
+    lines.push(`hiai_observe_db_pool_idle ${dbPoolStats.idle}`);
+
+    lines.push("# HELP hiai_observe_db_pool_waiting Requests waiting for a connection");
+    lines.push("# TYPE hiai_observe_db_pool_waiting gauge");
+    lines.push(`hiai_observe_db_pool_waiting ${dbPoolStats.waiting}`);
 
     return lines.join("\n") + "\n";
   });

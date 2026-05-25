@@ -1,4 +1,15 @@
-import { getMonitors, insertCheck } from "../store/uptime.js";
+import { getMonitors, insertCheck, getMonitor } from "../store/uptime.js";
+import { dispatchAlert } from "../alerts/dispatcher.js";
+import { shouldFireAlert } from "../alerts/dedup.js";
+import { db } from "../store/db.js";
+import { alerts as alertsTable } from "../store/schema.js";
+import { eq, and } from "drizzle-orm";
+import type { AlertRule, AlertCondition, AlertChannel, AlertEvaluationResult, AlertSeverity } from "../alerts/rules-engine.js";
+import { recordWorkerRun } from "../workers/health.js";
+import { logger } from "../lib/logger.js";
+import { checkCert } from "./checks/cert-check.js";
+import { runDnsCheck } from "./checks/dns-check.js";
+import { runPingCheck } from "./checks/ping-check.js";
 
 const CHECK_TIMEOUT_MS = 10_000;
 const TCP_TIMEOUT_MS = 5_000;
@@ -10,9 +21,22 @@ const nextCheckAt = new Map<string, { nextAt: number; intervalSeconds: number }>
 // Track monitor state for recovery detection
 const monitorState = new Map<string, { wasDown: boolean; consecutiveFailures: number }>();
 
+interface HttpCheckConfig {
+  method?: string | null;
+  headers?: Record<string, string> | null;
+  body?: string | null;
+  authType?: string | null;
+  authValue?: string | null;
+  ignoreSsl?: boolean | null;
+  maxRedirects?: number | null;
+  keyword?: string | null;
+  keywordNot?: string | null;
+}
+
 // ── HTTP Check ─────────────────────────────────────────────────────────────
 async function runHttpCheck(
-  url: string
+  url: string,
+  config?: HttpCheckConfig
 ): Promise<{ statusCode: number | null; responseTimeMs: number; error: string | null; success: boolean; certExpiry: Date | null }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
@@ -20,31 +44,63 @@ async function runHttpCheck(
   let certExpiry: Date | null = null;
 
   try {
-    const res = await fetch(url, {
-      method: "GET",
+    // Build headers
+    const headers: Record<string, string> = { ...config?.headers };
+    if (config?.authType === "basic" && config?.authValue) {
+      headers["Authorization"] = `Basic ${config.authValue}`;
+    } else if (config?.authType === "bearer" && config?.authValue) {
+      headers["Authorization"] = `Bearer ${config.authValue}`;
+    }
+
+    // Build fetch options
+    const fetchOpts: RequestInit = {
+      method: config?.method ?? "GET",
+      headers,
       signal: controller.signal,
-      redirect: "follow",
-    });
+      redirect: config?.maxRedirects === 0 ? "manual" : "follow",
+    };
+    if (config?.body && fetchOpts.method !== "GET" && fetchOpts.method !== "HEAD") {
+      fetchOpts.body = config.body;
+    }
+
+    const res = await fetch(url, fetchOpts);
     const responseTimeMs = Date.now() - start;
     clearTimeout(timeout);
 
-    // Try to get TLS cert expiry for HTTPS URLs
+    // Get TLS cert expiry for HTTPS URLs
     if (url.startsWith("https://")) {
       try {
         const urlObj = new URL(url);
-        const conn = await Bun.connect({ hostname: urlObj.hostname, port: Number(urlObj.port) || 443, socket: {} });
-        // Bun TLS cert extraction not directly available — skip for now
-        conn.end();
+        const certInfo = await checkCert(urlObj.hostname, Number(urlObj.port) || 443);
+        certExpiry = certInfo.validTo;
       } catch {
-        // TLS inspection not available in dev — skip silently
+        // TLS cert check failed — skip silently
       }
     }
+
+    // Keyword assertion
+    let keywordError: string | null = null;
+    if (config?.keyword || config?.keywordNot) {
+      try {
+        const body = await res.clone().text();
+        if (config.keyword && !body.includes(config.keyword)) {
+          keywordError = `Keyword "${config.keyword}" not found in response body`;
+        }
+        if (config.keywordNot && body.includes(config.keywordNot)) {
+          keywordError = `Excluded keyword "${config.keywordNot}" found in response body`;
+        }
+      } catch {
+        // Body read failed — skip keyword check
+      }
+    }
+
+    const success = res.status >= 200 && res.status < 400 && keywordError === null;
 
     return {
       statusCode: res.status,
       responseTimeMs,
-      error: null,
-      success: res.status >= 200 && res.status < 400,
+      error: keywordError,
+      success,
       certExpiry,
     };
   } catch (err: unknown) {
@@ -135,12 +191,74 @@ async function tick() {
       return schedule && now >= schedule.nextAt;
     });
 
-    if (dueMonitors.length === 0) return;
+    if (dueMonitors.length === 0) {
+      recordWorkerRun("uptime");
+      return;
+    }
 
     await Promise.allSettled(
-      dueMonitors.map(async (monitor: { id: string; url: string; type?: string; intervalSeconds: number }) => {
-        const isTcp = monitor.type === "tcp";
-        const result = isTcp ? await runTcpCheck(monitor.url) : await runHttpCheck(monitor.url);
+      dueMonitors.map(async (monitor: {
+        id: string; url: string; type: string; intervalSeconds: number;
+        method: string | null; headers: Record<string, string> | null; body: string | null;
+        authType: string | null; authValue: string | null; ignoreSsl: boolean | null; maxRedirects: number | null;
+        keyword: string | null; keywordNot: string | null;
+        dnsRecordType: string | null; dnsExpectedValue: string | null; dnsResolver: string | null;
+      }) => {
+        let result: { statusCode: number | null; responseTimeMs: number; error: string | null; success: boolean; certExpiry: Date | null };
+
+        if (monitor.type === "dns") {
+          let hostname: string;
+          try {
+            hostname = new URL(monitor.url).hostname;
+          } catch {
+            hostname = monitor.url;
+          }
+          const dnsResult = await runDnsCheck({
+            host: hostname,
+            recordType: monitor.dnsRecordType ?? "A",
+            expectedValue: monitor.dnsExpectedValue ?? undefined,
+            resolver: monitor.dnsResolver ?? undefined,
+          });
+          result = {
+            statusCode: null,
+            responseTimeMs: dnsResult.responseTimeMs,
+            error: dnsResult.error ?? null,
+            success: dnsResult.status === "up",
+            certExpiry: null,
+          };
+        } else if (monitor.type === "ping") {
+          let hostname: string;
+          try {
+            hostname = new URL(monitor.url).hostname;
+          } catch {
+            hostname = monitor.url;
+          }
+          const pingResult = await runPingCheck({
+            host: hostname,
+            timeoutMs: CHECK_TIMEOUT_MS,
+          });
+          result = {
+            statusCode: null,
+            responseTimeMs: pingResult.responseTimeMs,
+            error: pingResult.error ?? null,
+            success: pingResult.status === "up",
+            certExpiry: null,
+          };
+        } else if (monitor.type === "tcp") {
+          result = await runTcpCheck(monitor.url);
+        } else {
+          result = await runHttpCheck(monitor.url, {
+            method: monitor.method ?? undefined,
+            headers: monitor.headers ?? undefined,
+            body: monitor.body ?? undefined,
+            authType: monitor.authType ?? undefined,
+            authValue: monitor.authValue ?? undefined,
+            ignoreSsl: monitor.ignoreSsl ?? undefined,
+            maxRedirects: monitor.maxRedirects ?? undefined,
+            keyword: monitor.keyword ?? undefined,
+            keywordNot: monitor.keywordNot ?? undefined,
+          });
+        }
 
         await insertCheck({
           monitorId: monitor.id,
@@ -148,14 +266,58 @@ async function tick() {
           responseTimeMs: result.responseTimeMs,
           error: result.error,
           success: result.success,
+          certExpiry: result.certExpiry,
         });
 
         // Recovery detection
         const state = monitorState.get(monitor.id) ?? { wasDown: false, consecutiveFailures: 0 };
         if (result.success) {
           if (state.wasDown) {
-            console.log(`[uptime-worker] RECOVERY: ${monitor.id} is back UP`);
-            // TODO: fire recovery notification via alert system
+            logger.info("Monitor recovery detected", { monitorId: monitor.id, url: monitor.url });
+            // Fire recovery notification via alert system
+            try {
+              const monitorRecord = await getMonitor(monitor.id);
+              if (monitorRecord?.projectId) {
+                const projectRules = await db.select()
+                  .from(alertsTable)
+                  .where(and(
+                    eq(alertsTable.projectId, monitorRecord.projectId),
+                    eq(alertsTable.isActive, true),
+                  ));
+
+                for (const ruleRow of projectRules) {
+                  const condition = ruleRow.condition as AlertCondition | null;
+                  if (condition?.type !== "uptime_down") continue;
+
+                  const rule: AlertRule = {
+                    id: ruleRow.id,
+                    name: ruleRow.name,
+                    projectId: ruleRow.projectId,
+                    severity: (ruleRow.severity as AlertSeverity) ?? "warning",
+                    condition,
+                    channels: (ruleRow.channels as AlertChannel[]) ?? [],
+                    isActive: ruleRow.isActive,
+                    cooldownSeconds: ruleRow.cooldownSeconds,
+                    createdAt: ruleRow.createdAt,
+                  };
+
+                  const recoveryResult: AlertEvaluationResult = {
+                    triggered: true,
+                    currentValue: 0,
+                    threshold: condition.consecutiveFailures ?? 3,
+                    message: `Monitor "${monitor.url}" recovered — back online`,
+                  };
+
+                  const canFire = await shouldFireAlert(`${rule.id}:recovery`);
+                  if (!canFire) continue;
+                  await dispatchAlert(rule, recoveryResult, "recovered");
+                  logger.info("Recovery alert dispatched", { ruleId: rule.id, monitorId: monitor.id });
+                  break; // Only one recovery alert per monitor
+                }
+              }
+            } catch (recoveryErr) {
+              logger.error("Failed to dispatch recovery alert", { error: String(recoveryErr), monitorId: monitor.id });
+            }
           }
           state.wasDown = false;
           state.consecutiveFailures = 0;
@@ -174,8 +336,10 @@ async function tick() {
         }
       })
     );
+
+    recordWorkerRun("uptime");
   } catch (err) {
-    console.error("[uptime-worker] Tick error:", err);
+    logger.error("Uptime tick error", { error: String(err) });
   }
 }
 
@@ -185,9 +349,9 @@ let timer: ReturnType<typeof setInterval> | null = null;
 export function startUptimeWorker() {
   if (running) return;
   running = true;
-  tick().catch(console.error);
-  timer = setInterval(() => { tick().catch(console.error); }, TICK_INTERVAL_MS);
-  console.log("[uptime-worker] Started — checking monitors per their intervals");
+  tick().catch((err) => logger.error("Uptime tick error on startup", { error: String(err) }));
+  timer = setInterval(() => { tick().catch((err) => logger.error("Uptime tick error", { error: String(err) })); }, TICK_INTERVAL_MS);
+  logger.info("Uptime worker started", { tickIntervalMs: TICK_INTERVAL_MS });
 }
 
 export function stopUptimeWorker() {
@@ -195,5 +359,5 @@ export function stopUptimeWorker() {
   nextCheckAt.clear();
   monitorState.clear();
   running = false;
-  console.log("[uptime-worker] Stopped");
+  logger.info("Uptime worker stopped");
 }

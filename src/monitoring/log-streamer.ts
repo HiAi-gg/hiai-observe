@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { getConfig } from "./config.js";
 
 export interface LogEntry {
   id: string;
@@ -53,6 +54,28 @@ export function parseRawLogLine(line: string): {
 }
 
 /**
+ * Build fetch options for Docker API calls.
+ * Supports both TCP (socket proxy) and unix socket modes.
+ * The `unix` property is a Bun extension not in standard TS types.
+ */
+function dockerFetchOpts(
+  dockerSocket: string,
+  signal?: AbortSignal
+): { url: string; opts: RequestInit } {
+  const cfg = getConfig();
+  if (cfg.dockerHost) {
+    return {
+      url: cfg.dockerHost,
+      opts: signal ? { signal } : {},
+    };
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const unixOpts: any = { unix: dockerSocket };
+  if (signal) unixOpts.signal = signal;
+  return { url: "http://localhost", opts: unixOpts };
+}
+
+/**
  * Attach to a container's log stream via Docker Engine API.
  * Returns an abort controller to stop streaming.
  */
@@ -64,13 +87,11 @@ async function attachToContainerLogs(
 ): Promise<AbortController> {
   const controller = new AbortController();
 
-  const url = `http://localhost/v1.41/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
+  const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket, controller.signal);
+  const url = `${baseUrl}/v1.41/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
 
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      unix: dockerSocket,
-    });
+    const response = await fetch(url, opts);
 
     if (!response.ok || !response.body) {
       console.error(
@@ -184,9 +205,8 @@ export async function listContainers(
   dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock"
 ): Promise<Array<{ id: string; name: string }>> {
   try {
-    const response = await fetch("http://localhost/v1.41/containers/json", {
-      unix: dockerSocket,
-    });
+    const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket);
+    const response = await fetch(`${baseUrl}/v1.41/containers/json`, opts);
 
     if (!response.ok) return [];
 

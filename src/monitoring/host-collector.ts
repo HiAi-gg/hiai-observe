@@ -14,6 +14,14 @@ export interface DiskPartitionStats {
   totalGb: number;
 }
 
+export interface TopProcess {
+  pid: number;
+  name: string;
+  cpuPercent: number;
+  memoryMb: number;
+  state: string;
+}
+
 export interface HostStats {
   cpu_percent: number;
   cpu_cores: CpuCoreStats[];
@@ -30,6 +38,7 @@ export interface HostStats {
   load_avg_15m: number;
   network_rx_bytes: number;
   network_tx_bytes: number;
+  top_processes: TopProcess[];
 }
 
 // Track per-core CPU deltas
@@ -177,13 +186,110 @@ async function readNetwork(): Promise<{ rx: number; tx: number }> {
   }
 }
 
+/** Map of /proc/[pid]/stat state codes to human-readable names. */
+const PROC_STATE_MAP: Record<string, string> = {
+  R: "running",
+  S: "sleeping",
+  D: "disk-sleep",
+  Z: "zombie",
+  T: "stopped",
+  t: "tracing-stop",
+  X: "dead",
+  I: "idle",
+};
+
+async function readTopProcesses(): Promise<TopProcess[]> {
+  try {
+    const procDir = "/proc";
+    const entries = await Bun.file(procDir).text().catch(() => "");
+    // /proc listing isn't directly text-readable; use readdirSync instead
+    const dirEntries: string[] = [];
+    const { readdirSync } = await import("node:fs");
+    try {
+      for (const entry of readdirSync(procDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && /^\d+$/.test(entry.name)) {
+          dirEntries.push(entry.name);
+        }
+      }
+    } catch {
+      return [];
+    }
+
+    // Read /proc/stat for CPU total to compute per-process CPU%
+    const statContent = await Bun.file("/proc/stat").text().catch(() => "");
+    const cpuLine = statContent.split("\n")[0] ?? "";
+    const cpuParts = cpuLine.split(/\s+/).slice(1).map(Number);
+    const totalCpuTime = cpuParts.reduce((a, b) => a + b, 0);
+
+    const pageSizeKb = 4; // default page size 4KB
+    const processes: Array<{ pid: number; name: string; cpuPercent: number; memoryMb: number; state: string }> = [];
+
+    // Sample top 50 PIDs by reading stat files (limit to avoid overhead)
+    const samplePids = dirEntries.slice(0, 200);
+
+    for (const pid of samplePids) {
+      try {
+        const statText = await Bun.file(`${procDir}/${pid}/stat`).text().catch(() => "");
+        if (!statText) continue;
+
+        // Parse: pid (comm) state ppid ... utime stime ...
+        const match = statText.match(/^\d+\s+\((.+?)\)\s+(\S)\s+/);
+        if (!match) continue;
+
+        const name = match[1] ?? "unknown";
+        const stateCode = match[2] ?? "?";
+        const state = PROC_STATE_MAP[stateCode] ?? stateCode;
+
+        // Parse utime and stime (fields 14 and 15, 0-indexed from after the ')')
+        const afterComm = statText.slice(statText.indexOf(") ") + 2);
+        const fields = afterComm.split(/\s+/);
+        const utime = parseInt(fields[11] ?? "0", 10); // utime (field 14)
+        const stime = parseInt(fields[12] ?? "0", 10); // stime (field 15)
+        const totalTime = utime + stime;
+
+        // Read memory from /proc/[pid]/status
+        let memoryKb = 0;
+        try {
+          const statusText = await Bun.file(`${procDir}/${pid}/status`).text().catch(() => "");
+          const vmMatch = statusText.match(/VmRSS:\s+(\d+)/);
+          if (vmMatch) memoryKb = parseInt(vmMatch[1] ?? "0", 10);
+        } catch {
+          // ignore
+        }
+
+        // CPU% = (process time / total CPU time) * 100 — rough approximation
+        const cpuPercent = totalCpuTime > 0
+          ? Math.round((totalTime / totalCpuTime) * 10000) / 100
+          : 0;
+
+        processes.push({
+          pid: parseInt(pid, 10),
+          name: name.slice(0, 64),
+          cpuPercent,
+          memoryMb: Math.round((memoryKb / 1024) * 100) / 100,
+          state,
+        });
+      } catch {
+        // process may have exited
+      }
+    }
+
+    // Sort by CPU desc, take top 10
+    processes.sort((a, b) => b.cpuPercent - a.cpuPercent);
+    return processes.slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
 export async function collectHostStats(): Promise<HostStats> {
-  const [cpu, mem, disk, load, net] = await Promise.all([
+  const [cpu, mem, disk, load, net, procs] = await Promise.all([
     readCpuPercent(),
     readMemory(),
     readDisk(),
     readLoadAvg(),
     readNetwork(),
+    readTopProcesses(),
   ]);
 
   return {
@@ -202,5 +308,6 @@ export async function collectHostStats(): Promise<HostStats> {
     load_avg_15m: load[2],
     network_rx_bytes: net.rx,
     network_tx_bytes: net.tx,
+    top_processes: procs,
   };
 }

@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../store/db.js";
 import { redis } from "../store/redis.js";
 import { readFileSync } from "fs";
+import { getWorkerHealth } from "../workers/health.js";
 
 const startTime = Date.now();
 
@@ -49,6 +50,24 @@ async function checkRedis(): Promise<"ok" | "error"> {
   }
 }
 
+function checkDisk(): { status: "ok" | "degraded"; freeBytes: number } {
+  try {
+    const result = Bun.spawnSync(["df", "-B1", "/"]);
+    const output = result.stdout.toString();
+    const lines = output.trim().split("\n");
+    if (lines.length >= 2) {
+      const parts = lines[1]!.split(/\s+/);
+      // df output: Filesystem 1B-blocks Used Available Use% Mounted
+      const available = Number(parts[3]);
+      if (!Number.isNaN(available)) {
+        const ONE_GB = 1_073_741_824;
+        return { status: available < ONE_GB ? "degraded" : "ok", freeBytes: available };
+      }
+    }
+  } catch { /* ignore */ }
+  return { status: "ok", freeBytes: -1 };
+}
+
 export const healthPlugin = new Elysia()
   .get("/health", async ({ set }) => {
     const [postgres, redisStatus] = await Promise.all([
@@ -56,7 +75,9 @@ export const healthPlugin = new Elysia()
       checkRedis(),
     ]);
 
-    const allOk = postgres === "ok" && redisStatus === "ok";
+    const disk = checkDisk();
+
+    const allOk = postgres === "ok" && redisStatus === "ok" && disk.status === "ok";
     const anyOk = postgres === "ok" || redisStatus === "ok";
 
     const status = allOk ? "ok" : anyOk ? "degraded" : "error";
@@ -76,10 +97,13 @@ export const healthPlugin = new Elysia()
         heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
         external: `${Math.round(mem.external / 1024 / 1024)}MB`,
       },
+      diskFreeBytes: disk.freeBytes,
       dependencies: {
         postgres,
         redis: redisStatus,
+        disk: disk.status,
       },
+      workers: getWorkerHealth(),
       lastError: lastError ? {
         message: lastError.message,
         ago: formatUptime(Math.floor((Date.now() - lastError.timestamp) / 1000)),

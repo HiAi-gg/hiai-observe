@@ -2,6 +2,7 @@ import { startLogStreamer, listContainers } from "./log-streamer.js";
 import type { LogEntry } from "./log-streamer.js";
 import { insertLogs } from "../store/logs.js";
 import { publishLog } from "../store/log-pubsub.js";
+import { recordWorkerRun } from "../workers/health.js";
 
 let cleanup: (() => void) | null = null;
 
@@ -47,6 +48,8 @@ function onBatch(entries: LogEntry[]): void {
   for (const entry of entries) {
     publishLog(entry).catch(() => {});
   }
+
+  recordWorkerRun("log");
 }
 
 export async function startLogWorker(): Promise<void> {

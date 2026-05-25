@@ -1,9 +1,95 @@
 import { Elysia, t } from "elysia";
+import { z } from "zod";
 import { parseOTLPTraces, parseOTLPMetrics } from "../ingestion/otlp-parser.js";
 import { insertTraces } from "../store/traces.js";
-import { db } from "../store/db.js";
-import { projects } from "../store/schema.js";
-import { eq } from "drizzle-orm";
+import { resolveApiKey, lookupProject } from "../lib/auth.js";
+
+const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_ARRAY_LENGTH = 1000; // max spans/metrics per request
+
+// ── Zod schemas for OTLP JSON payloads ──────────────────────────────
+// Based on OpenTelemetry Protocol specification (OTLP/HTTP JSON)
+
+const AnyValueSchema = z.object({
+  stringValue: z.string().optional(),
+  intValue: z.string().optional(),
+  doubleValue: z.number().optional(),
+  boolValue: z.boolean().optional(),
+});
+
+const KeyValueSchema = z.object({
+  key: z.string(),
+  value: AnyValueSchema,
+});
+
+const OTLPSpanSchema = z.object({
+  traceId: z.string().min(1),
+  spanId: z.string().min(1),
+  parentSpanId: z.string().optional(),
+  name: z.string(),
+  kind: z.union([z.string(), z.number()]).optional(),
+  startTimeUnixNano: z.string(),
+  endTimeUnixNano: z.string(),
+  attributes: z.array(KeyValueSchema).optional(),
+  status: z.object({
+    code: z.union([z.string(), z.number()]).optional(),
+    message: z.string().optional(),
+  }).optional(),
+  events: z.array(z.object({
+    timeUnixNano: z.string(),
+    name: z.string(),
+    attributes: z.array(KeyValueSchema).optional(),
+  })).optional(),
+});
+
+const OTLPResourceSchema = z.object({
+  attributes: z.array(KeyValueSchema),
+});
+
+const OTLPResourceSpanSchema = z.object({
+  resource: OTLPResourceSchema.optional(),
+  scopeSpans: z.array(z.object({
+    scope: z.object({
+      name: z.string(),
+      version: z.string().optional(),
+    }).optional(),
+    spans: z.array(OTLPSpanSchema),
+  })).optional(),
+});
+
+const OTLPTracePayloadSchema = z.object({
+  resourceSpans: z.array(OTLPResourceSpanSchema).min(1).max(MAX_ARRAY_LENGTH),
+});
+
+const OTLPMetricDataPointSchema = z.object({
+  startTimeUnixNano: z.string().optional(),
+  timeUnixNano: z.string().optional(),
+  asInt: z.union([z.number(), z.string()]).optional(),
+  asDouble: z.union([z.number(), z.string()]).optional(),
+});
+
+const OTLPMetricSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  unit: z.string().optional(),
+  sum: z.object({
+    dataPoints: z.array(OTLPMetricDataPointSchema).optional(),
+  }).optional(),
+  gauge: z.object({
+    dataPoints: z.array(OTLPMetricDataPointSchema).optional(),
+  }).optional(),
+});
+
+const OTLPResourceMetricSchema = z.object({
+  resource: OTLPResourceSchema.optional(),
+  scopeMetrics: z.array(z.object({
+    metrics: z.array(OTLPMetricSchema),
+  })).optional(),
+});
+
+const OTLPMetricPayloadSchema = z.object({
+  resourceMetrics: z.array(OTLPResourceMetricSchema).min(1).max(MAX_ARRAY_LENGTH),
+});
 
 // OTLP JSON types (subset of OpenTelemetry spec)
 export interface OTLPResource {
@@ -35,27 +121,38 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
   // OTLP HTTP Trace Export (JSON)
   .post("/traces", async ({ body, headers, set }) => {
     try {
-      const apiKey = extractApiKey(headers);
-      if (!apiKey) {
+      // Body size guard
+      const bodyStr = JSON.stringify(body);
+      if (bodyStr.length > MAX_BODY_BYTES) {
+        set.status = 413;
+        return { error: "Payload too large", detail: "Max size: 5MB" };
+      }
+
+      const authKey = resolveApiKey(headers["authorization"])
+        ?? (headers["x-api-key"] ? { apiKey: headers["x-api-key"]! } : null);
+      if (!authKey) {
         set.status = 401;
         return { error: "Missing API key" };
       }
 
-      const projectId = await resolveProjectId(apiKey);
-      if (!projectId) {
+      const project = await lookupProject(authKey.apiKey);
+      if (!project) {
         set.status = 403;
         return { error: "Invalid API key" };
       }
+      const projectId = project.projectId;
 
-      const resourceSpans = (body as { resourceSpans?: OTLPResourceSpan[] }).resourceSpans;
-      if (!resourceSpans?.length) {
+      // Zod validation for OTLP trace payload structure
+      const traceResult = OTLPTracePayloadSchema.safeParse(body);
+      if (!traceResult.success) {
         set.status = 400;
-        return { error: "No resourceSpans in payload" };
+        return { error: "Invalid OTLP trace payload", detail: JSON.stringify(traceResult.error.flatten()) };
       }
 
-      const parsed = parseOTLPTraces(resourceSpans, projectId);
-      if (parsed.length > 0) {
-        await insertTraces(parsed);
+      const resourceSpans = traceResult.data.resourceSpans as OTLPResourceSpan[];
+      const traces = parseOTLPTraces(resourceSpans, projectId);
+      if (traces.length > 0) {
+        await insertTraces(traces);
       }
 
       // OTLP expects empty 200 on success
@@ -73,28 +170,38 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
   // OTLP HTTP Metrics Export (JSON)
   .post("/metrics", async ({ body, headers, set }) => {
     try {
-      const apiKey = extractApiKey(headers);
-      if (!apiKey) {
+      // Body size guard
+      const bodyStr = JSON.stringify(body);
+      if (bodyStr.length > MAX_BODY_BYTES) {
+        set.status = 413;
+        return { error: "Payload too large", detail: "Max size: 5MB" };
+      }
+
+      const authKey = resolveApiKey(headers["authorization"])
+        ?? (headers["x-api-key"] ? { apiKey: headers["x-api-key"]! } : null);
+      if (!authKey) {
         set.status = 401;
         return { error: "Missing API key" };
       }
 
-      const projectId = await resolveProjectId(apiKey);
-      if (!projectId) {
+      const project = await lookupProject(authKey.apiKey);
+      if (!project) {
         set.status = 403;
         return { error: "Invalid API key" };
       }
+      const projectId = project.projectId;
 
-      // Metrics are stored as traces with kind='metric' for MVP
-      const resourceMetrics = (body as { resourceMetrics?: unknown[] }).resourceMetrics;
-      if (!resourceMetrics?.length) {
+      // Zod validation for OTLP metric payload structure
+      const metricResult = OTLPMetricPayloadSchema.safeParse(body);
+      if (!metricResult.success) {
         set.status = 400;
-        return { error: "No resourceMetrics in payload" };
+        return { error: "Invalid OTLP metric payload", detail: JSON.stringify(metricResult.error.flatten()) };
       }
 
-      const parsed = parseOTLPMetrics(resourceMetrics, projectId);
-      if (parsed.length > 0) {
-        await insertTraces(parsed);
+      // Metrics are stored as traces with kind='metric' for MVP
+      const traces = parseOTLPMetrics(metricResult.data.resourceMetrics, projectId);
+      if (traces.length > 0) {
+        await insertTraces(traces);
       }
 
       return {};
@@ -107,37 +214,3 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
       resourceMetrics: t.Array(t.Any()),
     }),
   });
-
-// Helpers
-
-function extractApiKey(headers: Record<string, string | undefined>): string | null {
-  const auth = headers["authorization"];
-  if (!auth) return null;
-
-  // Bearer token
-  if (auth.startsWith("Bearer ")) {
-    return auth.slice(7);
-  }
-
-  // Basic auth (Sentry SDK format)
-  if (auth.startsWith("Basic ")) {
-    const decoded = Buffer.from(auth.slice(6), "base64").toString();
-    // Format: "apikey:" or "apikey:secret"
-    const colonIndex = decoded.indexOf(":");
-    if (colonIndex === -1) return decoded;
-    return decoded.slice(0, colonIndex);
-  }
-
-  // X-Api-Key header fallback
-  return headers["x-api-key"] ?? null;
-}
-
-async function resolveProjectId(apiKey: string): Promise<string | null> {
-  const [project] = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.apiKey, apiKey))
-    .limit(1);
-
-  return project?.id ?? null;
-}

@@ -1,28 +1,19 @@
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 import type { LogEntry } from "../monitoring/log-streamer.js";
+import { redis } from "./redis.js";
 
 const LOGS_CHANNEL_PREFIX = "logs:";
 const LOGS_RECENT_PREFIX = "logs:recent:";
 const LOGS_ALL_CHANNEL = "logs:*";
 const MAX_RECENT_LOGS = 10_000;
 
-let publisher: Redis | null = null;
+// Redis requires a SEPARATE connection for subscribe — cannot reuse the shared client.
 let subscriber: Redis | null = null;
-
-function getRedisUrl(): string {
-  return process.env.REDIS_URL || "redis://localhost:6379";
-}
-
-function getPublisher(): Redis {
-  if (!publisher) {
-    publisher = new Redis(getRedisUrl(), { lazyConnect: true });
-  }
-  return publisher;
-}
 
 function getSubscriber(): Redis {
   if (!subscriber) {
-    subscriber = new Redis(getRedisUrl(), { lazyConnect: true });
+    const url = process.env.REDIS_URL || "redis://localhost:6379";
+    subscriber = new Redis(url, { lazyConnect: true });
   }
   return subscriber;
 }
@@ -32,17 +23,16 @@ function getSubscriber(): Redis {
  * Also stores in a Redis list for recent log retrieval.
  */
 export async function publishLog(entry: LogEntry): Promise<void> {
-  const pub = getPublisher();
   const payload = JSON.stringify(entry);
 
   try {
-    await pub.publish(`${LOGS_CHANNEL_PREFIX}${entry.container_id}`, payload);
-    await pub.publish(LOGS_ALL_CHANNEL, payload);
+    await redis.publish(`${LOGS_CHANNEL_PREFIX}${entry.container_id}`, payload);
+    await redis.publish(LOGS_ALL_CHANNEL, payload);
 
     // Store in recent list (trim to MAX_RECENT_LOGS)
     const key = `${LOGS_RECENT_PREFIX}${entry.container_id}`;
-    await pub.lpush(key, payload);
-    await pub.ltrim(key, 0, MAX_RECENT_LOGS - 1);
+    await redis.lpush(key, payload);
+    await redis.ltrim(key, 0, MAX_RECENT_LOGS - 1);
   } catch (err) {
     console.error("[log-pubsub] Publish error:", err);
   }
@@ -79,7 +69,7 @@ export async function subscribeLogs(
 }
 
 /**
- * Subscribe to all container logs.
+ * Subscribe to all container logs via pattern subscription.
  * Returns unsubscribe function.
  */
 export async function subscribeAllLogs(
@@ -87,22 +77,21 @@ export async function subscribeAllLogs(
 ): Promise<() => void> {
   const sub = getSubscriber();
 
-  const handler = (ch: string, message: string) => {
-    if (ch === LOGS_ALL_CHANNEL) {
-      try {
-        callback(JSON.parse(message));
-      } catch {
-        // ignore parse errors
-      }
+  const handler = (_pattern: string, ch: string, message: string) => {
+    if (ch === LOGS_ALL_CHANNEL) return; // skip the literal wildcard channel
+    try {
+      callback(JSON.parse(message));
+    } catch {
+      // ignore parse errors
     }
   };
 
-  sub.on("message", handler);
-  await sub.subscribe(LOGS_ALL_CHANNEL);
+  sub.on("pmessage", handler);
+  await sub.psubscribe(LOGS_ALL_CHANNEL);
 
   return () => {
-    sub.off("message", handler);
-    sub.unsubscribe(LOGS_ALL_CHANNEL);
+    sub.off("pmessage", handler);
+    sub.punsubscribe(LOGS_ALL_CHANNEL);
   };
 }
 
@@ -113,9 +102,8 @@ export async function getRecentLogs(
   containerId: string,
   count = 100
 ): Promise<LogEntry[]> {
-  const pub = getPublisher();
   const key = `${LOGS_RECENT_PREFIX}${containerId}`;
-  const raw = await pub.lrange(key, 0, count - 1);
+  const raw = await redis.lrange(key, 0, count - 1);
 
   return raw
     .map((r) => {
@@ -130,21 +118,29 @@ export async function getRecentLogs(
 
 /**
  * Get all container IDs that have recent logs in Redis.
+ * Uses SCAN instead of KEYS for non-blocking iteration.
  */
 export async function getLogContainerIds(): Promise<string[]> {
-  const pub = getPublisher();
-  const keys = await pub.keys(`${LOGS_RECENT_PREFIX}*`);
-  return keys.map((k) => k.replace(LOGS_RECENT_PREFIX, ""));
+  const ids: string[] = [];
+  let cursor = "0";
+  const pattern = `${LOGS_RECENT_PREFIX}*`;
+
+  do {
+    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+    cursor = nextCursor;
+    for (const k of keys) {
+      ids.push(k.replace(LOGS_RECENT_PREFIX, ""));
+    }
+  } while (cursor !== "0");
+
+  return ids;
 }
 
 /**
- * Cleanup: disconnect Redis connections.
+ * Cleanup: disconnect subscriber connection.
+ * The shared redis client lifecycle is managed by redis.ts.
  */
 export async function closePubSub(): Promise<void> {
-  if (publisher) {
-    await publisher.quit();
-    publisher = null;
-  }
   if (subscriber) {
     await subscriber.quit();
     subscriber = null;

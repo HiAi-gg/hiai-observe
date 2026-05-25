@@ -100,9 +100,10 @@ export async function sendEmailAlert(
   const from = config?.from || process.env.SMTP_FROM || user;
 
   if (!host || !user || !pass) {
+    console.warn("[email-notifier] SMTP not configured — skipping email alert");
     return {
       ok: false,
-      error: "SMTP not configured (SMTP_HOST, SMTP_USER, SMTP_PASS required)",
+      error: "SMTP not configured",
     };
   }
 
@@ -135,36 +136,132 @@ export async function sendEmailAlert(
 
   const message = `${headers}\r\n${body}`;
 
-  // Use Bun's native SMTP support if available, otherwise log warning
-  // For MVP, we'll use a simple TCP approach via Bun
+  // Real SMTP conversation over Bun native TCP
   try {
-    if (typeof Bun !== "undefined" && Bun.connect) {
-      // Bun native TCP for SMTP
-      const socket = await Bun.connect({
-        hostname: host,
-        port,
-        socket: {
-          data() {},
-          open() {},
-          close() {},
-          error() {},
-        },
-      });
+    // Response queue for async SMTP reads
+    const responseQueue: string[] = [];
+    const waiters: Array<{ resolve: (v: string) => void; reject: (e: Error) => void }> = [];
 
-      if (!socket) {
-        return { ok: false, error: "Failed to connect to SMTP server" };
+    function pushResponse(data: string) {
+      const waiter = waiters.shift();
+      if (waiter) {
+        waiter.resolve(data);
+      } else {
+        responseQueue.push(data);
       }
-
-      // Simple SMTP conversation (simplified for MVP)
-      // Full SMTP implementation would handle EHLO, AUTH, etc.
-      socket.end();
-      return { ok: true };
     }
 
-    // Fallback: log the alert (in production, integrate with nodemailer or similar)
-    console.log(
-      `[Email Alert] To: ${alert.to}, Subject: ${subject}, Status: ${alert.status}`
-    );
+    function smtpRead(): Promise<string> {
+      const queued = responseQueue.shift();
+      if (queued) return Promise.resolve(queued);
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          const idx = waiters.findIndex((w) => w.resolve === resolve);
+          if (idx !== -1) waiters.splice(idx, 1);
+          reject(new Error("SMTP read timeout"));
+        }, 10_000);
+        waiters.push({
+          resolve: (v: string) => { clearTimeout(timeout); resolve(v); },
+          reject: (e: Error) => { clearTimeout(timeout); reject(e); },
+        });
+      });
+    }
+
+    const socket = await Bun.connect({
+      hostname: host,
+      port,
+      socket: {
+        data(_socket, data) {
+          pushResponse(data.toString());
+        },
+        open() {},
+        close() {},
+        error(_socket, err) {
+          const waiter = waiters.shift();
+          if (waiter) waiter.reject(err instanceof Error ? err : new Error(String(err)));
+        },
+      },
+    });
+
+    if (!socket) {
+      return { ok: false, error: "Failed to connect to SMTP server" };
+    }
+
+    async function smtpSend(line: string): Promise<string> {
+      socket.write(line + "\r\n");
+      return await smtpRead();
+    }
+
+    // Read the initial 220 greeting
+    const greeting = await smtpRead();
+    if (!greeting.startsWith("220")) {
+      socket.end();
+      return { ok: false, error: `SMTP greeting failed: ${greeting.trim()}` };
+    }
+
+    // EHLO
+    const ehloResp = await smtpSend(`EHLO ${host}`);
+    if (!ehloResp.includes("250")) {
+      const heloResp = await smtpSend(`HELO ${host}`);
+      if (!heloResp.includes("250")) {
+        socket.end();
+        return { ok: false, error: `SMTP HELO failed: ${heloResp.trim()}` };
+      }
+    }
+
+    // AUTH LOGIN
+    const authResp = await smtpSend("AUTH LOGIN");
+    if (!authResp.startsWith("334")) {
+      socket.end();
+      return { ok: false, error: `SMTP AUTH LOGIN rejected: ${authResp.trim()}` };
+    }
+
+    // Send username (base64)
+    const userResp = await smtpSend(Buffer.from(user!).toString("base64"));
+    if (!userResp.startsWith("334")) {
+      socket.end();
+      return { ok: false, error: `SMTP username rejected: ${userResp.trim()}` };
+    }
+
+    // Send password (base64)
+    const passResp = await smtpSend(Buffer.from(pass!).toString("base64"));
+    if (!passResp.startsWith("235")) {
+      socket.end();
+      return { ok: false, error: `SMTP auth failed: ${passResp.trim()}` };
+    }
+
+    // MAIL FROM
+    const fromResp = await smtpSend(`MAIL FROM:<${from}>`);
+    if (!fromResp.includes("250")) {
+      socket.end();
+      return { ok: false, error: `SMTP MAIL FROM rejected: ${fromResp.trim()}` };
+    }
+
+    // RCPT TO
+    const rcptResp = await smtpSend(`RCPT TO:<${alert.to}>`);
+    if (!rcptResp.includes("250")) {
+      socket.end();
+      return { ok: false, error: `SMTP RCPT TO rejected: ${rcptResp.trim()}` };
+    }
+
+    // DATA
+    const dataResp = await smtpSend("DATA");
+    if (!dataResp.startsWith("354")) {
+      socket.end();
+      return { ok: false, error: `SMTP DATA rejected: ${dataResp.trim()}` };
+    }
+
+    // Send message body (end with lone dot)
+    socket.write(message + "\r\n.\r\n");
+    const bodyResp = await smtpRead();
+    if (!bodyResp.includes("250")) {
+      socket.end();
+      return { ok: false, error: `SMTP message rejected: ${bodyResp.trim()}` };
+    }
+
+    // QUIT
+    await smtpSend("QUIT");
+    socket.end();
     return { ok: true };
   } catch (err) {
     const errorMessage =

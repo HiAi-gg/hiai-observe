@@ -1,7 +1,9 @@
 import { Elysia, t } from "elysia";
-import { db } from "../store/db.js";
+import { db, client } from "../store/db.js";
 import { events, traces, logs, containerStats, hostStats, uptimeChecks, alertHistory, retentionConfig } from "../store/schema.js";
 import { lt, sql, eq } from "drizzle-orm";
+import { recordWorkerRun } from "./health.js";
+import { logger } from "../lib/logger.js";
 
 const DEFAULT_RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 30;
 const BATCH_SIZE = 5000;
@@ -44,25 +46,27 @@ async function cleanupOldData() {
       const cutoff = new Date(Date.now() - days * 86400000);
       const deleted = await batchDelete(tableName, timeColumn, cutoff);
       if (deleted > 0) {
-        console.log(`[retention] ${tableName}: deleted ${deleted} rows (retention=${days}d)`);
+        logger.info(`Retention cleanup: ${tableName}`, { deleted, retentionDays: days });
       }
       totalCleaned += deleted;
     } catch (err) {
-      console.error(`[retention] ${tableName}: error —`, err instanceof Error ? err.message : err);
+      logger.error(`Retention cleanup failed: ${tableName}`, { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
   if (totalCleaned > 0) {
-    console.log(`[retention] Cleanup complete: ${totalCleaned} total rows deleted`);
+    logger.info("Retention cleanup complete", { totalDeleted: totalCleaned });
   } else {
-    console.log(`[retention] No old data to clean`);
+    logger.debug("Retention cleanup: no old data to clean");
   }
+
+  recordWorkerRun("retention");
 }
 
 export function startRetentionWorker(): void {
   if (intervalId) return;
   const intervalMs = 24 * 60 * 60 * 1000;
-  console.log(`[retention] Started — cleaning every 24h, default retention=${DEFAULT_RETENTION_DAYS} days`);
+  logger.info("Retention worker starting", { intervalHours: 24, defaultRetentionDays: DEFAULT_RETENTION_DAYS });
   intervalId = setInterval(cleanupOldData, intervalMs);
 }
 
@@ -70,7 +74,7 @@ export function stopRetentionWorker(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log("[retention] Stopped");
+    logger.info("Retention worker stopped");
   }
 }
 
@@ -81,9 +85,21 @@ function requireAdminKey(headers: Record<string, string | undefined>): { ok: tru
   }
   const auth = headers.authorization;
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (token !== adminKey) {
+  if (!token) {
+    return { ok: false, status: 401, error: "Missing admin API key" };
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  try {
+    const tokenBuf = Buffer.from(token, "utf-8");
+    const keyBuf = Buffer.from(adminKey, "utf-8");
+    if (tokenBuf.length !== keyBuf.length || !crypto.timingSafeEqual(tokenBuf, keyBuf)) {
+      return { ok: false, status: 401, error: "Invalid admin API key" };
+    }
+  } catch {
     return { ok: false, status: 401, error: "Invalid admin API key" };
   }
+
   return { ok: true };
 }
 
@@ -122,4 +138,43 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   }, {
     params: t.Object({ table: t.String() }),
     body: t.Object({ retentionDays: t.Number({ minimum: 1 }) }),
+  })
+  .get("/storage", async ({ headers, set }) => {
+    const check = requireAdminKey(headers as Record<string, string | undefined>);
+    if (!check.ok) { set.status = check.status; return { error: check.error }; }
+
+    const tableNames = TABLE_DEFS.map((t) => t.tableName);
+    const sizes: Array<{ tableName: string; sizeBytes: number; sizeHuman: string }> = [];
+
+    for (const tableName of tableNames) {
+      try {
+        const result = await client<{ size_bytes: number }[]>`
+          SELECT pg_total_relation_size(${tableName})::bigint AS size_bytes
+        `;
+        const sizeBytes = Number(result[0]?.size_bytes ?? 0);
+        sizes.push({
+          tableName,
+          sizeBytes,
+          sizeHuman: formatBytes(sizeBytes),
+        });
+      } catch (err) {
+        logger.error(`Storage query failed: ${tableName}`, { error: err instanceof Error ? err.message : String(err) });
+        sizes.push({ tableName, sizeBytes: 0, sizeHuman: "unknown" });
+      }
+    }
+
+    const totalBytes = sizes.reduce((sum, s) => sum + s.sizeBytes, 0);
+    return {
+      totalBytes,
+      totalHuman: formatBytes(totalBytes),
+      tables: sizes,
+    };
   });
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(1)} ${units[i]}`;
+}

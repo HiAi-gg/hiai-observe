@@ -41,6 +41,18 @@ export async function createMonitor(data: {
   projectId: string;
   type?: string;
   monitorGroup?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  authType?: string;
+  authValue?: string;
+  ignoreSsl?: boolean;
+  maxRedirects?: number;
+  keyword?: string;
+  keywordNot?: string;
+  dnsRecordType?: string;
+  dnsExpectedValue?: string;
+  dnsResolver?: string;
 }) {
   const [monitor] = await db
     .insert(uptimeMonitors)
@@ -51,6 +63,18 @@ export async function createMonitor(data: {
       monitorGroup: data.monitorGroup ?? null,
       intervalSeconds: data.intervalSeconds,
       projectId: data.projectId,
+      method: data.method ?? "GET",
+      headers: data.headers ?? null,
+      body: data.body ?? null,
+      authType: data.authType ?? null,
+      authValue: data.authValue ?? null,
+      ignoreSsl: data.ignoreSsl ?? false,
+      maxRedirects: data.maxRedirects ?? 5,
+      keyword: data.keyword ?? null,
+      keywordNot: data.keywordNot ?? null,
+      dnsRecordType: data.dnsRecordType ?? null,
+      dnsExpectedValue: data.dnsExpectedValue ?? null,
+      dnsResolver: data.dnsResolver ?? null,
     })
     .returning();
 
@@ -81,6 +105,18 @@ export async function updateMonitor(
     url: string;
     intervalSeconds: number;
     active: boolean;
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+    authType: string;
+    authValue: string;
+    ignoreSsl: boolean;
+    maxRedirects: number;
+    keyword: string;
+    keywordNot: string;
+    dnsRecordType: string;
+    dnsExpectedValue: string;
+    dnsResolver: string;
   }>
 ) {
   const [monitor] = await db
@@ -103,6 +139,7 @@ export async function insertCheck(data: {
   responseTimeMs: number;
   error: string | null;
   success: boolean;
+  certExpiry?: Date | null;
 }) {
   const [check] = await db
     .insert(uptimeChecks)

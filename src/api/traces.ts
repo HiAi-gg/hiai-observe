@@ -9,6 +9,7 @@ import {
   getTraceDetail,
   getWorkflowRuns,
 } from "../store/traces.js";
+import { badRequest, notFound, internal } from "../lib/errors.js";
 
 export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
   // List traces with filters
@@ -31,7 +32,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
       return result;
     } catch (err) {
       set.status = 500;
-      return { error: "Failed to fetch traces", detail: process.env.NODE_ENV === "development" ? String(err) : "Internal error" };
+      return internal(String(err));
     }
   }, {
     query: t.Object({
@@ -54,7 +55,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
 
       if (!projectId) {
         set.status = 400;
-        return { error: "projectId is required" };
+        return badRequest("projectId is required");
       }
 
       const [tokenUsage, latency] = await Promise.all([
@@ -74,7 +75,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
       return { tokenUsage, latency };
     } catch (err) {
       set.status = 500;
-      return { error: "Failed to compute stats", detail: process.env.NODE_ENV === "development" ? String(err) : "Internal error" };
+      return internal(String(err));
     }
   }, {
     query: t.Object({
@@ -101,7 +102,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
       return result;
     } catch (err) {
       set.status = 500;
-      return { error: "Failed to fetch workflow runs", detail: process.env.NODE_ENV === "development" ? String(err) : "Internal error" };
+      return internal(String(err));
     }
   }, {
     query: t.Object({
@@ -124,7 +125,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
       return result;
     } catch (err) {
       set.status = 500;
-      return { error: "Failed to fetch workflow run", detail: process.env.NODE_ENV === "development" ? String(err) : "Internal error" };
+      return internal(String(err));
     }
   }, {
     params: t.Object({
@@ -143,7 +144,7 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
       return result;
     } catch (err) {
       set.status = 500;
-      return { error: "Failed to fetch trace", detail: process.env.NODE_ENV === "development" ? String(err) : "Internal error" };
+      return internal(String(err));
     }
   }, {
     params: t.Object({

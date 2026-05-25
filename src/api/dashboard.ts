@@ -8,8 +8,13 @@ import {
   containerStats,
   alerts,
 } from "../store/schema.js";
-import { desc, eq, and, gte, count } from "drizzle-orm";
+import { desc, eq, and, gte, count, sql } from "drizzle-orm";
 import { getUptimePercentages } from "../store/uptime.js";
+
+export interface HourlyBucket {
+  hour: string; // ISO hour string
+  count: number;
+}
 
 export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
   .get("/", async ({ query }) => {
@@ -25,7 +30,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
     const monitorProjectFilter = projectId ? eq(uptimeMonitors.projectId, projectId) : undefined;
     const alertProjectFilter = projectId ? eq(alerts.projectId, projectId) : undefined;
 
-    const [errorCountRow, traceCountRow, recentIssues, monitors, activeAlerts] = await Promise.all([
+    const [errorCountRow, traceCountRow, recentIssues, monitors, activeAlerts, errorBuckets, traceBuckets] = await Promise.all([
       // errorCount24h
       db
         .select({ value: count() })
@@ -69,7 +74,41 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
         .select({ value: count() })
         .from(alerts)
         .where(and(eq(alerts.isActive, true), alertProjectFilter)),
+
+      // Hourly error buckets (last 24h)
+      db.execute(
+        sql`SELECT date_trunc('hour', created_at) AS hour, count(*)::int AS count
+            FROM events
+            WHERE level = 'error' AND created_at >= ${twentyFourHoursAgo.toISOString()}
+            ${projectId ? sql`AND project_id = ${projectId}` : sql``}
+            GROUP BY hour ORDER BY hour`
+      ) as unknown as Promise<HourlyBucket[]>,
+
+      // Hourly trace buckets (last 24h)
+      db.execute(
+        sql`SELECT date_trunc('hour', start_time) AS hour, count(*)::int AS count
+            FROM traces
+            WHERE start_time >= ${twentyFourHoursAgo.toISOString()}
+            ${projectId ? sql`AND project_id = ${projectId}` : sql``}
+            GROUP BY hour ORDER BY hour`
+      ) as unknown as Promise<HourlyBucket[]>,
     ]);
+
+    // Fill in missing hours with zero counts for sparklines
+    function fillBuckets(buckets: HourlyBucket[]): HourlyBucket[] {
+      const map = new Map<string, number>();
+      for (const b of buckets) {
+        const key = new Date(b.hour).toISOString().slice(0, 13) + ":00:00.000Z";
+        map.set(key, b.count);
+      }
+      const result: HourlyBucket[] = [];
+      for (let i = 23; i >= 0; i--) {
+        const h = new Date(now.getTime() - i * 3600_000);
+        const key = h.toISOString().slice(0, 13) + ":00:00.000Z";
+        result.push({ hour: key, count: map.get(key) ?? 0 });
+      }
+      return result;
+    }
 
     // Batch uptime percentage (single query instead of N)
     const monitorIds = monitors.map((m) => m.id);
@@ -78,20 +117,17 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
     const upMonitors = [...uptimeMap.values()].filter((v) => v >= 99.9).length;
     const uptimePercent = totalMonitors > 0 ? Math.round((upMonitors / totalMonitors) * 10000) / 100 : 100;
 
-    // activeContainers — deduplicate by containerId, take latest
-    const containerRows = await db
-      .select({ containerId: containerStats.containerId, status: containerStats.status, collectedAt: containerStats.collectedAt })
+    // activeContainers — SQL DISTINCT ON instead of JS dedup
+    const latestContainers = await db
+      .selectDistinctOn([containerStats.containerId], {
+        containerId: containerStats.containerId,
+        status: containerStats.status,
+      })
       .from(containerStats)
-      .where(gte(containerStats.collectedAt, fiveMinsAgo));
+      .where(gte(containerStats.collectedAt, fiveMinsAgo))
+      .orderBy(containerStats.containerId, desc(containerStats.collectedAt));
 
-    const containerMap = new Map<string, { status: string; collectedAt: Date }>();
-    for (const c of containerRows) {
-      const existing = containerMap.get(c.containerId);
-      if (!existing || c.collectedAt > existing.collectedAt) {
-        containerMap.set(c.containerId, { status: c.status, collectedAt: c.collectedAt });
-      }
-    }
-    const activeContainers = [...containerMap.values()].filter((v) => v.status === "running").length;
+    const activeContainers = latestContainers.filter((v) => v.status === "running").length;
 
     return {
       errorCount24h: errorCountRow[0]?.value ?? 0,
@@ -107,5 +143,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
         isUp: (uptimeMap.get(m.id) ?? 100) >= 99.9,
       })),
       alertCount: activeAlerts[0]?.value ?? 0,
+      errorBuckets: fillBuckets(errorBuckets),
+      traceBuckets: fillBuckets(traceBuckets),
     };
   });

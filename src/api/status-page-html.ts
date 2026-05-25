@@ -1,7 +1,16 @@
 import { Elysia } from "elysia";
 import { db } from "../store/db.js";
 import { projects, uptimeMonitors, uptimeChecks, alerts, alertHistory } from "../store/schema.js";
-import { eq, desc, and, gte, count, sql } from "drizzle-orm";
+import { eq, desc, and, gte, count, sql, inArray } from "drizzle-orm";
+
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 function overallColor(status: string): string {
   switch (status) {
@@ -61,42 +70,83 @@ export const statusPageHtmlRoutes = new Elysia()
       active: uptimeMonitors.active,
     }).from(uptimeMonitors).where(eq(uptimeMonitors.projectId, project.id));
 
+    const monitorIds = monitors.map(m => m.id);
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600_000);
 
-    const monitorData = await Promise.all(monitors.map(async (m) => {
-      // Latest check
-      const [latest] = await db.select().from(uptimeChecks)
-        .where(eq(uptimeChecks.monitorId, m.id))
-        .orderBy(desc(uptimeChecks.checkedAt))
-        .limit(1);
+    // Batch query 1: latest check per monitor (DISTINCT ON instead of N queries)
+    const latestChecksRows = monitorIds.length > 0
+      ? await db.selectDistinctOn([uptimeChecks.monitorId], {
+          monitorId: uptimeChecks.monitorId,
+          responseTimeMs: uptimeChecks.responseTimeMs,
+          success: uptimeChecks.success,
+          certExpiry: uptimeChecks.certExpiry,
+        })
+        .from(uptimeChecks)
+        .where(inArray(uptimeChecks.monitorId, monitorIds))
+        .orderBy(uptimeChecks.monitorId, desc(uptimeChecks.checkedAt))
+      : [];
 
-      // 24h uptime %
-      const [stats] = await db.select({
-        total: count(),
-        up: sql<number>`COUNT(*) FILTER (WHERE ${uptimeChecks.success} = true)`.mapWith(Number),
-      }).from(uptimeChecks)
-        .where(and(eq(uptimeChecks.monitorId, m.id), gte(uptimeChecks.checkedAt, twentyFourHoursAgo)));
+    const latestByMonitor = new Map<string, { responseTimeMs: number; success: boolean; certExpiry: Date | null }>();
+    for (const row of latestChecksRows) {
+      latestByMonitor.set(row.monitorId, {
+        responseTimeMs: row.responseTimeMs,
+        success: row.success,
+        certExpiry: row.certExpiry,
+      });
+    }
 
-      const uptimePercent = stats && stats.total > 0 ? (stats.up / stats.total) * 100 : 100;
+    // Batch query 2: uptime stats for all monitors (GROUP BY instead of N queries)
+    const uptimeStatsRows = monitorIds.length > 0
+      ? await db.select({
+          monitorId: uptimeChecks.monitorId,
+          total: count(),
+          up: sql<number>`COUNT(*) FILTER (WHERE ${uptimeChecks.success} = true)`.mapWith(Number),
+        })
+        .from(uptimeChecks)
+        .where(and(inArray(uptimeChecks.monitorId, monitorIds), gte(uptimeChecks.checkedAt, twentyFourHoursAgo)))
+        .groupBy(uptimeChecks.monitorId)
+      : [];
 
-      // All checks for bars
-      const checks = await db.select({
-        checkedAt: uptimeChecks.checkedAt,
-        success: uptimeChecks.success,
-      }).from(uptimeChecks)
-        .where(and(eq(uptimeChecks.monitorId, m.id), gte(uptimeChecks.checkedAt, twentyFourHoursAgo)))
-        .orderBy(uptimeChecks.checkedAt);
+    const uptimeMap = new Map<string, number>();
+    for (const row of uptimeStatsRows) {
+      uptimeMap.set(row.monitorId, row.total > 0 ? (row.up / row.total) * 100 : 100);
+    }
 
+    // Batch query 3: all checks for bars (single query instead of N queries)
+    const allChecksRows = monitorIds.length > 0
+      ? await db.select({
+          monitorId: uptimeChecks.monitorId,
+          checkedAt: uptimeChecks.checkedAt,
+          success: uptimeChecks.success,
+        })
+        .from(uptimeChecks)
+        .where(and(inArray(uptimeChecks.monitorId, monitorIds), gte(uptimeChecks.checkedAt, twentyFourHoursAgo)))
+        .orderBy(uptimeChecks.monitorId, uptimeChecks.checkedAt)
+      : [];
+
+    const checksByMonitor = new Map<string, Array<{ checkedAt: Date; success: boolean }>>();
+    for (const row of allChecksRows) {
+      let arr = checksByMonitor.get(row.monitorId);
+      if (!arr) {
+        arr = [];
+        checksByMonitor.set(row.monitorId, arr);
+      }
+      arr.push({ checkedAt: row.checkedAt, success: row.success });
+    }
+
+    // Combine batch results into monitorData
+    const monitorData = monitors.map(m => {
+      const latest = latestByMonitor.get(m.id);
       return {
         name: m.name,
         active: m.active,
-        uptimePercent,
+        uptimePercent: uptimeMap.get(m.id) ?? 100,
         responseTimeMs: latest?.responseTimeMs,
         success: latest?.success ?? true,
         certExpiry: latest?.certExpiry,
-        bars: generateUptimeBars(checks),
+        bars: generateUptimeBars(checksByMonitor.get(m.id) ?? []),
       };
-    }));
+    });
 
     // Determine overall status
     const activeMonitors = monitorData.filter(m => m.active);
@@ -131,12 +181,16 @@ export const statusPageHtmlRoutes = new Elysia()
     const customCss = process.env.STATUS_PAGE_CSS ?? "";
     const favicon = `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">`;
 
+    const projectName = esc(project.name);
+    const overallColorVal = overallColor(overall);
+    const overallLabelVal = overallLabel(overall);
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${project.name} — Status</title>
+  <title>${projectName} — Status</title>
   ${favicon}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -167,21 +221,21 @@ export const statusPageHtmlRoutes = new Elysia()
 </head>
 <body>
   <div class="container">
-    <h1>${project.name}</h1>
-    <div class="overall" style="background: ${overallColor(overall)}22; border: 1px solid ${overallColor(overall)}44">
-      <span class="dot" style="background: ${overallColor(overall)}"></span>
-      <span style="color: ${overallColor(overall)}">${overallLabel(overall)}</span>
+    <h1>${projectName}</h1>
+    <div class="overall" style="background: ${overallColorVal}22; border: 1px solid ${overallColorVal}44">
+      <span class="dot" style="background: ${overallColorVal}"></span>
+      <span style="color: ${overallColorVal}">${overallLabelVal}</span>
     </div>
 
     ${certWarnings.length > 0 ? `
     <div class="cert-warning">
-      ⚠️ SSL certificate expiring soon: ${certWarnings.map(w => w.name).join(", ")}
+      ⚠️ SSL certificate expiring soon: ${certWarnings.map(w => esc(w.name)).join(", ")}
     </div>` : ""}
 
     ${monitorData.map(m => `
     <div class="monitor">
       <div class="monitor-header">
-        <span class="monitor-name">${m.name}</span>
+        <span class="monitor-name">${esc(m.name)}</span>
         <span class="monitor-status" style="color: ${m.success ? "#22c55e" : "#ef4444"}">
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${m.success ? "#22c55e" : "#ef4444"}"></span>
           ${m.success ? "Up" : "Down"}
@@ -199,7 +253,7 @@ export const statusPageHtmlRoutes = new Elysia()
     ${recentAlerts.map(a => `
     <div class="incident">
       <div class="incident-header">
-        <span class="incident-name">${a.alertName}</span>
+        <span class="incident-name">${esc(a.alertName)}</span>
         <span class="incident-status ${a.resolvedAt ? "incident-resolved" : "incident-ongoing"}">
           ${a.resolvedAt ? "Resolved" : "Ongoing"}
         </span>

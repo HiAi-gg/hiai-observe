@@ -3,6 +3,27 @@ import { db } from "../store/db.js";
 import { issues, traces, logs } from "../store/schema.js";
 import { desc, gte, lte, and, eq } from "drizzle-orm";
 
+const MAX_RANGE_DAYS = 90;
+const MAX_EXPORT_ROWS = 10_000;
+const MS_PER_DAY = 86_400_000;
+
+function clampDateRange(from?: Date, to?: Date, defaultDays = 7): { from: Date; to: Date } {
+  const now = new Date();
+  const effectiveTo = to ?? now;
+  const effectiveFrom = from ?? new Date(effectiveTo.getTime() - defaultDays * MS_PER_DAY);
+
+  // Cap range to MAX_RANGE_DAYS
+  const rangeMs = effectiveTo.getTime() - effectiveFrom.getTime();
+  if (rangeMs > MAX_RANGE_DAYS * MS_PER_DAY) {
+    return { from: new Date(effectiveTo.getTime() - MAX_RANGE_DAYS * MS_PER_DAY), to: effectiveTo };
+  }
+  if (rangeMs < 0) {
+    // from is after to — swap
+    return { from: effectiveTo, to: effectiveFrom };
+  }
+  return { from: effectiveFrom, to: effectiveTo };
+}
+
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]!);
@@ -24,12 +45,16 @@ function toCsv(rows: Record<string, unknown>[]): string {
 export const exportRoutes = new Elysia({ prefix: "/api/export" })
 
   .get("/issues", async ({ query }) => {
-    const to = query.to ? new Date(query.to) : new Date();
+    const { from, to } = clampDateRange(
+      query.from ? new Date(query.from) : undefined,
+      query.to ? new Date(query.to) : undefined,
+      30,
+    );
 
     const rows = await db.select().from(issues)
-      .where(lte(issues.lastSeen, to))
+      .where(and(gte(issues.lastSeen, from), lte(issues.lastSeen, to)))
       .orderBy(desc(issues.lastSeen))
-      .limit(10000);
+      .limit(MAX_EXPORT_ROWS);
 
     const data = rows.map((r) => ({
       id: r.id,
@@ -56,12 +81,16 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
   })
 
   .get("/traces", async ({ query }) => {
-    const from = query.from ? new Date(query.from) : new Date(Date.now() - 7 * 86400000);
+    const { from, to } = clampDateRange(
+      query.from ? new Date(query.from) : undefined,
+      query.to ? new Date(query.to) : undefined,
+      7,
+    );
 
     const rows = await db.select().from(traces)
-      .where(gte(traces.startTime, from))
+      .where(and(gte(traces.startTime, from), lte(traces.startTime, to)))
       .orderBy(desc(traces.startTime))
-      .limit(10000);
+      .limit(MAX_EXPORT_ROWS);
 
     const data = rows.map((r) => ({
       id: r.id,
@@ -89,17 +118,21 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
   })
 
   .get("/logs", async ({ query }) => {
-    const conditions = [];
-    if (query.from) conditions.push(gte(logs.timestamp, new Date(query.from)));
-    if (query.to) conditions.push(lte(logs.timestamp, new Date(query.to)));
+    const { from, to } = clampDateRange(
+      query.from ? new Date(query.from) : undefined,
+      query.to ? new Date(query.to) : undefined,
+      7,
+    );
+
+    const conditions = [gte(logs.timestamp, from), lte(logs.timestamp, to)];
     if (query.level) conditions.push(eq(logs.level, query.level));
     if (query.container) conditions.push(eq(logs.containerId, query.container));
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const where = and(...conditions);
 
     const rows = await db.select().from(logs)
       .where(where)
       .orderBy(desc(logs.timestamp))
-      .limit(10000);
+      .limit(MAX_EXPORT_ROWS);
 
     const data = rows.map((r) => ({
       id: r.id,

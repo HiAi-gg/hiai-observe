@@ -3,7 +3,7 @@ import { db } from "../store/db.js";
 import { alerts, alertHistory } from "../store/schema.js";
 import { eq, desc, and, ilike, count } from "drizzle-orm";
 import { testAlert } from "../alerts/dispatcher.js";
-import type { AlertCondition, AlertChannel, AlertRule } from "../alerts/rules-engine.js";
+import type { AlertCondition, AlertChannel, AlertRule, AlertSeverity } from "../alerts/rules-engine.js";
 
 export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
@@ -49,6 +49,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
     const [created] = await db.insert(alerts).values({
       name: body.name,
       projectId: body.projectId,
+      severity: body.severity ?? "warning",
       condition: body.condition as AlertCondition,
       channels: body.channels as Array<{ type: string; target: string }>,
       cooldownSeconds: body.cooldownSeconds ?? 300,
@@ -58,6 +59,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
     body: t.Object({
       name: t.String({ minLength: 1 }),
       projectId: t.String(),
+      severity: t.Optional(t.Union([t.Literal("critical"), t.Literal("warning"), t.Literal("info")])),
       condition: t.Object({
         type: t.Union([t.Literal("error_rate"), t.Literal("uptime_down"), t.Literal("resource_threshold"), t.Literal("trace_error"), t.Literal("token_usage")]),
         threshold: t.Number(),
@@ -81,8 +83,9 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
+    if (body.severity !== undefined) updateData.severity = body.severity;
     if (body.condition !== undefined) updateData.condition = body.condition as AlertCondition;
-    if (body.channels !== undefined) updateData.channels = body.channels as Array<{ type: string; config: Record<string, string> }>;
+    if (body.channels !== undefined) updateData.channels = body.channels as Array<{ type: string; target: string }>;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
     if (body.cooldownSeconds !== undefined) updateData.cooldownSeconds = body.cooldownSeconds;
 
@@ -92,6 +95,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
     params: t.Object({ id: t.String() }),
     body: t.Object({
       name: t.Optional(t.String()),
+      severity: t.Optional(t.Union([t.Literal("critical"), t.Literal("warning"), t.Literal("info")])),
       condition: t.Optional(t.Object({})),
       channels: t.Optional(t.Array(t.Object({}))),
       isActive: t.Optional(t.Boolean()),
@@ -103,8 +107,10 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
     const [existing] = await db.select({ id: alerts.id }).from(alerts).where(eq(alerts.id, params.id)).limit(1);
     if (!existing) { set.status = 404; return { error: "Alert not found" }; }
 
-    await db.delete(alertHistory).where(eq(alertHistory.alertId, params.id));
-    await db.delete(alerts).where(eq(alerts.id, params.id));
+    await db.transaction(async (tx) => {
+      await tx.delete(alertHistory).where(eq(alertHistory.alertId, params.id));
+      await tx.delete(alerts).where(eq(alerts.id, params.id));
+    });
     return { deleted: true };
   }, { params: t.Object({ id: t.String() }) })
 
@@ -116,6 +122,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
       id: alert.id,
       name: alert.name,
       projectId: alert.projectId,
+      severity: (alert.severity as AlertSeverity) ?? "warning",
       condition: alert.condition as AlertCondition,
       channels: (alert.channels ?? []) as unknown as AlertChannel[],
       isActive: alert.isActive,
@@ -161,6 +168,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
           id: alert.id,
           name: alert.name,
           projectId: alert.projectId,
+          severity: (alert.severity as AlertSeverity) ?? "warning",
           condition: alert.condition as AlertCondition,
           channels: (alert.channels ?? []) as unknown as AlertChannel[],
           isActive: alert.isActive,

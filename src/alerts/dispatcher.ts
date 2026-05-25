@@ -12,6 +12,12 @@ import { sendTelegramAlert } from "./notifiers/telegram.js";
 import { sendDiscordAlert } from "./notifiers/discord.js";
 import { sendEmailAlert } from "./notifiers/email.js";
 import { sendSlackAlert } from "./notifiers/slack.js";
+import { sendWebhookAlert } from "./notifiers/webhook.js";
+import { sendPagerdutyAlert } from "./notifiers/pagerduty.js";
+import { sendTeamsAlert } from "./notifiers/teams.js";
+import { sendNtfyAlert } from "./notifiers/ntfy.js";
+import { sendGotifyAlert } from "./notifiers/gotify.js";
+import { sendPushoverAlert } from "./notifiers/pushover.js";
 import { markAlertFired } from "./dedup.js";
 import type { AlertRule, AlertChannel, AlertEvaluationResult } from "./rules-engine.js";
 
@@ -33,21 +39,47 @@ async function getChannelConfig(projectId: string, channel: string): Promise<Rec
   return row?.config ?? null;
 }
 
+const SEVERITY_EMOJI: Record<string, string> = {
+  critical: "\u{1F534}", // red circle
+  warning: "\u{1F7E1}",  // yellow circle
+  info: "\u{1F535}",     // blue circle
+  recovered: "\u{1F7E2}", // green circle
+};
+
 export async function dispatchAlert(
   rule: AlertRule,
-  result: AlertEvaluationResult
+  result: AlertEvaluationResult,
+  overrideStatus?: "critical" | "warning" | "recovered",
 ): Promise<DispatchResult> {
   const timestamp = new Date();
   const channelResults: DispatchResult["channels"] = [];
 
+  // Use rule's computed severity (auto-escalated by rules engine),
+  // fall back to override, then rule default
   const status: "critical" | "warning" | "recovered" =
-    result.currentValue > result.threshold * 2 ? "critical" : "warning";
+    overrideStatus ?? (rule.severity as "critical" | "warning") ?? "warning";
 
-  for (const channel of rule.channels) {
+  // Use per-alert channels if configured, otherwise fall back to project-level
+  let channelsToUse = rule.channels;
+  if (channelsToUse.length === 0) {
+    const projectConfigs = await db.select()
+      .from(notificationConfig)
+      .where(and(
+        eq(notificationConfig.projectId, rule.projectId),
+        eq(notificationConfig.enabled, true),
+      ));
+    channelsToUse = projectConfigs
+      .map((c) => ({ type: c.channel as AlertChannel["type"], target: extractTarget(c.channel, c.config) }))
+      .filter((c) => c.target.length > 0);
+  }
+
+  for (const channel of channelsToUse) {
     const dbConfig = await getChannelConfig(rule.projectId, channel.type);
 
+    const emoji = SEVERITY_EMOJI[status] ?? SEVERITY_EMOJI.warning;
+
     const delivery = await deliverToChannel(channel, {
-      title: rule.name,
+      title: `${emoji} ${rule.name}`,
       status,
       details: result.message,
       currentValue: result.currentValue,
@@ -63,7 +95,11 @@ export async function dispatchAlert(
     });
   }
 
-  await markAlertFired(rule.id, rule.cooldownSeconds);
+  const anySucceeded = channelResults.some(r => r.ok);
+
+  if (anySucceeded) {
+    await markAlertFired(rule.id, rule.cooldownSeconds);
+  }
 
   await db.insert(alertHistory).values({
     alertId: rule.id,
@@ -121,6 +157,24 @@ async function deliverToChannel(
       case "slack":
         return sendSlackAlert(channel.target, payload, dbConfig ?? undefined);
 
+      case "webhook":
+        return sendWebhookAlert(channel.target, payload, dbConfig ?? undefined);
+
+      case "pagerduty":
+        return sendPagerdutyAlert(channel.target, payload, dbConfig ?? undefined);
+
+      case "teams":
+        return sendTeamsAlert(channel.target, payload, dbConfig ?? undefined);
+
+      case "ntfy":
+        return sendNtfyAlert(channel.target, payload, dbConfig ?? undefined);
+
+      case "gotify":
+        return sendGotifyAlert(channel.target, payload, dbConfig ?? undefined);
+
+      case "pushover":
+        return sendPushoverAlert(channel.target, payload, dbConfig ?? undefined);
+
       default:
         return {
           ok: false,
@@ -130,6 +184,23 @@ async function deliverToChannel(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return { ok: false, error: `Delivery failed: ${errorMessage}` };
+  }
+}
+
+function extractTarget(channel: string, config: Record<string, string> | null): string {
+  if (!config) return "";
+  switch (channel) {
+    case "telegram": return config.chatId ?? "";
+    case "discord": return config.webhookUrl ?? "";
+    case "email": return config.to ?? "";
+    case "slack": return config.webhookUrl ?? "";
+    case "webhook": return config.url ?? "";
+    case "pagerduty": return config.routingKey ?? "";
+    case "teams": return config.webhookUrl ?? "";
+    case "ntfy": return config.topic ?? "";
+    case "gotify": return config.server ?? "";
+    case "pushover": return config.userKey ?? "";
+    default: return "";
   }
 }
 

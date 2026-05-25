@@ -60,9 +60,13 @@ interface DockerStats {
 
 function dockerFetch(path: string): Promise<Response> {
   const cfg = getConfig();
-  const socketPath = cfg.dockerSocket;
+  // TCP mode: connect via Docker socket proxy
+  if (cfg.dockerHost) {
+    return fetch(`${cfg.dockerHost}${path}`);
+  }
+  // Unix socket mode: direct socket connection
   return fetch(`http://localhost${path}`, {
-    unix: socketPath,
+    unix: cfg.dockerSocket,
   });
 }
 

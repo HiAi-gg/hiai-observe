@@ -1,42 +1,18 @@
 import { Elysia } from "elysia";
-import { db } from "../store/db.js";
-import { projects } from "../store/schema.js";
-import { eq } from "drizzle-orm";
+import { resolveApiKey, lookupProject } from "../lib/auth.js";
 
 const PUBLIC_PATHS = [
   "/health",
   "/metrics",
-  "/api/status",  // public status pages
-  "/v1/traces",   // OTLP ingestion uses its own auth
-  "/v1/metrics",  // OTLP ingestion uses its own auth
+  "/api/status",     // public status pages
+  "/api/badges",     // public SVG badges (no auth)
+  "/api/openapi.json", // public OpenAPI spec (no auth)
+  "/v1/traces",      // OTLP ingestion uses its own auth
+  "/v1/metrics",     // OTLP ingestion uses its own auth
 ];
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
-}
-
-// ── In-memory auth cache (API key → projectId) ────────────────────────────
-const CACHE_TTL_MS = 60_000; // 60 seconds
-const CACHE_MAX = 1_000;
-const authCache = new Map<string, { projectId: string; expiresAt: number }>();
-
-function cacheGet(key: string): string | null {
-  const entry = authCache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    authCache.delete(key);
-    return null;
-  }
-  return entry.projectId;
-}
-
-function cacheSet(key: string, projectId: string): void {
-  // Evict oldest entries if at capacity
-  if (authCache.size >= CACHE_MAX) {
-    const oldest = authCache.keys().next().value;
-    if (oldest) authCache.delete(oldest);
-  }
-  authCache.set(key, { projectId, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
 // ── Auth middleware ────────────────────────────────────────────────────────
@@ -59,51 +35,19 @@ export const authMiddleware = new Elysia()
     }
 
     const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
+    const apiKeyHeader = request.headers.get("x-api-key");
+
+    const parsed = resolveApiKey(authHeader ?? undefined) ?? (apiKeyHeader ? { apiKey: apiKeyHeader.trim() } : null);
+    if (!parsed) {
       set.status = 401;
-      return { error: "Missing Authorization header" } as never;
+      return { error: authHeader ? "Invalid Authorization format" : "Missing Authorization header" } as never;
     }
 
-    let apiKey: string | undefined;
-
-    // Bearer token
-    if (authHeader.startsWith("Bearer ")) {
-      apiKey = authHeader.slice(7).trim();
-    }
-    // X-API-Key header
-    else if (authHeader.startsWith("X-API-Key ")) {
-      apiKey = authHeader.slice(10).trim();
-    }
-    // Raw key (no prefix)
-    else if (!authHeader.includes(" ")) {
-      apiKey = authHeader.trim();
-    }
-
-    if (!apiKey) {
-      set.status = 401;
-      return { error: "Invalid Authorization format" } as never;
-    }
-
-    // Check cache first
-    const cached = cacheGet(apiKey);
-    if (cached) {
-      return { projectId: cached };
-    }
-
-    // Cache miss — query DB
-    const [project] = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.apiKey, apiKey))
-      .limit(1);
-
+    const project = await lookupProject(parsed.apiKey);
     if (!project) {
       set.status = 401;
       return { error: "Invalid API key" } as never;
     }
 
-    // Cache the result
-    cacheSet(apiKey, project.id);
-
-    return { projectId: project.id };
+    return { projectId: project.projectId };
   });

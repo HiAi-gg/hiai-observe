@@ -26,10 +26,7 @@ interface ParsedTraceRow {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-function hexToBase64(hex: string): string {
-  // OTLP JSON uses hex-encoded trace/span IDs; store as-is
-  return hex;
-}
+// hexToBase64 removed — trace/span IDs stored as hex strings directly (text columns in DB)
 
 function parseAttributes(
   attrs?: Array<{ key: string; value: Record<string, unknown> }>,

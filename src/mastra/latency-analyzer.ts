@@ -8,6 +8,7 @@
 import { db } from "../store/db.js";
 import { traces } from "../store/schema.js";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { castDbRows } from "../lib/db-types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ export async function getLatencyStats(
 
   // Group by workflow name
   const byWorkflow = new Map<string, Array<Record<string, unknown>>>();
-  for (const row of workflowSpans as unknown as Array<Record<string, unknown>>) {
+  for (const row of castDbRows<Record<string, unknown>>(workflowSpans)) {
     const name = String(row.workflow_name ?? "unknown");
     const list = byWorkflow.get(name) ?? [];
     list.push(row);
@@ -139,7 +140,7 @@ export async function getLatencyStats(
 
     // Group step durations by step name
     const stepDurations = new Map<string, number[]>();
-    for (const row of stepSpans as unknown as Array<Record<string, unknown>>) {
+    for (const row of castDbRows<Record<string, unknown>>(stepSpans)) {
       const stepName = String(row.step_name ?? "unknown");
       const dur = Number(row.duration_ms ?? 0);
       const list = stepDurations.get(stepName) ?? [];

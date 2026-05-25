@@ -15,15 +15,6 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
-    workspace: [
-      {
-        extends: true,
-        test: {
-          include: ["src/lib/components/**/*.test.ts"],
-          environment: "jsdom",
-        },
-      },
-    ],
     globals: true,
   },
 });

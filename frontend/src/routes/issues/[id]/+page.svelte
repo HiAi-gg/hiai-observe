@@ -1,8 +1,10 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { getIssue, updateIssue, getEvents, type Issue, type IssueEvent } from "$lib/api";
+  import { getIssue, updateIssue, getEvents, getTeamMembers, getIssueComments, createIssueComment, deleteIssueComment, type Issue, type IssueEvent, type TeamMember, type IssueComment } from "$lib/api";
+  import { showToast } from "$lib/stores.svelte";
   import { timeAgo } from "$lib/utils";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   let issue = $state<Issue | null>(null);
   let events = $state<IssueEvent[]>([]);
@@ -12,6 +14,18 @@
   let actionLoading = $state(false);
   let occurrenceData = $state<Array<{ time: Date; value: number }>>([]);
 
+  // Team & assignee
+  let teamMembers = $state<TeamMember[]>([]);
+  let assigneeName = $state<string | null>(null);
+
+  // Comments
+  let comments = $state<IssueComment[]>([]);
+  let commentAuthor = $state("");
+  let commentBody = $state("");
+  let submittingComment = $state(false);
+  let confirmDeleteCommentId = $state<string | null>(null);
+  let showDeleteCommentDialog = $state(false);
+
   const issueId = $derived(page.params.id ?? "");
 
   async function load() {
@@ -19,12 +33,27 @@
       loading = true;
       error = null;
       if (!issueId) { error = "Missing issue ID"; loading = false; return; }
-      issue = await getIssue(issueId);
 
-      // Load events for this issue
-      const evResult = await getEvents({ issueId, limit: "20" });
+      const [issueData, evResult, teamResult, commentResult] = await Promise.all([
+        getIssue(issueId),
+        getEvents({ issueId, limit: "20" }),
+        getTeamMembers({ limit: 200 }).catch(() => ({ data: [] })),
+        getIssueComments(issueId).catch(() => ({ data: [] })),
+      ]);
+
+      issue = issueData;
       events = evResult.data;
       selectedEventIdx = 0;
+      teamMembers = teamResult.data;
+      comments = commentResult.data;
+
+      // Resolve assignee name
+      if (issue.assignedTo) {
+        const member = teamMembers.find((m) => m.id === issue!.assignedTo);
+        assigneeName = member?.name ?? null;
+      } else {
+        assigneeName = null;
+      }
 
       // Build occurrence sparkline from events grouped by day
       const dayMap = new Map<string, number>();
@@ -39,6 +68,51 @@
       error = e instanceof Error ? e.message : "Failed to load issue";
     } finally {
       loading = false;
+    }
+  }
+
+  async function handleAssign(assigneeId: string) {
+    if (!issue) return;
+    try {
+      await updateIssue(issue.id, { assignedTo: assigneeId || "" });
+      await load();
+      showToast(assigneeId ? "Issue assigned" : "Issue unassigned", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to update assignee";
+    }
+  }
+
+  async function handleSubmitComment() {
+    if (!issueId || !commentAuthor.trim() || !commentBody.trim()) return;
+    try {
+      submittingComment = true;
+      await createIssueComment(issueId, {
+        authorName: commentAuthor.trim(),
+        body: commentBody.trim(),
+      });
+      commentBody = "";
+      const result = await getIssueComments(issueId);
+      comments = result.data;
+      showToast("Comment added", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to add comment";
+    } finally {
+      submittingComment = false;
+    }
+  }
+
+  async function handleDeleteComment(id: string) {
+    try {
+      await deleteIssueComment(id);
+      confirmDeleteCommentId = null;
+      showDeleteCommentDialog = false;
+      if (issueId) {
+        const result = await getIssueComments(issueId);
+        comments = result.data;
+      }
+      showToast("Comment deleted", "success");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to delete comment";
     }
   }
 
@@ -88,7 +162,7 @@
 
   const stackTrace = $derived.by(() => {
     if (!selectedEvent) return null;
-    if (selectedEvent.stack_trace) return parseStackTrace(selectedEvent.stack_trace);
+    if (selectedEvent.stackTrace) return parseStackTrace(selectedEvent.stackTrace);
     const exception = rawPayload?.exception as Record<string, unknown> | undefined;
     const values = exception?.values as Array<Record<string, unknown>> | undefined;
     const exc = values?.[values.length! - 1];
@@ -197,7 +271,7 @@
             {issue.count.toLocaleString()} occurrences
           </span>
           <span class="text-sm text-[var(--color-text-muted)]">&middot;</span>
-          <span class="text-sm text-[var(--color-text-muted)]">First seen {timeAgo(issue.first_seen)}</span>
+          <span class="text-sm text-[var(--color-text-muted)]">First seen {timeAgo(issue.firstSeen)}</span>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -340,14 +414,77 @@
                 >
                   <span class="h-2 w-2 shrink-0 rounded-full" style="background: {i === selectedEventIdx ? 'var(--color-accent)' : 'var(--color-border)'}"></span>
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium text-[var(--color-text-primary)]">{ev.message ?? ev.exception_type ?? "Event"}</p>
-                    <p class="text-[10px] text-[var(--color-text-muted)]">{timeAgo(ev.created_at)}</p>
+                    <p class="truncate text-xs font-medium text-[var(--color-text-primary)]">{ev.message ?? ev.exceptionType ?? "Event"}</p>
+                    <p class="text-[10px] text-[var(--color-text-muted)]">{timeAgo(ev.createdAt)}</p>
                   </div>
                 </button>
               {/each}
             </div>
           </div>
         {/if}
+
+        <!-- Comments -->
+        <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
+          <div class="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-overlay)]/50 px-4 py-2.5">
+            <svg class="h-4 w-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <h2 class="text-sm font-semibold text-[var(--color-text-secondary)]">Comments ({comments.length})</h2>
+          </div>
+
+          <!-- Comment form -->
+          <div class="border-b border-[var(--color-border)] p-4 space-y-3">
+            <input
+              type="text"
+              bind:value={commentAuthor}
+              placeholder="Your name"
+              class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+            />
+            <textarea
+              bind:value={commentBody}
+              placeholder="Write a comment..."
+              rows="3"
+              class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none resize-none"
+            ></textarea>
+            <div class="flex justify-end">
+              <button
+                onclick={handleSubmitComment}
+                disabled={!commentAuthor.trim() || !commentBody.trim() || submittingComment}
+                class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
+              >
+                {submittingComment ? "Posting..." : "Post Comment"}
+              </button>
+            </div>
+          </div>
+
+          <!-- Comment list -->
+          {#if comments.length === 0}
+            <div class="flex flex-col items-center justify-center py-8">
+              <p class="text-sm text-[var(--color-text-muted)]">No comments yet</p>
+            </div>
+          {:else}
+            <div class="divide-y divide-[var(--color-border)]">
+              {#each comments as comment (comment.id)}
+                <div class="px-4 py-3">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-surface-overlay)] text-[10px] font-medium text-[var(--color-text-secondary)]">
+                        {comment.authorName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <span class="text-sm font-medium text-[var(--color-text-primary)]">{comment.authorName}</span>
+                      <span class="text-xs text-[var(--color-text-muted)]">{timeAgo(comment.createdAt)}</span>
+                    </div>
+                    <button
+                      onclick={() => { confirmDeleteCommentId = comment.id; showDeleteCommentDialog = true; }}
+                      class="text-xs text-[var(--color-danger)] hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <p class="mt-2 text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">{comment.body}</p>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
 
       <!-- Sidebar -->
@@ -418,24 +555,57 @@
           <div class="space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-[var(--color-text-muted)]">First seen</span>
-              <span class="text-[var(--color-text-secondary)]">{timeAgo(issue.first_seen)}</span>
+              <span class="text-[var(--color-text-secondary)]">{timeAgo(issue.firstSeen)}</span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-[var(--color-text-muted)]">Last seen</span>
-              <span class="text-[var(--color-text-secondary)]">{timeAgo(issue.last_seen)}</span>
+              <span class="text-[var(--color-text-secondary)]">{timeAgo(issue.lastSeen)}</span>
             </div>
           </div>
         </div>
 
+        <!-- Assignee -->
+        <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Assignee</h3>
+          {#if teamMembers.length > 0}
+            <select
+              value={issue.assignedTo ?? ""}
+              onchange={(e) => handleAssign((e.target as HTMLSelectElement).value)}
+              class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+            >
+              <option value="">Unassigned</option>
+              {#each teamMembers as member (member.id)}
+                <option value={member.id}>{member.name} ({member.role})</option>
+              {/each}
+            </select>
+          {:else}
+            <p class="text-xs text-[var(--color-text-muted)]">
+              {#if assigneeName}
+                {assigneeName}
+              {:else}
+                No team members configured
+              {/if}
+            </p>
+          {/if}
+          {#if assigneeName}
+            <div class="flex items-center gap-2">
+              <div class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-surface-overlay)] text-[10px] font-medium text-[var(--color-text-secondary)]">
+                {assigneeName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+              </div>
+              <span class="text-sm text-[var(--color-text-secondary)]">{assigneeName}</span>
+            </div>
+          {/if}
+        </div>
+
         <!-- Tags -->
-        {#if issue.tags && typeof issue.tags === "object" && Object.keys(issue.tags).length > 0}
+        {#if issue.metadata && typeof issue.metadata === "object" && Object.keys(issue.metadata).length > 0}
           <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Tags</h3>
             <div class="flex flex-wrap gap-1.5">
-              {#each Object.entries(issue.tags) as [key, value] (key)}
+              {#each Object.entries(issue.metadata).filter(([k]) => !["stackTrace", "rawPayload", "breadcrumbs"].includes(k)) as [key, value] (key)}
                 <span class="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface-overlay)] px-2 py-1 text-xs">
                   <span class="text-[var(--color-text-muted)]">{key}:</span>
-                  <span class="font-medium text-[var(--color-text-secondary)]">{value}</span>
+                  <span class="font-medium text-[var(--color-text-secondary)]">{typeof value === "object" ? JSON.stringify(value) : String(value)}</span>
                 </span>
               {/each}
             </div>
@@ -470,7 +640,7 @@
           <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 space-y-3">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Context</h3>
             <dl class="space-y-2">
-              {#each Object.entries(issue.metadata).filter(([k]) => !["stack_trace", "rawPayload", "breadcrumbs"].includes(k)) as [key, value] (key)}
+              {#each Object.entries(issue.metadata).filter(([k]) => !["stackTrace", "rawPayload", "breadcrumbs"].includes(k)) as [key, value] (key)}
                 <div>
                   <dt class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{key}</dt>
                   <dd class="mt-0.5 break-all text-xs text-[var(--color-text-secondary)]">{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd>
@@ -491,3 +661,13 @@
     </div>
   {/if}
 </div>
+
+<ConfirmDialog
+  bind:open={showDeleteCommentDialog}
+  title="Delete Comment"
+  message="Are you sure you want to delete this comment? This action cannot be undone."
+  confirmLabel="Delete"
+  variant="danger"
+  onconfirm={() => { if (confirmDeleteCommentId) handleDeleteComment(confirmDeleteCommentId); }}
+  oncancel={() => { confirmDeleteCommentId = null; }}
+/>

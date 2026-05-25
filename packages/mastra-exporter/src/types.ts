@@ -6,6 +6,8 @@ export interface HiaiObserveExporterConfig {
   endpoint: string;
   /** API key for authentication */
   apiKey: string;
+  /** Service name reported in OTLP resource attributes. Default: "mastra-app" */
+  serviceName?: string;
   /** Number of spans to buffer before flushing. Default: 100 */
   batchSize?: number;
   /** Flush interval in milliseconds. Default: 5000 (5s) */
@@ -32,7 +34,7 @@ export interface OTLPSpan {
     value: {
       stringValue?: string;
       intValue?: string;
-      doubleValue?: boolean;
+      doubleValue?: number;
       boolValue?: boolean;
     };
   }>;

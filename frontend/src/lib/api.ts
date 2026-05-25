@@ -46,10 +46,12 @@ export async function getDashboard() {
   return apiFetch<DashboardData>(`/api/dashboard?${qs}`);
 }
 
-export async function getIssues(params?: { status?: string; search?: string; limit?: number; offset?: number }) {
+export async function getIssues(params?: { status?: string; search?: string; environment?: string; level?: string; limit?: number; offset?: number }) {
   const qs = withProject(new URLSearchParams());
   if (params?.status) qs.set("status", params.status);
   if (params?.search) qs.set("search", params.search);
+  if (params?.environment) qs.set("environment", params.environment);
+  if (params?.level) qs.set("level", params.level);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
   return apiFetch<{ issues: Issue[]; total: number }>(`/api/issues?${qs}`);
@@ -59,7 +61,7 @@ export async function getIssue(id: string) {
   return apiFetch<Issue>(`/api/issues/${id}`);
 }
 
-export async function updateIssue(id: string, data: { status: string }) {
+export async function updateIssue(id: string, data: { status?: string; assignedTo?: string }) {
   return apiFetch<Issue>(`/api/issues/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
@@ -89,14 +91,15 @@ export async function getHostStats() {
   return apiFetch<HostStats>("/api/infrastructure/host");
 }
 
-export async function getLogs(params?: { container?: string; level?: string; search?: string; limit?: number; offset?: number }) {
+export async function getLogs(params?: { container?: string; level?: string; search?: string; regex?: string; limit?: number; offset?: number }) {
   const qs = new URLSearchParams();
   if (params?.container) qs.set("container", params.container);
   if (params?.level) qs.set("level", params.level);
   if (params?.search) qs.set("search", params.search);
+  if (params?.regex) qs.set("regex", params.regex);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
-  return apiFetch<{ data: { logs: LogEntry[]; total: number } }>(`/api/logs?${qs}`);
+  return apiFetch<{ data: { logs: LogEntry[]; total: number }; error?: string }>(`/api/logs?${qs}`);
 }
 
 export interface LogStats {
@@ -108,6 +111,54 @@ export interface LogStats {
 
 export async function getLogStats() {
   return apiFetch<LogStats>("/api/logs/stats");
+}
+
+export interface LogVolumeBucket {
+  time: string;
+  count: number;
+}
+
+export async function getLogVolume(params?: { interval?: string; containerId?: string; from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.interval) qs.set("interval", params.interval);
+  if (params?.containerId) qs.set("containerId", params.containerId);
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  return apiFetch<{ data: LogVolumeBucket[] }>("/api/logs/volume?" + qs);
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  filters?: Record<string, unknown> | null;
+  projectId?: string | null;
+  createdAt: string;
+}
+
+export async function getSavedSearches(projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<{ data: SavedSearch[] }>(`/api/saved-searches?${qs}`);
+}
+
+export async function createSavedSearch(data: { name: string; query: string; filters?: Record<string, unknown>; projectId?: string }) {
+  return apiFetch<{ data: SavedSearch }>("/api/saved-searches", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSavedSearch(id: string) {
+  return apiFetch<{ data: SavedSearch }>(`/api/saved-searches/${id}`, { method: "DELETE" });
+}
+
+export function getLogsDownloadUrl(params: { container?: string; level?: string; format?: string }): string {
+  const qs = new URLSearchParams();
+  qs.set("format", params.format ?? "csv");
+  if (params.container) qs.set("container", params.container);
+  if (params.level) qs.set("level", params.level);
+  return `${BASE_URL}/api/export/logs?${qs}`;
 }
 
 export async function getTraces(params?: { workflow?: string; agent?: string; limit?: number; offset?: number; from?: string; to?: string }) {
@@ -195,6 +246,11 @@ export async function getAlertHistory(params?: { alertId?: string; limit?: numbe
 
 // ---
 
+export interface HourlyBucket {
+  hour: string;
+  count: number;
+}
+
 export interface DashboardData {
   errorCount24h: number;
   uptimePercent: number;
@@ -203,31 +259,34 @@ export interface DashboardData {
   recentIssues: Issue[];
   monitorStatuses: { id: string; name: string; url: string; active: boolean; isUp: boolean }[];
   alertCount: number;
+  errorBuckets: HourlyBucket[];
+  traceBuckets: HourlyBucket[];
 }
 
 export interface IssueEvent {
   id: string;
   message?: string;
-  exception_type?: string;
-  stack_trace?: string;
+  exceptionType?: string;
+  stackTrace?: string;
   level?: string;
   tags?: Record<string, string>;
   context?: Record<string, unknown>;
   sdk?: string;
-  created_at: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
 export interface Issue {
   id: string;
-  project_id: string;
+  projectId: string;
   title: string;
   type: string;
   fingerprint: string;
   status: "unresolved" | "resolved" | "ignored";
   count: number;
-  first_seen: string;
-  last_seen: string;
+  firstSeen: string;
+  lastSeen: string;
+  assignedTo?: string | null;
+  environment?: string | null;
   tags?: Record<string, string>;
   sdk?: string;
   metadata?: Record<string, unknown>;
@@ -345,4 +404,150 @@ export interface AlertHistoryEntry {
   triggeredAt: string;
   resolvedAt?: string;
   context?: Record<string, unknown>;
+}
+
+// --- Releases ---
+
+export interface Release {
+  id: string;
+  projectId: string;
+  version: string;
+  environment: string;
+  deployedAt: string | null;
+  createdAt: string;
+}
+
+export interface ReleaseHealth {
+  releaseId: string;
+  version: string;
+  environment: string;
+  newIssuesCount: number;
+  errorRate: number;
+  healthScore: "green" | "yellow" | "red";
+  windowHours: number;
+}
+
+export async function getReleases(params?: { projectId?: string; environment?: string; limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.projectId) qs.set("projectId", params.projectId);
+  if (params?.environment) qs.set("environment", params.environment);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ data: Release[]; total: number }>(`/api/releases?${qs}`);
+}
+
+export async function createRelease(data: { projectId: string; version: string; environment?: string; deployedAt?: string }) {
+  return apiFetch<Release>("/api/releases", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function getReleaseHealth(id: string) {
+  return apiFetch<ReleaseHealth>(`/api/releases/${id}/health`);
+}
+
+export async function deleteRelease(id: string) {
+  return apiFetch<void>(`/api/releases/${id}`, { method: "DELETE" });
+}
+
+// --- Team ---
+
+export interface TeamMember {
+  id: string;
+  projectId: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export async function getTeamMembers(params?: { projectId?: string; limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.projectId) qs.set("projectId", params.projectId);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ data: TeamMember[]; total: number }>(`/api/team?${qs}`);
+}
+
+export async function createTeamMember(data: { projectId: string; name: string; email: string; role?: string }) {
+  return apiFetch<TeamMember>("/api/team", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateTeamMember(id: string, data: { name?: string; email?: string; role?: string }) {
+  return apiFetch<TeamMember>(`/api/team/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function deleteTeamMember(id: string) {
+  return apiFetch<void>(`/api/team/${id}`, { method: "DELETE" });
+}
+
+// --- Comments ---
+
+export interface IssueComment {
+  id: string;
+  issueId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export async function getIssueComments(issueId: string, params?: { limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ data: IssueComment[]; total: number }>(`/api/issues/${issueId}/comments?${qs}`);
+}
+
+export async function createIssueComment(issueId: string, data: { authorName: string; body: string }) {
+  return apiFetch<IssueComment>(`/api/issues/${issueId}/comments`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteIssueComment(id: string) {
+  return apiFetch<void>(`/api/comments/${id}`, { method: "DELETE" });
+}
+
+// --- Search ---
+
+export interface SearchResult {
+  issues: Array<{ id: string; title: string; type: string; status: string; count: number; projectId: string; lastSeen: string; projectName: string }>;
+  events: Array<{ id: string; message: string | null; exceptionType: string | null; level: string | null; projectId: string; createdAt: string; projectName: string }>;
+  traces: Array<{ id: string; name: string; agent: string | null; workflow: string | null; durationMs: number | null; status: string; projectId: string; startTime: string; projectName: string }>;
+}
+
+export async function searchAll(q: string, projectId?: string) {
+  const qs = new URLSearchParams({ q });
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<SearchResult>(`/api/search?${qs}`);
+}
+
+// --- Admin ---
+
+export interface StorageTable {
+  tableName: string;
+  sizeBytes: number;
+  sizeHuman: string;
+}
+
+export interface RetentionTable {
+  tableName: string;
+  retentionDays: number;
+}
+
+export async function getStorage(adminKey: string) {
+  return apiFetch<{ totalBytes: number; totalHuman: string; tables: StorageTable[] }>("/api/admin/storage", {
+    headers: { Authorization: `Bearer ${adminKey}` },
+  });
+}
+
+export async function getRetention(adminKey: string) {
+  return apiFetch<{ defaultDays: number; tables: RetentionTable[] }>("/api/admin/retention", {
+    headers: { Authorization: `Bearer ${adminKey}` },
+  });
+}
+
+export async function updateRetention(adminKey: string, table: string, retentionDays: number) {
+  return apiFetch<{ tableName: string; retentionDays: number }>(`/api/admin/retention/${table}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ retentionDays }),
+  });
 }

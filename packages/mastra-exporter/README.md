@@ -32,6 +32,7 @@ const mastra = new Mastra({
 |--------|------|---------|-------------|
 | `endpoint` | `string` | *required* | HiAi Observe server URL |
 | `apiKey` | `string` | *required* | API key for authentication |
+| `serviceName` | `string` | `"mastra-app"` | Service name in OTLP resource attributes |
 | `batchSize` | `number` | `100` | Spans to buffer before auto-flush |
 | `flushInterval` | `number` | `5000` | Flush interval in ms |
 | `timeout` | `number` | `10000` | Request timeout in ms |

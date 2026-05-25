@@ -10,6 +10,8 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
   let statusFilter = $state<string>("all");
+  let environmentFilter = $state<string>("all");
+  let levelFilter = $state<string>("all");
   let searchQuery = $state("");
   let page = $state(1);
   const perPage = 25;
@@ -20,6 +22,8 @@
       error = null;
       const params: Record<string, string | number> = { limit: perPage, offset: (page - 1) * perPage };
       if (statusFilter !== "all") params.status = statusFilter;
+      if (environmentFilter !== "all") params.environment = environmentFilter;
+      if (levelFilter !== "all") params.level = levelFilter;
       if (searchQuery) params.search = searchQuery;
       const result = await getIssues(params as any);
       issues = result.issues;
@@ -35,6 +39,8 @@
 
   $effect(() => {
     statusFilter;
+    environmentFilter;
+    levelFilter;
     searchQuery;
     page = 1;
     load();
@@ -46,7 +52,9 @@
     debouncedLoad();
   }
 
-  const tabs = ["all", "unresolved", "resolved", "ignored"] as const;
+  const statusTabs = ["all", "unresolved", "resolved", "ignored"] as const;
+  const envTabs = ["all", "production", "staging", "development"] as const;
+  const levelTabs = ["all", "error", "warning", "info"] as const;
 
 
 </script>
@@ -72,33 +80,83 @@
   {/if}
 
   <!-- Filters -->
-  <div class="flex flex-wrap items-center gap-3">
-    <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
-      {#each tabs as tab (tab)}
-        <button
-          onclick={() => { statusFilter = tab; }}
-          class="rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all duration-150"
-          class:bg-[var(--color-accent)]={statusFilter === tab}
-          class:text-white={statusFilter === tab}
-          class:shadow-sm={statusFilter === tab}
-          class:text-[var(--color-text-secondary)]={statusFilter !== tab}
-          class:hover:text-[var(--color-text-primary)]={statusFilter !== tab}
-          class:hover:bg-[var(--color-surface-overlay)]={statusFilter !== tab}
-        >
-          {tab}
-        </button>
-      {/each}
+  <div class="space-y-3">
+    <!-- Status filter -->
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Status:</span>
+      <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
+        {#each statusTabs as tab (tab)}
+          <button
+            onclick={() => { statusFilter = tab; }}
+            class="rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-all duration-150"
+            class:bg-[var(--color-accent)]={statusFilter === tab}
+            class:text-white={statusFilter === tab}
+            class:shadow-sm={statusFilter === tab}
+            class:text-[var(--color-text-secondary)]={statusFilter !== tab}
+            class:hover:text-[var(--color-text-primary)]={statusFilter !== tab}
+            class:hover:bg-[var(--color-surface-overlay)]={statusFilter !== tab}
+          >
+            {tab}
+          </button>
+        {/each}
+      </div>
+
+      <!-- Search -->
+      <div class="relative flex-1 max-w-xs">
+        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          type="text"
+          placeholder="Search issues..."
+          value={searchQuery}
+          oninput={onSearch}
+          class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-2 pl-9 pr-3 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] transition-colors focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/30"
+        />
+      </div>
     </div>
 
-    <div class="relative flex-1 max-w-xs">
-      <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input
-        type="text"
-        placeholder="Search issues..."
-        value={searchQuery}
-        oninput={onSearch}
-        class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-2 pl-9 pr-3 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] transition-colors focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/30"
-      />
+    <!-- Environment + Level filters -->
+    <div class="flex flex-wrap items-center gap-6">
+      <!-- Environment filter -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Env:</span>
+        <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
+          {#each envTabs as tab (tab)}
+            <button
+              onclick={() => { environmentFilter = tab; }}
+              class="rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-all duration-150"
+              class:bg-[var(--color-accent)]={environmentFilter === tab}
+              class:text-white={environmentFilter === tab}
+              class:shadow-sm={environmentFilter === tab}
+              class:text-[var(--color-text-secondary)]={environmentFilter !== tab}
+              class:hover:text-[var(--color-text-primary)]={environmentFilter !== tab}
+              class:hover:bg-[var(--color-surface-overlay)]={environmentFilter !== tab}
+            >
+              {tab === "development" ? "dev" : tab}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Level filter -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Level:</span>
+        <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
+          {#each levelTabs as tab (tab)}
+            <button
+              onclick={() => { levelFilter = tab; }}
+              class="rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-all duration-150"
+              class:bg-[var(--color-accent)]={levelFilter === tab}
+              class:text-white={levelFilter === tab}
+              class:shadow-sm={levelFilter === tab}
+              class:text-[var(--color-text-secondary)]={levelFilter !== tab}
+              class:hover:text-[var(--color-text-primary)]={levelFilter !== tab}
+              class:hover:bg-[var(--color-surface-overlay)]={levelFilter !== tab}
+            >
+              {tab}
+            </button>
+          {/each}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -116,7 +174,7 @@
       <svg class="mb-4 h-12 w-12 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       <p class="text-sm font-medium text-[var(--color-text-secondary)]">No issues found</p>
       <p class="mt-1 text-xs text-[var(--color-text-muted)]">
-        {#if searchQuery || statusFilter !== "all"}
+        {#if searchQuery || statusFilter !== "all" || environmentFilter !== "all" || levelFilter !== "all"}
           Try adjusting your filters
         {:else}
           Issues will appear here when errors are captured
@@ -151,12 +209,17 @@
               <td class="px-4 py-3.5">
                 <div class="flex flex-col gap-0.5">
                   <span class="font-medium text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors">{issue.title}</span>
-                  <span class="text-xs text-[var(--color-text-muted)]">{issue.type}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-[var(--color-text-muted)]">{issue.type}</span>
+                    {#if issue.environment}
+                      <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium {issue.environment === 'production' ? 'bg-red-900/40 text-red-300' : issue.environment === 'staging' ? 'bg-amber-900/40 text-amber-300' : 'bg-blue-900/40 text-blue-300'}">{issue.environment}</span>
+                    {/if}
+                  </div>
                 </div>
               </td>
               <td class="px-4 py-3.5 text-right tabular-nums text-[var(--color-text-secondary)]">{issue.count.toLocaleString()}</td>
-              <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.first_seen)}</td>
-              <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.last_seen)}</td>
+              <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.firstSeen)}</td>
+              <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.lastSeen)}</td>
             </tr>
           {/each}
         </tbody>

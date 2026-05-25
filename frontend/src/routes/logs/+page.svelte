@@ -1,8 +1,13 @@
 <script lang="ts">
-  import { getLogs, getLogStats, type LogEntry, type LogStats } from "$lib/api";
+  import {
+    getLogs, getLogStats, getLogVolume, getSavedSearches,
+    createSavedSearch, deleteSavedSearch, getLogsDownloadUrl,
+    type LogEntry, type LogStats, type LogVolumeBucket, type SavedSearch,
+  } from "$lib/api";
   import { wsManager } from "$lib/ws";
   import { debounce, stripAnsi, isJson, highlightJson, isStackTrace } from "$lib/utils";
   import LiveIndicator from "$lib/components/LiveIndicator.svelte";
+  import AnsiText from "$lib/components/AnsiText.svelte";
 
   const MAX_LIVE_LOGS = 1000;
   const PAGE_SIZE = 100;
@@ -15,6 +20,8 @@
   let containerFilter = $state("");
   let levelFilter = $state("");
   let searchQuery = $state("");
+  let regexMode = $state(false);
+  let regexError = $state<string | null>(null);
   let paused = $state(false);
   let autoScroll = $state(true);
   let autoRefresh = $state(true);
@@ -26,6 +33,15 @@
   // Stats
   let stats = $state<LogStats | null>(null);
 
+  // Log volume chart
+  let volumeData = $state<LogVolumeBucket[]>([]);
+  let volumeLoading = $state(false);
+
+  // Saved searches
+  let savedSearches = $state<SavedSearch[]>([]);
+  let showSaveDialog = $state(false);
+  let saveName = $state("");
+
   // Track expanded JSON/stack-trace entries by log ID
   let expandedJson = $state<Set<string>>(new Set());
   let expandedStack = $state<Set<string>>(new Set());
@@ -34,13 +50,24 @@
     try {
       loading = true;
       error = null;
+      regexError = null;
       const params: Record<string, string | number> = { limit: PAGE_SIZE, offset: 0 };
       if (containerFilter) params.container = containerFilter;
       if (levelFilter) params.level = levelFilter;
-      if (searchQuery) params.search = searchQuery;
+      if (regexMode && searchQuery) {
+        params.regex = searchQuery;
+      } else if (searchQuery) {
+        params.search = searchQuery;
+      }
       const result = await getLogs(params as any);
-      logs = result.data.logs;
-      total = result.data.total;
+      if (result.error) {
+        regexError = result.error;
+        logs = [];
+        total = 0;
+      } else {
+        logs = result.data.logs;
+        total = result.data.total;
+      }
       oldestLoaded = logs.length < PAGE_SIZE;
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load logs";
@@ -56,7 +83,11 @@
       const params: Record<string, string | number> = { limit: PAGE_SIZE, offset: logs.length };
       if (containerFilter) params.container = containerFilter;
       if (levelFilter) params.level = levelFilter;
-      if (searchQuery) params.search = searchQuery;
+      if (regexMode && searchQuery) {
+        params.regex = searchQuery;
+      } else if (searchQuery) {
+        params.search = searchQuery;
+      }
       const result = await getLogs(params as any);
       const older = result.data.logs;
       if (older.length < PAGE_SIZE) oldestLoaded = true;
@@ -71,6 +102,24 @@
   async function loadStats() {
     try {
       stats = await getLogStats();
+    } catch { /* optional */ }
+  }
+
+  async function loadVolume() {
+    try {
+      volumeLoading = true;
+      const params: Record<string, string> = { interval: "1h" };
+      if (containerFilter) params.containerId = containerFilter;
+      const result = await getLogVolume(params);
+      volumeData = result.data;
+    } catch { /* optional */ }
+    finally { volumeLoading = false; }
+  }
+
+  async function loadSavedSearches() {
+    try {
+      const result = await getSavedSearches();
+      savedSearches = result.data;
     } catch { /* optional */ }
   }
 
@@ -102,6 +151,8 @@
   $effect(() => {
     load();
     loadStats();
+    loadVolume();
+    loadSavedSearches();
 
     wsManager.connect("/ws/logs");
     const unsub = wsManager.subscribe("*", onWsMessage);
@@ -117,10 +168,14 @@
       }, 5_000);
     }
 
+    // Refresh volume chart every 60s
+    const volumeInterval = setInterval(loadVolume, 60_000);
+
     return () => {
       unsub();
       wsManager.disconnect("/ws/logs");
       clearInterval(connInterval);
+      clearInterval(volumeInterval);
       if (refreshInterval) clearInterval(refreshInterval);
     };
   });
@@ -166,16 +221,86 @@
     expandedStack = next;
   }
 
-  function cleanMessage(msg: string): string {
-    return stripAnsi(msg);
-  }
-
   function toggleAutoRefresh() {
     autoRefresh = !autoRefresh;
     if (autoRefresh) {
       load();
       loadStats();
     }
+  }
+
+  function toggleRegex() {
+    regexMode = !regexMode;
+    regexError = null;
+    oldestLoaded = false;
+    load();
+  }
+
+  function applySavedSearch(ss: SavedSearch) {
+    searchQuery = ss.query;
+    if (ss.filters) {
+      if (ss.filters.level) levelFilter = ss.filters.level as string;
+      if (ss.filters.container) containerFilter = ss.filters.container as string;
+      if (ss.filters.regex) regexMode = true;
+    }
+    oldestLoaded = false;
+    load();
+  }
+
+  async function saveCurrentSearch() {
+    if (!saveName.trim() || !searchQuery.trim()) return;
+    try {
+      await createSavedSearch({
+        name: saveName.trim(),
+        query: searchQuery,
+        filters: {
+          level: levelFilter || undefined,
+          container: containerFilter || undefined,
+          regex: regexMode || undefined,
+        } as Record<string, unknown>,
+      });
+      saveName = "";
+      showSaveDialog = false;
+      await loadSavedSearches();
+    } catch { /* ignore */ }
+  }
+
+  async function removeSavedSearch(id: string) {
+    try {
+      await deleteSavedSearch(id);
+      savedSearches = savedSearches.filter(s => s.id !== id);
+    } catch { /* ignore */ }
+  }
+
+  function downloadLogs() {
+    const url = getLogsDownloadUrl({ container: containerFilter, level: levelFilter, format: "csv" });
+    window.open(url, "_blank");
+  }
+
+  // Volume chart helpers
+  function volumeMaxCount(): number {
+    return Math.max(1, ...volumeData.map(b => b.count));
+  }
+
+  function jumpToTime(time: string) {
+    // Set "from" to the clicked bucket's time and reload
+    // For simplicity, just reload with the from parameter
+    const from = new Date(time).toISOString();
+    const params: Record<string, string | number> = { limit: PAGE_SIZE, offset: 0, from };
+    if (containerFilter) params.container = containerFilter;
+    if (levelFilter) params.level = levelFilter;
+    if (regexMode && searchQuery) params.regex = searchQuery;
+    else if (searchQuery) params.search = searchQuery;
+    getLogs(params as any).then(result => {
+      logs = result.data.logs;
+      total = result.data.total;
+      oldestLoaded = logs.length < PAGE_SIZE;
+    }).catch(() => {});
+  }
+
+  function formatBucketLabel(time: string): string {
+    const d = new Date(time);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 </script>
 
@@ -187,6 +312,13 @@
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
       <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+    </div>
+  {/if}
+
+  {#if regexError}
+    <div class="flex items-center gap-3 rounded-lg border border-[var(--color-warning)]/50 bg-[var(--color-warning-bg)] px-4 py-3 text-sm text-[var(--color-warning)]">
+      <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span class="flex-1">{regexError}</span>
     </div>
   {/if}
 
@@ -208,6 +340,35 @@
       <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3">
         <p class="text-xs text-[var(--color-text-muted)]">Containers</p>
         <p class="text-lg font-bold">{stats.byContainer.length}</p>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Log volume chart -->
+  {#if volumeData.length > 0}
+    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3">
+      <div class="mb-2 flex items-center justify-between">
+        <p class="text-xs font-medium text-[var(--color-text-muted)]">Log Volume (24h)</p>
+        {#if volumeLoading}
+          <span class="text-xs text-[var(--color-text-muted)]">Loading...</span>
+        {/if}
+      </div>
+      <div class="flex items-end gap-px" style="height: 48px;">
+        {#each volumeData as bucket (bucket.time)}
+          {@const pct = Math.max(2, (bucket.count / volumeMaxCount()) * 100)}
+          <button
+            onclick={() => jumpToTime(bucket.time)}
+            title="{formatBucketLabel(bucket.time)}: {bucket.count} logs"
+            class="flex-1 min-w-[4px] rounded-t bg-[var(--color-accent)]/70 hover:bg-[var(--color-accent)] transition-colors cursor-pointer"
+            style="height: {pct}%;"
+          ></button>
+        {/each}
+      </div>
+      <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-muted)]">
+        {#if volumeData.length > 0}
+          <span>{formatBucketLabel(volumeData[0].time)}</span>
+          <span>{formatBucketLabel(volumeData[volumeData.length - 1].time)}</span>
+        {/if}
       </div>
     </div>
   {/if}
@@ -253,6 +414,14 @@
         <input type="checkbox" bind:checked={autoScroll} class="rounded" />
         Auto-scroll
       </label>
+      <button
+        onclick={downloadLogs}
+        class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
+        title="Download filtered logs as CSV"
+      >
+        <svg class="inline-block h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+        Download
+      </button>
     </div>
   </div>
 
@@ -276,14 +445,94 @@
       oninput={() => { oldestLoaded = false; debouncedLoad(); }}
       class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
     />
-    <input
-      type="text"
-      placeholder="Search logs..."
-      value={searchQuery}
-      oninput={onSearch}
-      class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
-    />
+    <div class="relative flex-1 flex items-center gap-2">
+      <input
+        type="text"
+        placeholder={regexMode ? "Regex pattern (e.g. ERROR|WARN)" : "Search logs..."}
+        value={searchQuery}
+        oninput={onSearch}
+        class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+        class:border-[var(--color-accent)]={regexMode}
+      />
+      <button
+        onclick={toggleRegex}
+        class="rounded-md border px-2.5 py-1.5 text-xs font-mono transition-colors"
+        class:border-[var(--color-accent)]={regexMode}
+        class:bg-[var(--color-accent)]={regexMode}
+        class:text-white={regexMode}
+        class:border-[var(--color-border)]={!regexMode}
+        class:text-[var(--color-text-muted)]={!regexMode}
+        title="Toggle regex mode"
+      >
+        .*
+      </button>
+      {#if searchQuery}
+        <button
+          onclick={() => { searchQuery = ""; oldestLoaded = false; load(); }}
+          class="rounded-md border border-[var(--color-border)] px-2 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)]"
+          title="Clear search"
+        >
+          x
+        </button>
+      {/if}
+    </div>
+    <button
+      onclick={() => { showSaveDialog = !showSaveDialog; }}
+      class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
+      title="Save current search"
+    >
+      Save
+    </button>
   </div>
+
+  <!-- Save search dialog -->
+  {#if showSaveDialog}
+    <div class="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3">
+      <input
+        type="text"
+        placeholder="Search name..."
+        bind:value={saveName}
+        class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+      />
+      <button
+        onclick={saveCurrentSearch}
+        disabled={!saveName.trim() || !searchQuery.trim()}
+        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
+      >
+        Save Search
+      </button>
+      <button
+        onclick={() => { showSaveDialog = false; }}
+        class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)]"
+      >
+        Cancel
+      </button>
+    </div>
+  {/if}
+
+  <!-- Saved searches -->
+  {#if savedSearches.length > 0}
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-[var(--color-text-muted)]">Saved:</span>
+      {#each savedSearches as ss (ss.id)}
+        <span class="inline-flex items-center gap-1">
+          <button
+            onclick={() => applySavedSearch(ss)}
+            class="rounded-full border border-[var(--color-border)] px-2.5 py-0.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
+          >
+            {ss.name}
+          </button>
+          <button
+            onclick={() => removeSavedSearch(ss.id)}
+            class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] px-1"
+            title="Delete saved search"
+          >
+            x
+          </button>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   <!-- Log stream -->
   <div
@@ -323,9 +572,8 @@
       <table class="w-full">
         <tbody>
           {#each logs as log (log.id)}
-            {@const msg = cleanMessage(log.message)}
-            {@const isJsonMsg = isJson(msg)}
-            {@const isStack = isStackTrace(msg)}
+            {@const isJsonMsg = isJson(stripAnsi(log.message))}
+            {@const isStack = isStackTrace(stripAnsi(log.message))}
             <tr class="border-b border-[var(--color-border)] {levelBg(log.level)} align-top">
               <td class="whitespace-nowrap px-3 py-1 text-[var(--color-text-muted)]">
                 {new Date(log.timestamp).toLocaleTimeString()}
@@ -338,6 +586,7 @@
               </td>
               <td class="px-3 py-1 text-[var(--color-text-primary)] break-all">
                 {#if isJsonMsg}
+                  {@const plainMsg = stripAnsi(log.message)}
                   <button
                     onclick={() => toggleJson(log.id)}
                     class="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline"
@@ -346,12 +595,13 @@
                     JSON
                   </button>
                   {#if expandedJson.has(log.id)}
-                    <pre class="mt-1 overflow-x-auto rounded bg-[var(--color-surface-raised)] p-2 text-xs">{@html highlightJson(JSON.parse(msg))}</pre>
+                    <pre class="mt-1 overflow-x-auto rounded bg-[var(--color-surface-raised)] p-2 text-xs">{@html highlightJson(JSON.parse(plainMsg))}</pre>
                   {:else}
-                    <span class="text-[var(--color-text-muted)]">{msg.slice(0, 120)}{msg.length > 120 ? "..." : ""}</span>
+                    <span class="text-[var(--color-text-muted)]">{plainMsg.slice(0, 120)}{plainMsg.length > 120 ? "..." : ""}</span>
                   {/if}
                 {:else if isStack}
-                  {@const lines = msg.split("\n")}
+                  {@const plainMsg = stripAnsi(log.message)}
+                  {@const lines = plainMsg.split("\n")}
                   <button
                     onclick={() => toggleStack(log.id)}
                     class="inline-flex items-center gap-1 text-[var(--color-warning)] hover:underline"
@@ -366,7 +616,7 @@
                     <span class="text-[var(--color-text-muted)]">{lines[0]?.slice(0, 120)}...</span>
                   {/if}
                 {:else}
-                  {msg}
+                  <AnsiText text={log.message} />
                 {/if}
               </td>
             </tr>

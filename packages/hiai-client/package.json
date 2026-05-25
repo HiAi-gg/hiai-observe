@@ -1,0 +1,24 @@
+{
+  "name": "@hiai-observe/client",
+  "version": "0.1.0",
+  "description": "TypeScript client SDK for HiAi Observe API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "keywords": ["hiai", "observe", "observability", "monitoring", "sdk", "client"],
+  "engines": {
+    "node": ">=18"
+  }
+}

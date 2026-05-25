@@ -335,6 +335,53 @@
       </div>
     </div>
   </section>
+
+  <!-- Data Retention -->
+  <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-lg font-semibold">Data Retention</h2>
+      <a
+        href="/settings/retention"
+        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
+      >
+        Manage
+      </a>
+    </div>
+    <div class="flex items-center justify-between rounded-md border border-[var(--color-border)] p-3">
+      <div>
+        <p class="text-sm font-medium">Storage & Retention Policies</p>
+        <p class="text-xs text-[var(--color-text-muted)]">View table sizes and configure per-table data retention periods</p>
+      </div>
+      <svg class="h-5 w-5 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    </div>
+  </section>
+
+  <!-- Team Management -->
+  <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-lg font-semibold">Team</h2>
+      <a
+        href="/settings/team"
+        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
+      >
+        Manage
+      </a>
+    </div>
+    <a
+      href="/settings/team"
+      class="flex items-center justify-between rounded-md border border-[var(--color-border)] p-3 transition-colors hover:bg-[var(--color-accent)]/5"
+    >
+      <div>
+        <p class="text-sm font-medium">Team Members</p>
+        <p class="text-xs text-[var(--color-text-muted)]">Manage team members, roles, and issue assignments</p>
+      </div>
+      <svg class="h-5 w-5 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    </a>
+  </section>
 </div>
 
 <!-- Confirm delete project dialog -->

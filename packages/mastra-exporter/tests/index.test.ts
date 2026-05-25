@@ -166,4 +166,23 @@ describe("HiaiObserveExporter", () => {
     expect(svcAttr).toBeDefined();
     expect(svcAttr.value.stringValue).toBe("mastra-app");
   });
+
+  it("uses custom serviceName when provided", async () => {
+    const exporter = new HiaiObserveExporter({
+      endpoint: "http://localhost:8001",
+      apiKey: "test-key",
+      serviceName: "my-custom-app",
+      batchSize: 1,
+      flushInterval: 60000,
+    });
+
+    exporter.export([makeSpan()]);
+    await waitFor(50);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const attrs = body.resourceSpans[0].resource.attributes;
+    const svcAttr = attrs.find((a: { key: string }) => a.key === "service.name");
+    expect(svcAttr).toBeDefined();
+    expect(svcAttr.value.stringValue).toBe("my-custom-app");
+  });
 });

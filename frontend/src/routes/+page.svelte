@@ -10,6 +10,9 @@
   let connected = $state(false);
   let flashError = $state(false);
 
+  const maxErrorCount = $derived(data?.errorBuckets ? Math.max(...data.errorBuckets.map(b => b.count), 1) : 1);
+  const maxTraceCount = $derived(data?.traceBuckets ? Math.max(...data.traceBuckets.map(b => b.count), 1) : 1);
+
   async function load() {
     try {
       loading = true;
@@ -74,6 +77,59 @@
       {/if}
     </div>
   </div>
+
+  <!-- Sparkline row -->
+  {#if data && (data.errorBuckets?.length || data.traceBuckets?.length)}
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <!-- Error rate sparkline (24h) -->
+      {#if data.errorBuckets?.length}
+        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-medium text-[var(--color-text-secondary)]">Error rate (24h)</span>
+            <span class="text-xs text-[var(--color-text-muted)]">hourly</span>
+          </div>
+          <div class="sparkline-row" role="img" aria-label="Error rate sparkline for last 24 hours">
+            {#each data.errorBuckets as bucket (bucket.hour)}
+              <div class="sparkline-bar-group" title="{new Date(bucket.hour).getHours()}:00 — {bucket.count} errors">
+                <div
+                  class="sparkline-bar sparkline-error"
+                  style="height: {Math.max((bucket.count / maxErrorCount) * 100, bucket.count > 0 ? 8 : 0)}%"
+                ></div>
+              </div>
+            {/each}
+          </div>
+          <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-muted)]">
+            <span>24h ago</span>
+            <span>now</span>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Trace count sparkline (24h) -->
+      {#if data.traceBuckets?.length}
+        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-medium text-[var(--color-text-secondary)]">Trace volume (24h)</span>
+            <span class="text-xs text-[var(--color-text-muted)]">hourly</span>
+          </div>
+          <div class="sparkline-row" role="img" aria-label="Trace volume sparkline for last 24 hours">
+            {#each data.traceBuckets as bucket (bucket.hour)}
+              <div class="sparkline-bar-group" title="{new Date(bucket.hour).getHours()}:00 — {bucket.count} traces">
+                <div
+                  class="sparkline-bar sparkline-violet"
+                  style="height: {Math.max((bucket.count / maxTraceCount) * 100, bucket.count > 0 ? 8 : 0)}%"
+                ></div>
+              </div>
+            {/each}
+          </div>
+          <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-muted)]">
+            <span>24h ago</span>
+            <span>now</span>
+          </div>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if loading && !data}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -212,6 +268,53 @@
     .flash-error {
       animation: none;
       border-color: var(--color-danger);
+    }
+  }
+
+  /* Sparkline CSS-only bars */
+  .sparkline-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 56px;
+  }
+
+  .sparkline-bar-group {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+    cursor: default;
+  }
+
+  .sparkline-bar {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    min-height: 0;
+    transition: height 0.3s ease;
+  }
+
+  .sparkline-error {
+    background: var(--color-danger);
+    opacity: 0.75;
+  }
+
+  .sparkline-error:hover {
+    opacity: 1;
+  }
+
+  .sparkline-violet {
+    background: var(--color-violet);
+    opacity: 0.75;
+  }
+
+  .sparkline-violet:hover {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sparkline-bar {
+      transition: none;
     }
   }
 </style>

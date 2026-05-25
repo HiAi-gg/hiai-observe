@@ -14,6 +14,7 @@ import type {
 
 export type { HiaiObserveExporterConfig, MastraSpan } from "./types.js";
 
+const DEFAULT_SERVICE_NAME = "mastra-app";
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_FLUSH_INTERVAL = 5000;
 const DEFAULT_TIMEOUT = 10000;
@@ -30,6 +31,7 @@ export class HiaiObserveExporter {
     this.config = {
       endpoint: config.endpoint.replace(/\/+$/, ""),
       apiKey: config.apiKey,
+      serviceName: config.serviceName ?? DEFAULT_SERVICE_NAME,
       batchSize: config.batchSize ?? DEFAULT_BATCH_SIZE,
       flushInterval: config.flushInterval ?? DEFAULT_FLUSH_INTERVAL,
       timeout: config.timeout ?? DEFAULT_TIMEOUT,
@@ -107,7 +109,7 @@ export class HiaiObserveExporter {
         {
           resource: {
             attributes: [
-              { key: "service.name", value: { stringValue: "mastra-app" } },
+              { key: "service.name", value: { stringValue: this.config.serviceName } },
               { key: "hiai.exporter.version", value: { stringValue: "0.1.0" } },
             ],
           },

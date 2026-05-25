@@ -8,6 +8,17 @@ on:
 
 jobs:
   lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+
+  typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
     steps:
@@ -16,22 +27,52 @@ jobs:
         with:
           bun-version: "1.3"
       - run: bun install --frozen-lockfile
-      - run: bunx tsc --noEmit
+      - run: bun run typecheck
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint, typecheck]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: observe
+          POSTGRES_PASSWORD: observe
+          POSTGRES_DB: hiai_observe
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://observe:observe@localhost:5432/hiai_observe
+      REDIS_URL: redis://localhost:6379
+      INTEGRATION: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3"
       - run: bun install --frozen-lockfile
-      - run: bun test
+      - name: Run migrations
+        run: bun run drizzle-kit push || true
+      - name: Run tests with coverage
+        run: bunx vitest run --coverage
 
   build:
-    name: Build
+    name: Build Backend
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -42,10 +83,48 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
 
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install and build frontend
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, build-frontend]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: observe
+          POSTGRES_PASSWORD: observe
+          POSTGRES_DB: hiai_observe
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
@@ -53,10 +132,17 @@ jobs:
       - name: Verify healthcheck
         run: |
           docker run -d --name test-app \
+            --network host \
             -e DATABASE_URL="postgresql://observe:observe@localhost:5432/hiai_observe" \
             -e REDIS_URL="redis://localhost:6379" \
-            -p 8001:8001 \
-            hiai-observe:ci || true
-          sleep 5
-          docker logs test-app 2>&1 | head -20
-          docker rm -f test-app || true
+            -e PORT=8001 \
+            hiai-observe:ci
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health)
+          echo "Health endpoint returned HTTP $STATUS"
+          docker logs test-app 2>&1 | tail -20
+          docker rm -f test-app
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: expected HTTP 200 from /health, got $STATUS"
+            exit 1
+          fi

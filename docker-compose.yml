@@ -10,12 +10,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg18
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-observe}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
       POSTGRES_DB: ${POSTGRES_DB:-hiai_observe}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Ports removed for production — access only via internal network.
+    # For local development, uncomment:
+    # ports:
+    #   - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,8 +30,11 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    mem_limit: 256m
+    # Ports removed for production — access only via internal network.
+    # For local development, uncomment:
+    # ports:
+    #   - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,18 +43,58 @@ services:
       timeout: 3s
       retries: 5
 
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      # Read-only access to Docker API
+      CONTAINERS: 1
+      EVENTS: 1
+      SYSTEM: 1
+      # Disable write operations
+      POST: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      GRPC: 0
+      IMAGES: 0
+      INFO: 0
+      NETWORKS: 0
+      NODES: 0
+      PLUGINS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      TASKS: 0
+      VOLUMES: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run/proxy
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 100
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      docker-socket-proxy:
+        condition: service_started
     ports:
       - "${PORT:-8001}:8001"
+    volumes:
+      - ./drizzle:/app/drizzle
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-observe}:${POSTGRES_PASSWORD:-observe}@postgres:5432/${POSTGRES_DB:-hiai_observe}"
       REDIS_URL: "redis://redis:6379"
@@ -58,8 +104,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-false}
       HIAI_OBSERVE_API_KEY: ${HIAI_OBSERVE_API_KEY:-}
       RETENTION_DAYS: ${RETENTION_DAYS:-30}
-    volumes:
-      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # Connect to Docker via socket proxy (TCP) instead of direct socket mount
+      DOCKER_HOST: "http://docker-socket-proxy:2375"
 
 volumes:
   pg_data:

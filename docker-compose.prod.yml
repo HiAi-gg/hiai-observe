@@ -27,6 +27,10 @@ services:
       POSTGRES_USER: observe
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
       POSTGRES_DB: hiai_observe
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -42,6 +46,10 @@ services:
 
   redis:
     image: redis:8-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     volumes:
       - redisdata:/data
     healthcheck:

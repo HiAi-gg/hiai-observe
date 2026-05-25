@@ -42,6 +42,9 @@ COPY drizzle/ ./drizzle/ 2>/dev/null || true
 # Copy scripts
 COPY scripts/ ./scripts/ 2>/dev/null || true
 
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 ENV NODE_ENV=production
 ENV PORT=8001
 EXPOSE 8001
@@ -49,4 +52,7 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8001/health || exit 1
 
+USER bun
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bun", "dist/index.js"]

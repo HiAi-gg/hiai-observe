@@ -1,53 +1,71 @@
-import { Elysia } from "elysia";
+import type { Context } from "elysia";
 import { resolveApiKey, lookupProject } from "../lib/auth.js";
+import { checkWriteAccess } from "../lib/rbac.js";
 
-const PUBLIC_PATHS = [
+export const PUBLIC_PATHS = [
   "/health",
   "/metrics",
-  "/api/status",     // public status pages
-  "/api/badges",     // public SVG badges (no auth)
-  "/api/openapi.json", // public OpenAPI spec (no auth)
-  "/v1/traces",      // OTLP ingestion uses its own auth
-  "/v1/metrics",     // OTLP ingestion uses its own auth
+  "/api/status",
+  "/api/badges",
+  "/api/openapi.json",
+  "/v1/traces",
+  "/v1/metrics",
 ];
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
 }
 
-// ── Auth middleware ────────────────────────────────────────────────────────
-export const authMiddleware = new Elysia()
-  .derive(async ({ request, set }) => {
-    const url = new URL(request.url);
-    const path = url.pathname;
+function isSentryPath(path: string): boolean {
+  return /^\/api\/[^/]+\/(store|envelope)(\/|$)/.test(path);
+}
 
-    // Skip auth for public paths and OPTIONS (CORS preflight)
-    if (isPublicPath(path) || request.method === "OPTIONS") {
-      return { projectId: undefined as string | undefined };
-    }
+function shouldSkipAuth(path: string, method: string): boolean {
+  return isPublicPath(path) || method === "OPTIONS" || isSentryPath(path);
+}
 
-    // Sentry-style auth: sentry-ingest handles its own auth
-    if (path.startsWith("/api/") && path.includes("/store")) {
-      return { projectId: undefined as string | undefined };
-    }
-    if (path.startsWith("/api/") && path.includes("/envelope")) {
-      return { projectId: undefined as string | undefined };
-    }
+export async function resolveProjectId(request: Request): Promise<string | undefined> {
+  const url = new URL(request.url);
+  const path = url.pathname;
 
-    const authHeader = request.headers.get("authorization");
-    const apiKeyHeader = request.headers.get("x-api-key");
+  if (shouldSkipAuth(path, request.method)) {
+    return undefined;
+  }
 
-    const parsed = resolveApiKey(authHeader ?? undefined) ?? (apiKeyHeader ? { apiKey: apiKeyHeader.trim() } : null);
-    if (!parsed) {
-      set.status = 401;
-      return { error: authHeader ? "Invalid Authorization format" : "Missing Authorization header" } as never;
-    }
+  const authHeader = request.headers.get("authorization");
+  const apiKeyHeader = request.headers.get("x-api-key");
 
-    const project = await lookupProject(parsed.apiKey);
-    if (!project) {
-      set.status = 401;
-      return { error: "Invalid API key" } as never;
-    }
+  const parsed = resolveApiKey(authHeader ?? undefined) ?? (apiKeyHeader ? { apiKey: apiKeyHeader.trim() } : null);
+  if (!parsed) {
+    return undefined;
+  }
 
-    return { projectId: project.projectId };
-  });
+  const project = await lookupProject(parsed.apiKey);
+  return project?.projectId;
+}
+
+export async function authGuard({ request, set }: { request: Request; set: Context["set"] }): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  if (shouldSkipAuth(path, request.method)) {
+    return undefined;
+  }
+
+  const projectId = await resolveProjectId(request);
+  if (!projectId) {
+    set.status = 401;
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!(await checkWriteAccess(projectId, request.method))) {
+    set.status = 403;
+    return new Response(JSON.stringify({ error: "Forbidden: write access requires admin or member role" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}

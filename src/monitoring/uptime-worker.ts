@@ -11,6 +11,7 @@ import { checkCert } from "./checks/cert-check.js";
 import { runDnsCheck } from "./checks/dns-check.js";
 import { runPingCheck } from "./checks/ping-check.js";
 import { runHttpCheck, type HttpCheckConfig } from "./checks/http-check.js";
+import { runGrpcCheck } from "./checks/grpc-check.js";
 
 const CHECK_TIMEOUT_MS = 10_000;
 const _TCP_TIMEOUT_MS = 5_000;
@@ -109,6 +110,7 @@ async function tick() {
         authType: string | null; authValue: string | null; ignoreSsl: boolean | null; maxRedirects: number | null;
         keyword: string | null; keywordNot: string | null;
         dnsRecordType: string | null; dnsExpectedValue: string | null; dnsResolver: string | null;
+        host: string | null; port: number | null; tls: boolean | null; serviceName: string | null;
       }) => {
         let result: { statusCode: number | null; responseTimeMs: number; error: string | null; success: boolean; certExpiry: Date | null };
 
@@ -152,6 +154,21 @@ async function tick() {
           };
         } else if (monitor.type === "tcp") {
           result = await runTcpCheck(monitor.url);
+        } else if (monitor.type === "grpc") {
+          const grpcResult = await runGrpcCheck({
+            host: monitor.host ?? new URL(monitor.url).hostname,
+            port: monitor.port ?? 50051,
+            timeout: CHECK_TIMEOUT_MS,
+            serviceName: monitor.serviceName ?? "",
+            tls: monitor.tls ?? false,
+          });
+          result = {
+            statusCode: null,
+            responseTimeMs: grpcResult.responseTime,
+            error: grpcResult.error ?? null,
+            success: grpcResult.isUp,
+            certExpiry: null,
+          };
         } else {
           result = await runHttpCheck(monitor.url, {
             method: (monitor.method ?? "GET") as HttpCheckConfig["method"],

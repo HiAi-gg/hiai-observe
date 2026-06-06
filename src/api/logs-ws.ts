@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { subscribeLogs, subscribeAllLogs, getRecentLogs } from "../store/log-pubsub.js";
 import { lookupProject } from "../lib/auth.js";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { logger } from "../lib/logger.js";
 import type { LogEntry } from "../monitoring/log-streamer.js";
 
@@ -104,7 +104,7 @@ export const logsWsPlugin = new Elysia()
         const unsub = await subscribeAllLogs((entry: LogEntry) => {
           try { sendFn(JSON.stringify({ type: "log", data: entry })); } catch { /* client disconnected */ }
         });
-        clients.get(id)!.unsubscribes.push(unsub);
+        clients.get(id)?.unsubscribes.push(unsub);
       } catch (subErr) {
         // Clean up client entry if subscription fails (e.g. Redis down)
         for (const unsub of clients.get(id)?.unsubscribes ?? []) unsub();

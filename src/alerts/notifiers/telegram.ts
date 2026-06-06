@@ -32,7 +32,7 @@ function getStatusEmoji(status: TelegramMessage["status"]): string {
 
 function escapeMarkdownV2(text: string): string {
   // Escape all MarkdownV2 special characters
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+  return text.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }
 
 function formatMessage(msg: TelegramMessage): string {

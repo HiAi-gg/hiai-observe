@@ -128,7 +128,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
         return { error: "Payload too large", detail: "Max size: 5MB" };
       }
 
-      const authKey = resolveApiKey(headers["authorization"])
+      const authKey = resolveApiKey(headers.authorization)
         ?? (headers["x-api-key"] ? { apiKey: headers["x-api-key"]! } : null);
       if (!authKey) {
         set.status = 401;
@@ -157,7 +157,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
 
       // OTLP expects empty 200 on success
       return {};
-    } catch (err) {
+    } catch (_err) {
       set.status = 500;
       return { error: "Internal error" };
     }
@@ -177,7 +177,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
         return { error: "Payload too large", detail: "Max size: 5MB" };
       }
 
-      const authKey = resolveApiKey(headers["authorization"])
+      const authKey = resolveApiKey(headers.authorization)
         ?? (headers["x-api-key"] ? { apiKey: headers["x-api-key"]! } : null);
       if (!authKey) {
         set.status = 401;
@@ -205,7 +205,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
       }
 
       return {};
-    } catch (err) {
+    } catch (_err) {
       set.status = 500;
       return { error: "Internal error" };
     }

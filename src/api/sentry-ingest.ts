@@ -46,7 +46,7 @@ async function ingestEvent(projectId: string, parsed: ReturnType<typeof parseSen
 export const sentryIngestPlugin = new Elysia({ prefix: "/api" })
   .post(
     "/:projectId/store",
-    async ({ params, headers, body, set }) => {
+    async ({ headers, body, set }) => {
       const authorizedProjectId = await authorizeProject(headers.authorization);
       if (!authorizedProjectId) {
         set.status = 401;
@@ -79,7 +79,7 @@ export const sentryIngestPlugin = new Elysia({ prefix: "/api" })
   )
   .post(
     "/:projectId/envelope",
-    async ({ params, headers, body, set }) => {
+    async ({ headers, body, set }) => {
       const authorizedProjectId = await authorizeProject(headers.authorization);
       if (!authorizedProjectId) {
         set.status = 401;

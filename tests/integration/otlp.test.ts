@@ -14,7 +14,6 @@ import {
   createTestProject,
   cleanupTestData,
   waitForCondition,
-  apiFetch,
   isServerReachable,
   TEST_API_KEY,
   TEST_BASE_URL,
@@ -211,15 +210,15 @@ describe.skipIf(SKIP)("OTLP Integration", () => {
     const child2 = stored.find((s) => s.spanId === "child-step-2-0000000000");
 
     expect(parent).toBeDefined();
-    expect(parent!.parentSpanId).toBeNull();
-    expect(child1!.parentSpanId).toBe("parent-span-id-00000000");
-    expect(child2!.parentSpanId).toBe("parent-span-id-00000000");
+    expect(parent?.parentSpanId).toBeNull();
+    expect(child1?.parentSpanId).toBe("parent-span-id-00000000");
+    expect(child2?.parentSpanId).toBe("parent-span-id-00000000");
 
     // Verify Mastra attributes are preserved in the attributes JSONB field
-    const parentAttrs = parent!.attributes as Record<string, unknown>;
+    const parentAttrs = parent?.attributes as Record<string, unknown>;
     expect(parentAttrs?.["mastra.workflow"]).toBe("generate-article");
 
-    const child2Attrs = child2!.attributes as Record<string, unknown>;
+    const child2Attrs = child2?.attributes as Record<string, unknown>;
     expect(child2Attrs?.["mastra.step"]).toBe("generate-content");
     expect(child2Attrs?.["mastra.tool"]).toBe("web-search");
   });

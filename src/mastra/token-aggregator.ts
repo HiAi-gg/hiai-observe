@@ -7,7 +7,7 @@
 
 import { db } from "../store/db.js";
 import { traces } from "../store/schema.js";
-import { eq, and, gte, lte, sql, between } from "drizzle-orm";
+import { eq, gte, lte, sql, } from "drizzle-orm";
 import { castDbRows } from "../lib/db-types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────

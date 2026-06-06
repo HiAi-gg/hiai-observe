@@ -6,7 +6,7 @@
  */
 
 import { db } from "../store/db.js";
-import { events, issues, traces, uptimeChecks, maintenanceWindows } from "../store/schema.js";
+import { events, traces, maintenanceWindows } from "../store/schema.js";
 import { eq, and, gte, lte, sql, count } from "drizzle-orm";
 import { castDbRows } from "../lib/db-types.js";
 

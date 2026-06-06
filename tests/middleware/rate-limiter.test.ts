@@ -113,7 +113,7 @@ describe("sliding window checkLimit", () => {
     mockExecResults = [[[null, 5]]];
 
     const now = Date.now();
-    const key = `rl:ip:1.2.3.4:/api/test`;
+    const _key = `rl:ip:1.2.3.4:/api/test`;
     const windowMs = 60_000;
     const maxRequests = 100;
 

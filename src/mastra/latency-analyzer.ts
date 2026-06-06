@@ -7,7 +7,7 @@
 
 import { db } from "../store/db.js";
 import { traces } from "../store/schema.js";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { castDbRows } from "../lib/db-types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -127,16 +127,20 @@ export async function getLatencyStats(
 
     if (traceIds.length === 0) continue;
 
-    const stepSpans = await db.execute(sql`
-      SELECT
-        name AS step_name,
-        duration_ms
-      FROM traces
-      WHERE trace_id = ANY(${traceIds})
-        AND parent_span_id IS NOT NULL
-        AND parent_span_id != ''
-      ORDER BY name, start_time
-    `);
+    const stepSpans = await db
+      .select({
+        step_name: traces.name,
+        duration_ms: traces.durationMs,
+      })
+      .from(traces)
+      .where(
+        and(
+          inArray(traces.traceId, traceIds),
+          sql`${traces.parentSpanId} IS NOT NULL`,
+          sql`${traces.parentSpanId} != ''`,
+        ),
+      )
+      .orderBy(traces.name, traces.startTime);
 
     // Group step durations by step name
     const stepDurations = new Map<string, number[]>();

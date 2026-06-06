@@ -49,7 +49,7 @@ export async function checkCert(
         try {
           const cert = socket.getPeerCertificate();
 
-          if (!cert || !cert.valid_from || !cert.valid_to) {
+          if (!cert?.valid_from || !cert.valid_to) {
             socket.destroy();
             safeReject(new Error("No certificate returned from server"));
             return;

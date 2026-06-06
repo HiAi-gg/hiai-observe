@@ -89,7 +89,7 @@ function durationMs(start: string, end: string): number {
   return nsToMs(end) - nsToMs(start);
 }
 
-function attrsToRecord(
+function _attrsToRecord(
   attrs: Array<{ key: string; value: Record<string, unknown> }>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
@@ -179,8 +179,8 @@ export function parseMastraTrace(spans: ParsedSpan[]): MastraTrace {
         spanId: span.spanId,
         parentSpanId: span.parentSpanId,
         toolName: attrs["mastra.tool"] ?? span.name,
-        input: inputEvent?.attributes["data"] ?? attrs["tool.input"] ?? null,
-        output: outputEvent?.attributes["data"] ?? attrs["tool.output"] ?? null,
+        input: inputEvent?.attributes.data ?? attrs["tool.input"] ?? null,
+        output: outputEvent?.attributes.data ?? attrs["tool.output"] ?? null,
         durationMs: durationMs(span.startTimeUnixNano, span.endTimeUnixNano),
         success: statusCode(span.status ?? undefined) === "ok",
       });
@@ -195,13 +195,13 @@ export function parseMastraTrace(spans: ParsedSpan[]): MastraTrace {
         spanId: span.spanId,
         parentSpanId: span.parentSpanId,
         agentName: attrs["mastra.agent"] ?? span.name,
-        model: attrs["gen_ai.request.model"] ?? attrs["model"] ?? null,
-        prompt: promptEvent?.attributes["data"] ?? attrs["agent.prompt"] ?? null,
-        response: responseEvent?.attributes["data"] ?? attrs["agent.response"] ?? null,
+        model: attrs["gen_ai.request.model"] ?? attrs.model ?? null,
+        prompt: promptEvent?.attributes.data ?? attrs["agent.prompt"] ?? null,
+        response: responseEvent?.attributes.data ?? attrs["agent.response"] ?? null,
         durationMs: durationMs(span.startTimeUnixNano, span.endTimeUnixNano),
-        promptTokens: parseInt(attrs["gen_ai.usage.prompt_tokens"] ?? "0") || 0,
-        completionTokens: parseInt(attrs["gen_ai.usage.completion_tokens"] ?? "0") || 0,
-        totalTokens: parseInt(attrs["gen_ai.usage.total_tokens"] ?? "0") || 0,
+        promptTokens: parseInt(attrs["gen_ai.usage.prompt_tokens"] ?? "0", 10) || 0,
+        completionTokens: parseInt(attrs["gen_ai.usage.completion_tokens"] ?? "0", 10) || 0,
+        totalTokens: parseInt(attrs["gen_ai.usage.total_tokens"] ?? "0", 10) || 0,
       });
     }
   }
@@ -214,7 +214,7 @@ export function parseMastraTrace(spans: ParsedSpan[]): MastraTrace {
  * with children nested under parents.
  */
 export function buildSpanTree(spans: ParsedSpan[]): SpanTreeNode[] {
-  const byId = new Map(spans.map((s) => [s.spanId, s]));
+  const _byId = new Map(spans.map((s) => [s.spanId, s]));
   const roots: SpanTreeNode[] = [];
   const nodes = new Map<string, SpanTreeNode>();
 
@@ -227,7 +227,7 @@ export function buildSpanTree(spans: ParsedSpan[]): SpanTreeNode[] {
   for (const span of spans) {
     const node = nodes.get(span.spanId)!;
     if (span.parentSpanId && nodes.has(span.parentSpanId)) {
-      nodes.get(span.parentSpanId)!.children.push(node);
+      nodes.get(span.parentSpanId)?.children.push(node);
     } else {
       roots.push(node);
     }
@@ -266,13 +266,13 @@ export function extractTokenUsageFromSpans(spans: ParsedSpan[]): {
 
   for (const span of spans) {
     const attrs = span.attributes;
-    const promptTokens = parseInt(attrs["gen_ai.usage.prompt_tokens"] ?? "0") || 0;
-    const completionTokens = parseInt(attrs["gen_ai.usage.completion_tokens"] ?? "0") || 0;
-    const totalTokens = parseInt(attrs["gen_ai.usage.total_tokens"] ?? "0") || 0;
+    const promptTokens = parseInt(attrs["gen_ai.usage.prompt_tokens"] ?? "0", 10) || 0;
+    const completionTokens = parseInt(attrs["gen_ai.usage.completion_tokens"] ?? "0", 10) || 0;
+    const totalTokens = parseInt(attrs["gen_ai.usage.total_tokens"] ?? "0", 10) || 0;
 
     if (totalTokens > 0) {
       results.push({
-        model: attrs["gen_ai.request.model"] ?? attrs["model"] ?? "unknown",
+        model: attrs["gen_ai.request.model"] ?? attrs.model ?? "unknown",
         promptTokens,
         completionTokens,
         totalTokens,

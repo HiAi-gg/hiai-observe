@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
-import { savedSearches, projects } from "../store/schema.js";
+import { savedSearches, } from "../store/schema.js";
 import { eq, desc } from "drizzle-orm";
 import { notFound } from "../lib/errors.js";
 

@@ -205,7 +205,7 @@ export class HiaiObserveExporter {
 
       // Exponential backoff: 1s, 2s, 4s
       if (attempt < this.config.maxRetries) {
-        const delay = RETRY_BASE_DELAY * Math.pow(2, attempt);
+        const delay = RETRY_BASE_DELAY * 2 ** attempt;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }

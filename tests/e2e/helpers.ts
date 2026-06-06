@@ -104,7 +104,7 @@ export function sentryExceptionPayload(overrides?: Record<string, unknown>) {
 /**
  * Minimal OTLP trace payload with one span.
  */
-export function otlpTracePayload(projectId: string) {
+export function otlpTracePayload(_projectId: string) {
   const traceId = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
   const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const now = Date.now();

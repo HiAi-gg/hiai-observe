@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { getMonitors, getChecks, getUptimePercentage, getUptimePercentages } from "../store/uptime.js";
+import { getMonitors, getChecks, getUptimePercentages } from "../store/uptime.js";
 import { db } from "../store/db.js";
 import { projects } from "../store/schema.js";
 import { eq } from "drizzle-orm";

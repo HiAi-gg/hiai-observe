@@ -201,7 +201,7 @@ const PROC_STATE_MAP: Record<string, string> = {
 async function readTopProcesses(): Promise<TopProcess[]> {
   try {
     const procDir = "/proc";
-    const entries = await Bun.file(procDir).text().catch(() => "");
+    const _entries = await Bun.file(procDir).text().catch(() => "");
     // /proc listing isn't directly text-readable; use readdirSync instead
     const dirEntries: string[] = [];
     const { readdirSync } = await import("node:fs");
@@ -221,57 +221,56 @@ async function readTopProcesses(): Promise<TopProcess[]> {
     const cpuParts = cpuLine.split(/\s+/).slice(1).map(Number);
     const totalCpuTime = cpuParts.reduce((a, b) => a + b, 0);
 
-    const pageSizeKb = 4; // default page size 4KB
+    const _pageSizeKb = 4; // default page size 4KB
     const processes: Array<{ pid: number; name: string; cpuPercent: number; memoryMb: number; state: string }> = [];
 
-    // Sample top 50 PIDs by reading stat files (limit to avoid overhead)
+    // Sample top N PIDs by reading stat files (limit to avoid overhead)
     const samplePids = dirEntries.slice(0, 200);
 
-    for (const pid of samplePids) {
-      try {
-        const statText = await Bun.file(`${procDir}/${pid}/stat`).text().catch(() => "");
-        if (!statText) continue;
-
-        // Parse: pid (comm) state ppid ... utime stime ...
-        const match = statText.match(/^\d+\s+\((.+?)\)\s+(\S)\s+/);
-        if (!match) continue;
-
-        const name = match[1] ?? "unknown";
-        const stateCode = match[2] ?? "?";
-        const state = PROC_STATE_MAP[stateCode] ?? stateCode;
-
-        // Parse utime and stime (fields 14 and 15, 0-indexed from after the ')')
-        const afterComm = statText.slice(statText.indexOf(") ") + 2);
-        const fields = afterComm.split(/\s+/);
-        const utime = parseInt(fields[11] ?? "0", 10); // utime (field 14)
-        const stime = parseInt(fields[12] ?? "0", 10); // stime (field 15)
-        const totalTime = utime + stime;
-
-        // Read memory from /proc/[pid]/status
-        let memoryKb = 0;
+    const perPidReads = await Promise.all(
+      samplePids.map(async (pid) => {
         try {
-          const statusText = await Bun.file(`${procDir}/${pid}/status`).text().catch(() => "");
+          const [statText, statusText] = await Promise.all([
+            Bun.file(`${procDir}/${pid}/stat`).text().catch(() => ""),
+            Bun.file(`${procDir}/${pid}/status`).text().catch(() => ""),
+          ]);
+          if (!statText) return null;
+
+          const match = statText.match(/^\d+\s+\((.+?)\)\s+(\S)\s+/);
+          if (!match) return null;
+
+          const name = match[1] ?? "unknown";
+          const stateCode = match[2] ?? "?";
+          const state = PROC_STATE_MAP[stateCode] ?? stateCode;
+
+          const afterComm = statText.slice(statText.indexOf(") ") + 2);
+          const fields = afterComm.split(/\s+/);
+          const utime = parseInt(fields[11] ?? "0", 10);
+          const stime = parseInt(fields[12] ?? "0", 10);
+          const totalTime = utime + stime;
+
           const vmMatch = statusText.match(/VmRSS:\s+(\d+)/);
-          if (vmMatch) memoryKb = parseInt(vmMatch[1] ?? "0", 10);
+          const memoryKb = vmMatch ? parseInt(vmMatch[1] ?? "0", 10) : 0;
+
+          const cpuPercent = totalCpuTime > 0
+            ? Math.round((totalTime / totalCpuTime) * 10000) / 100
+            : 0;
+
+          return {
+            pid: parseInt(pid, 10),
+            name: name.slice(0, 64),
+            cpuPercent,
+            memoryMb: Math.round((memoryKb / 1024) * 100) / 100,
+            state,
+          };
         } catch {
-          // ignore
+          return null;
         }
+      })
+    );
 
-        // CPU% = (process time / total CPU time) * 100 — rough approximation
-        const cpuPercent = totalCpuTime > 0
-          ? Math.round((totalTime / totalCpuTime) * 10000) / 100
-          : 0;
-
-        processes.push({
-          pid: parseInt(pid, 10),
-          name: name.slice(0, 64),
-          cpuPercent,
-          memoryMb: Math.round((memoryKb / 1024) * 100) / 100,
-          state,
-        });
-      } catch {
-        // process may have exited
-      }
+    for (const p of perPidReads) {
+      if (p) processes.push(p);
     }
 
     // Sort by CPU desc, take top 10

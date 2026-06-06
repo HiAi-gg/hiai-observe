@@ -179,7 +179,6 @@ export async function getLatestHostStats(hostId?: string) {
 export async function getContainerLogCounts(): Promise<Map<string, number>> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const { logs } = await import("./schema.js");
-  const { sql } = await import("drizzle-orm");
 
   const rows = await db
     .select({

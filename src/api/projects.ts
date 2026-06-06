@@ -6,7 +6,7 @@ import {
   maintenanceWindows, incidents,
 } from "../store/schema.js";
 import { eq, inArray } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { hashApiKey, maskApiKey } from "../lib/auth.js";
 
 export const projectsRoutes = new Elysia({ prefix: "/api/projects" })

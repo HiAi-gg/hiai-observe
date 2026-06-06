@@ -1,8 +1,8 @@
 import { Elysia, t } from "elysia";
 import { timingSafeEqual } from "node:crypto";
 import { db, client } from "../store/db.js";
-import { events, traces, logs, containerStats, hostStats, uptimeChecks, alertHistory, retentionConfig } from "../store/schema.js";
-import { lt, sql, eq } from "drizzle-orm";
+import { retentionConfig } from "../store/schema.js";
+import { sql, eq } from "drizzle-orm";
 import { recordWorkerRun } from "./health.js";
 import { logger } from "../lib/logger.js";
 
@@ -176,6 +176,6 @@ function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  const value = bytes / Math.pow(1024, i);
+  const value = bytes / 1024 ** i;
   return `${value.toFixed(1)} ${units[i]}`;
 }

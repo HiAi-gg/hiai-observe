@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
 import { issues, events, teamMembers } from "../store/schema.js";
-import { eq, and, ilike, desc, count, sql } from "drizzle-orm";
+import { eq, and, ilike, desc, count, } from "drizzle-orm";
 
 export const issuesPlugin = new Elysia({ prefix: "/api" })
   .get(

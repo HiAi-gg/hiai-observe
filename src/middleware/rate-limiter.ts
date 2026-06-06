@@ -63,7 +63,7 @@ async function checkLimit(key: string, windowMs: number, maxRequests: number): P
 }
 
 export const rateLimiterPlugin = new Elysia()
-  .derive(({ request }) => {
+  .derive(() => {
     return { rateLimitHeaders: {} as Record<string, string> };
   })
   .onBeforeHandle(async ({ request, set }) => {

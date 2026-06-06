@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { getConfig } from "./config.js";
 
 export interface LogEntry {
@@ -101,7 +101,7 @@ async function attachToContainerLogs(
     }
 
     const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    const _decoder = new TextDecoder();
     let buffer = Buffer.alloc(0);
 
     const containerName = containerNames?.get(containerId) ?? containerId.substring(0, 12);

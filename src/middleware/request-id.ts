@@ -7,7 +7,7 @@
  */
 
 import { Elysia } from "elysia";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 
 export const requestIdPlugin = new Elysia({ name: "request-id" })
   .derive({ as: "global" }, ({ request }) => {

@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
-import { mkdir, writeFile, readFile, readdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 const SOURCEMAPS_DIR = join(process.cwd(), "sourcemaps");
 
@@ -41,7 +41,7 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
       await writeFile(filePath, buffer);
 
       return { uploaded: true, projectId: params.projectId, release, size: buffer.length };
-    } catch (err) {
+    } catch (_err) {
       set.status = 500;
       return { error: "Upload failed" };
     }
@@ -85,7 +85,7 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
 
   // Delete a source map
   .delete("/:projectId/:release", async ({ params, set }) => {
-    const { unlink } = await import("fs/promises");
+    const { unlink } = await import("node:fs/promises");
     const dir = projectDir(params.projectId);
     const safeName = params.release.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = join(dir, `${safeName}.map`);

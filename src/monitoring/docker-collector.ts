@@ -110,7 +110,7 @@ function calculateBlockIo(stats: DockerStats): { read: number; write: number } {
 function parseUptime(startedAt: string): number {
   try {
     const start = new Date(startedAt).getTime();
-    if (isNaN(start)) return 0;
+    if (Number.isNaN(start)) return 0;
     return Math.floor((Date.now() - start) / 1000);
   } catch {
     return 0;

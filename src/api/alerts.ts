@@ -226,6 +226,71 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
           ],
           configured: !!(process.env.SMTP_HOST && process.env.SMTP_FROM),
         },
+        {
+          type: "slack",
+          name: "Slack",
+          description: "Send alerts via Slack incoming webhook",
+          configFields: [
+            { key: "webhookUrl", label: "Webhook URL", envVar: "SLACK_WEBHOOK_URL", required: true },
+          ],
+          configured: !!process.env.SLACK_WEBHOOK_URL,
+        },
+        {
+          type: "webhook",
+          name: "Generic Webhook",
+          description: "POST alert JSON to any URL",
+          configFields: [
+            { key: "url", label: "Webhook URL", envVar: "WEBHOOK_URL", required: true },
+          ],
+          configured: !!process.env.WEBHOOK_URL,
+        },
+        {
+          type: "pagerduty",
+          name: "PagerDuty",
+          description: "Trigger PagerDuty incidents via Events API v2",
+          configFields: [
+            { key: "routingKey", label: "Routing Key", envVar: "PAGERDUTY_ROUTING_KEY", required: true },
+          ],
+          configured: !!process.env.PAGERDUTY_ROUTING_KEY,
+        },
+        {
+          type: "teams",
+          name: "Microsoft Teams",
+          description: "Send alerts via Teams incoming webhook",
+          configFields: [
+            { key: "webhookUrl", label: "Webhook URL", envVar: "TEAMS_WEBHOOK_URL", required: true },
+          ],
+          configured: !!process.env.TEAMS_WEBHOOK_URL,
+        },
+        {
+          type: "ntfy",
+          name: "ntfy.sh",
+          description: "Push notifications via ntfy.sh",
+          configFields: [
+            { key: "topic", label: "Topic", envVar: "NTFY_TOPIC", required: true },
+          ],
+          configured: !!process.env.NTFY_TOPIC,
+        },
+        {
+          type: "gotify",
+          name: "Gotify",
+          description: "Self-hosted push notifications via Gotify",
+          configFields: [
+            { key: "server", label: "Server URL", envVar: "GOTIFY_SERVER", required: true },
+            { key: "token", label: "App Token", envVar: "GOTIFY_TOKEN", required: true },
+          ],
+          configured: !!(process.env.GOTIFY_SERVER && process.env.GOTIFY_TOKEN),
+        },
+        {
+          type: "pushover",
+          name: "Pushover",
+          description: "Mobile push notifications via Pushover",
+          configFields: [
+            { key: "userKey", label: "User Key", envVar: "PUSHOVER_USER_KEY", required: true },
+            { key: "token", label: "App Token", envVar: "PUSHOVER_TOKEN", required: true },
+          ],
+          configured: !!(process.env.PUSHOVER_USER_KEY && process.env.PUSHOVER_TOKEN),
+        },
       ],
     };
   });

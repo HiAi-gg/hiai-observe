@@ -44,9 +44,9 @@ describe("monitors API", () => {
       });
 
       expect(monitor).toBeDefined();
-      expect(monitor!.id).toBe("test-id");
-      expect(monitor!.name).toBe("Test Monitor");
-      expect(monitor!.url).toBe("https://example.com");
+      expect(monitor?.id).toBe("test-id");
+      expect(monitor?.name).toBe("Test Monitor");
+      expect(monitor?.url).toBe("https://example.com");
     });
 
     it("getMonitor returns null for non-existent id", async () => {

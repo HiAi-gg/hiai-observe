@@ -30,7 +30,7 @@ vi.mock("../../src/store/db.js", () => {
 });
 
 // Mock Bun.password.verify to return true for test keys
-const originalVerify = globalThis.Bun?.password?.verify;
+const _originalVerify = globalThis.Bun?.password?.verify;
 if (typeof globalThis.Bun === "undefined") (globalThis as any).Bun = {};
 (globalThis as any).Bun.password = {
   verify: vi.fn().mockResolvedValue(true),

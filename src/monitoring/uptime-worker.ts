@@ -10,9 +10,10 @@ import { logger } from "../lib/logger.js";
 import { checkCert } from "./checks/cert-check.js";
 import { runDnsCheck } from "./checks/dns-check.js";
 import { runPingCheck } from "./checks/ping-check.js";
+import { runHttpCheck, type HttpCheckConfig } from "./checks/http-check.js";
 
 const CHECK_TIMEOUT_MS = 10_000;
-const TCP_TIMEOUT_MS = 5_000;
+const _TCP_TIMEOUT_MS = 5_000;
 const TICK_INTERVAL_MS = 10_000;
 
 // Track next check time per monitor
@@ -20,101 +21,6 @@ const nextCheckAt = new Map<string, { nextAt: number; intervalSeconds: number }>
 
 // Track monitor state for recovery detection
 const monitorState = new Map<string, { wasDown: boolean; consecutiveFailures: number }>();
-
-interface HttpCheckConfig {
-  method?: string | null;
-  headers?: Record<string, string> | null;
-  body?: string | null;
-  authType?: string | null;
-  authValue?: string | null;
-  ignoreSsl?: boolean | null;
-  maxRedirects?: number | null;
-  keyword?: string | null;
-  keywordNot?: string | null;
-}
-
-// ── HTTP Check ─────────────────────────────────────────────────────────────
-async function runHttpCheck(
-  url: string,
-  config?: HttpCheckConfig
-): Promise<{ statusCode: number | null; responseTimeMs: number; error: string | null; success: boolean; certExpiry: Date | null }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
-  const start = Date.now();
-  let certExpiry: Date | null = null;
-
-  try {
-    // Build headers
-    const headers: Record<string, string> = { ...config?.headers };
-    if (config?.authType === "basic" && config?.authValue) {
-      headers["Authorization"] = `Basic ${config.authValue}`;
-    } else if (config?.authType === "bearer" && config?.authValue) {
-      headers["Authorization"] = `Bearer ${config.authValue}`;
-    }
-
-    // Build fetch options
-    const fetchOpts: RequestInit = {
-      method: config?.method ?? "GET",
-      headers,
-      signal: controller.signal,
-      redirect: config?.maxRedirects === 0 ? "manual" : "follow",
-    };
-    if (config?.body && fetchOpts.method !== "GET" && fetchOpts.method !== "HEAD") {
-      fetchOpts.body = config.body;
-    }
-
-    const res = await fetch(url, fetchOpts);
-    const responseTimeMs = Date.now() - start;
-    clearTimeout(timeout);
-
-    // Get TLS cert expiry for HTTPS URLs
-    if (url.startsWith("https://")) {
-      try {
-        const urlObj = new URL(url);
-        const certInfo = await checkCert(urlObj.hostname, Number(urlObj.port) || 443);
-        certExpiry = certInfo.validTo;
-      } catch {
-        // TLS cert check failed — skip silently
-      }
-    }
-
-    // Keyword assertion
-    let keywordError: string | null = null;
-    if (config?.keyword || config?.keywordNot) {
-      try {
-        const body = await res.clone().text();
-        if (config.keyword && !body.includes(config.keyword)) {
-          keywordError = `Keyword "${config.keyword}" not found in response body`;
-        }
-        if (config.keywordNot && body.includes(config.keywordNot)) {
-          keywordError = `Excluded keyword "${config.keywordNot}" found in response body`;
-        }
-      } catch {
-        // Body read failed — skip keyword check
-      }
-    }
-
-    const success = res.status >= 200 && res.status < 400 && keywordError === null;
-
-    return {
-      statusCode: res.status,
-      responseTimeMs,
-      error: keywordError,
-      success,
-      certExpiry,
-    };
-  } catch (err: unknown) {
-    clearTimeout(timeout);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return {
-      statusCode: null,
-      responseTimeMs: Date.now() - start,
-      error: message,
-      success: false,
-      certExpiry,
-    };
-  }
-}
 
 // ── TCP Check ──────────────────────────────────────────────────────────────
 async function runTcpCheck(
@@ -248,12 +154,11 @@ async function tick() {
           result = await runTcpCheck(monitor.url);
         } else {
           result = await runHttpCheck(monitor.url, {
-            method: monitor.method ?? undefined,
+            method: (monitor.method ?? "GET") as HttpCheckConfig["method"],
             headers: monitor.headers ?? undefined,
             body: monitor.body ?? undefined,
-            authType: monitor.authType ?? undefined,
+            authType: (monitor.authType ?? undefined) as HttpCheckConfig["authType"],
             authValue: monitor.authValue ?? undefined,
-            ignoreSsl: monitor.ignoreSsl ?? undefined,
             maxRedirects: monitor.maxRedirects ?? undefined,
             keyword: monitor.keyword ?? undefined,
             keywordNot: monitor.keywordNot ?? undefined,

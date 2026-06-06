@@ -88,7 +88,7 @@ function mockSelectSequence(results: any[]) {
   });
 }
 
-function mockInsert() {
+function _mockInsert() {
   vi.mocked(dbModule.db.insert).mockReturnValue(createChain(undefined) as any);
 }
 

@@ -4,7 +4,7 @@ import { uptimeMonitors, uptimeChecks, projects } from "../store/schema.js";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
-const BADGE_WIDTH = 120;
+const _BADGE_WIDTH = 120;
 const BADGE_HEIGHT = 22;
 
 function escapeXml(s: string): string {
@@ -102,7 +102,7 @@ export const badgesRoutes = new Elysia({ prefix: "/api/badges" })
     async ({ params, set }) => {
       const { name, status } = await getMonitorStatus(params.slug);
       const color = statusColor(status);
-      const label = name.length > 20 ? name.slice(0, 18) + ".." : name;
+      const label = name.length > 20 ? `${name.slice(0, 18)}..` : name;
       const value = status.charAt(0).toUpperCase() + status.slice(1);
 
       set.headers["Content-Type"] = "image/svg+xml";
@@ -117,7 +117,7 @@ export const badgesRoutes = new Elysia({ prefix: "/api/badges" })
     "/:slug/uptime",
     async ({ params, set }) => {
       const { name, uptime } = await getMonitorStatus(params.slug);
-      const label = name.length > 20 ? name.slice(0, 18) + ".." : name;
+      const label = name.length > 20 ? `${name.slice(0, 18)}..` : name;
       const value = uptime !== null ? `${uptime}%` : "N/A";
       const color = uptime !== null
         ? uptime >= 99.9 ? "#4c1" : uptime >= 99 ? "#97CA00" : uptime >= 95 ? "#dbab09" : "#e05d44"

@@ -99,7 +99,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
         .set({ config: body.config, enabled: body.enabled ?? true, updatedAt: new Date() })
         .where(eq(notificationConfig.id, existing.id))
         .returning();
-      return { id: updated!.id, channel: params.channel, updated: true };
+      return { id: updated?.id, channel: params.channel, updated: true };
     }
 
     const [created] = await db.insert(notificationConfig).values({
@@ -110,7 +110,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     }).returning();
 
     set.status = 201;
-    return { id: created!.id, channel: params.channel, created: true };
+    return { id: created?.id, channel: params.channel, created: true };
   }, {
     params: t.Object({ channel: t.String() }),
     body: t.Object({
@@ -256,7 +256,7 @@ function maskSensitive(config: Record<string, string> | null): Record<string, st
   for (const [key, value] of Object.entries(config)) {
     if (!value) { masked[key] = ""; continue; }
     if (sensitiveKeys.some((k) => key.toLowerCase().includes(k.toLowerCase()))) {
-      masked[key] = value.length > 8 ? value.slice(0, 4) + "••••" + value.slice(-4) : "••••";
+      masked[key] = value.length > 8 ? `${value.slice(0, 4)}••••${value.slice(-4)}` : "••••";
     } else {
       masked[key] = value;
     }

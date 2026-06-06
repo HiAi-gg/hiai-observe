@@ -6,7 +6,7 @@
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
 import { issues, events, traces, projects } from "../store/schema.js";
-import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
+import { eq, and, ilike, desc, sql, inArray } from "drizzle-orm";
 
 export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
@@ -85,9 +85,10 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
     const projectMap = new Map<string, string>();
     if (projectIds.size > 0) {
+      const idArray = Array.from(projectIds);
       const projs = await db.select({ id: projects.id, name: projects.name })
         .from(projects)
-        .where(sql`${projects.id} = ANY(${Array.from(projectIds)})`);
+        .where(inArray(projects.id, idArray));
       for (const p of projs) {
         projectMap.set(p.id, p.name);
       }

@@ -15,7 +15,6 @@ import {
   waitForCondition,
   apiFetch,
   isServerReachable,
-  TEST_API_KEY,
   TEST_BASE_URL,
 } from "./helpers.js";
 import { db } from "../../src/store/db.js";

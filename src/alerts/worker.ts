@@ -6,12 +6,12 @@
  */
 
 import { db } from "../store/db.js";
-import { alerts, alertHistory } from "../store/schema.js";
-import { evaluateRules, type AlertRule, type AlertCondition, type AlertChannel } from "./rules-engine.js";
+import { alertHistory } from "../store/schema.js";
+import { evaluateRules, type AlertRule, } from "./rules-engine.js";
 import { shouldFireAlert } from "./dedup.js";
 import { dispatchAlert } from "./dispatcher.js";
 import { getLatestHostStats } from "../store/infra.js";
-import { desc, and, eq, sql } from "drizzle-orm";
+import { desc, eq, } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { recordWorkerRun } from "../workers/health.js";
 

@@ -188,7 +188,7 @@ export async function sendEmailAlert(
     }
 
     async function smtpSend(line: string): Promise<string> {
-      socket.write(line + "\r\n");
+      socket.write(`${line}\r\n`);
       return await smtpRead();
     }
 
@@ -252,7 +252,7 @@ export async function sendEmailAlert(
     }
 
     // Send message body (end with lone dot)
-    socket.write(message + "\r\n.\r\n");
+    socket.write(`${message}\r\n.\r\n`);
     const bodyResp = await smtpRead();
     if (!bodyResp.includes("250")) {
       socket.end();

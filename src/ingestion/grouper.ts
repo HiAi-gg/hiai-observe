@@ -28,12 +28,12 @@ export function buildFingerprint(event: ParsedEvent): string {
 function buildTitle(event: ParsedEvent): string {
   if (event.exception) {
     const value = event.exception.value.length > 120
-      ? event.exception.value.slice(0, 120) + "…"
+      ? `${event.exception.value.slice(0, 120)}…`
       : event.exception.value;
     return `${event.exception.type}: ${value}`;
   }
   const msg = event.message ?? "Unknown error";
-  return msg.length > 140 ? msg.slice(0, 140) + "…" : msg;
+  return msg.length > 140 ? `${msg.slice(0, 140)}…` : msg;
 }
 
 /**

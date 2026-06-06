@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { sql } from "drizzle-orm";
 import { db } from "../store/db.js";
 import { redis } from "../store/redis.js";
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 import { getWorkerHealth } from "../workers/health.js";
 
 const startTime = Date.now();

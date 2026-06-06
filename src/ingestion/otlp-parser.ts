@@ -5,7 +5,7 @@
  * trace representations suitable for storage.
  */
 
-import type { OTLPResourceSpan, OTLPSpan, OTLPResource } from "../api/otlp.js";
+import type { OTLPResourceSpan, OTLPResource } from "../api/otlp.js";
 
 // ── Internal normalized types ───────────────────────────────────────────
 

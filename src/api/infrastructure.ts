@@ -16,7 +16,6 @@ import {
   getGpuStatsHistory,
   getLatestGpuStats,
 } from "../store/infra.js";
-import { badRequest } from "../lib/errors.js";
 
 export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" })
 

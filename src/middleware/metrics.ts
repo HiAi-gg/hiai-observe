@@ -95,5 +95,5 @@ export const metricsPlugin = new Elysia()
     lines.push("# TYPE hiai_observe_db_pool_waiting gauge");
     lines.push(`hiai_observe_db_pool_waiting ${dbPoolStats.waiting}`);
 
-    return lines.join("\n") + "\n";
+    return `${lines.join("\n")}\n`;
   });

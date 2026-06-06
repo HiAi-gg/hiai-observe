@@ -7,7 +7,7 @@
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
 import { releases, issues, events } from "../store/schema.js";
-import { eq, and, desc, count, gte, lte } from "drizzle-orm";
+import { eq, and, desc, count, gte, } from "drizzle-orm";
 
 const VALID_ENVIRONMENTS = ["production", "staging", "development"] as const;
 

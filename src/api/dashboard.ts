@@ -98,13 +98,13 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" })
     function fillBuckets(buckets: HourlyBucket[]): HourlyBucket[] {
       const map = new Map<string, number>();
       for (const b of buckets) {
-        const key = new Date(b.hour).toISOString().slice(0, 13) + ":00:00.000Z";
+        const key = `${new Date(b.hour).toISOString().slice(0, 13)}:00:00.000Z`;
         map.set(key, b.count);
       }
       const result: HourlyBucket[] = [];
       for (let i = 23; i >= 0; i--) {
         const h = new Date(now.getTime() - i * 3600_000);
-        const key = h.toISOString().slice(0, 13) + ":00:00.000Z";
+        const key = `${h.toISOString().slice(0, 13)}:00:00.000Z`;
         result.push({ hour: key, count: map.get(key) ?? 0 });
       }
       return result;

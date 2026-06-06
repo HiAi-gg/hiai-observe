@@ -12,7 +12,7 @@ import { eq, and, desc, count } from "drizzle-orm";
 export const commentsRoutes = new Elysia({ prefix: "/api" })
 
   // ── List comments for an issue ──────────────────────────────────────
-  .get("/issues/:issueId/comments", async ({ params, query, set }) => {
+  .get("/issues/:id/comments", async ({ params, query, set }) => {
     const { limit = "50", offset = "0" } = query;
     const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
     const off = Math.max(parseInt(offset, 10) || 0, 0);
@@ -20,7 +20,7 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
     // Verify issue exists
     const [issue] = await db.select({ id: issues.id })
       .from(issues)
-      .where(eq(issues.id, params.issueId))
+      .where(eq(issues.id, params.id))
       .limit(1);
     if (!issue) {
       set.status = 404;
@@ -29,13 +29,13 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
 
     const [items, totalResult] = await Promise.all([
       db.select().from(issueComments)
-        .where(eq(issueComments.issueId, params.issueId))
+        .where(eq(issueComments.issueId, params.id))
         .orderBy(desc(issueComments.createdAt))
         .limit(lim)
         .offset(off),
       db.select({ total: count() })
         .from(issueComments)
-        .where(eq(issueComments.issueId, params.issueId)),
+        .where(eq(issueComments.issueId, params.id)),
     ]);
 
     return {
@@ -45,7 +45,7 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
       offset: off,
     };
   }, {
-    params: t.Object({ issueId: t.String({ format: "uuid" }) }),
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
     query: t.Object({
       limit: t.Optional(t.String()),
       offset: t.Optional(t.String()),
@@ -53,11 +53,11 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
   })
 
   // ── Add comment to an issue ─────────────────────────────────────────
-  .post("/issues/:issueId/comments", async ({ params, body, set }) => {
+  .post("/issues/:id/comments", async ({ params, body, set }) => {
     // Verify issue exists
     const [issue] = await db.select({ id: issues.id })
       .from(issues)
-      .where(eq(issues.id, params.issueId))
+      .where(eq(issues.id, params.id))
       .limit(1);
     if (!issue) {
       set.status = 404;
@@ -65,7 +65,7 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
     }
 
     const [created] = await db.insert(issueComments).values({
-      issueId: params.issueId,
+      issueId: params.id,
       authorName: body.authorName,
       body: body.body,
     }).returning();
@@ -73,7 +73,7 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
     set.status = 201;
     return created;
   }, {
-    params: t.Object({ issueId: t.String({ format: "uuid" }) }),
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
     body: t.Object({
       authorName: t.String({ minLength: 1 }),
       body: t.String({ minLength: 1 }),

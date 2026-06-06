@@ -1,7 +1,4 @@
 import { Elysia, t } from "elysia";
-import { db } from "../store/db.js";
-import { traces } from "../store/schema.js";
-import { eq, and, desc, asc, sql, between, count, ilike } from "drizzle-orm";
 import { getTokenUsage } from "../mastra/token-aggregator.js";
 import { getLatencyStats } from "../mastra/latency-analyzer.js";
 import {
@@ -9,7 +6,7 @@ import {
   getTraceDetail,
   getWorkflowRuns,
 } from "../store/traces.js";
-import { badRequest, notFound, internal } from "../lib/errors.js";
+import { badRequest, internal } from "../lib/errors.js";
 
 export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
   // List traces with filters
@@ -25,8 +22,8 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
         status,
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
-        limit: Math.min(parseInt(limit) || 50, 200),
-        offset: parseInt(offset) || 0,
+        limit: Math.min(parseInt(limit, 10) || 50, 200),
+        offset: parseInt(offset, 10) || 0,
       });
 
       return result;
@@ -95,8 +92,8 @@ export const tracesRoutes = new Elysia({ prefix: "/api/traces" })
         projectId,
         workflowName,
         status,
-        limit: Math.min(parseInt(limit) || 50, 200),
-        offset: parseInt(offset) || 0,
+        limit: Math.min(parseInt(limit, 10) || 50, 200),
+        offset: parseInt(offset, 10) || 0,
       });
 
       return result;

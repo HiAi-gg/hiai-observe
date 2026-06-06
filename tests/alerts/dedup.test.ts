@@ -14,7 +14,7 @@ const cooldownKeys = new Map<string, number>();
 // Mock Redis before importing dedup module
 vi.mock("../../src/store/redis.js", () => ({
   redis: {
-    set: vi.fn(async (key: string, value: string, ex?: string, ttl?: number, nx?: string) => {
+    set: vi.fn(async (key: string, _value: string, ex?: string, ttl?: number, nx?: string) => {
       if (ex === "EX" && nx === "NX") {
         if (cooldownKeys.has(key)) return null; // key exists -> NX fails
         cooldownKeys.set(key, ttl!);

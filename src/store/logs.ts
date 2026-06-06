@@ -1,7 +1,7 @@
 import { db } from "./db.js";
 import { logs } from "./schema.js";
 import { eq, and, gte, lte, ilike, sql, desc } from "drizzle-orm";
-import type { LogEntry, NewLogEntry } from "./schema.js";
+import type { NewLogEntry } from "./schema.js";
 
 interface SearchLogsParams {
   container?: string;

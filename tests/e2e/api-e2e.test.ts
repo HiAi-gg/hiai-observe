@@ -7,7 +7,7 @@
  * Run: INTEGRATION=1 bun run test tests/e2e/api-e2e.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, } from "vitest";
 import {
   apiFetch,
   createTestProjectViaApi,
@@ -70,8 +70,8 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
       const body = await res.json() as { data: Array<{ id: string; title: string }> };
       return body.data.length > 0 ? body.data[0] : null;
     });
-    issueId = result!.id;
-    expect(result!.title).toContain("E2E lifecycle test error");
+    issueId = result?.id;
+    expect(result?.title).toContain("E2E lifecycle test error");
   });
 
   // ── Step 4: Event stored ─────────────────────────────────────────────────
@@ -82,8 +82,8 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
     const body = await res.json() as { data: Array<{ stackTrace: string | null }> };
     expect(body.data.length).toBeGreaterThan(0);
     // Stack trace should be JSON stringified array of frames
-    if (body.data[0]!.stackTrace) {
-      const frames = JSON.parse(body.data[0]!.stackTrace);
+    if (body.data[0]?.stackTrace) {
+      const frames = JSON.parse(body.data[0]?.stackTrace);
       expect(Array.isArray(frames)).toBe(true);
     }
   });
@@ -220,7 +220,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
       const body = await res.json() as { data: Array<{ name: string }>; total: number };
       return body.total > 0 ? body.data[0] : null;
     });
-    expect(result!.name).toBe("e2e-test-span");
+    expect(result?.name).toBe("e2e-test-span");
   });
 
   // ── Step 13: Cleanup ─────────────────────────────────────────────────────

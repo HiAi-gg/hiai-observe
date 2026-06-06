@@ -18,6 +18,7 @@ import { projectsRoutes } from "./api/projects.js";
 import { exportRoutes } from "./api/export.js";
 import { adminRoutes } from "./workers/retention.js";
 import { notificationsRoutes } from "./api/notifications.js";
+import { subscribersPlugin } from "./api/subscribers.js";
 import { sourcemapsRoutes } from "./api/sourcemaps.js";
 import { maintenanceRoutes } from "./api/maintenance.js";
 import { incidentsRoutes } from "./api/incidents.js";
@@ -28,6 +29,7 @@ import { commentsRoutes } from "./api/comments.js";
 import { savedSearchesPlugin } from "./api/saved-searches.js";
 import { searchRoutes } from "./api/search.js";
 import { badgesRoutes } from "./api/badges.js";
+import { fingerprintRulesPlugin } from "./api/fingerprint-rules.js";
 import { openapiRoutes } from "./lib/openapi.js";
 import { metricsPlugin } from "./middleware/metrics.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -87,6 +89,8 @@ const app = new Elysia()
   .use(savedSearchesPlugin)
   .use(searchRoutes)
   .use(badgesRoutes)
+  .use(fingerprintRulesPlugin)
+  .use(subscribersPlugin)
   .use(openapiRoutes)
   .onError(({ code, error, set }) => {
     logger.error(`${code}`, { error: String(error) });

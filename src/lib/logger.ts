@@ -45,12 +45,12 @@ function write(level: LogLevel, msg: string, ctx?: LogContext): void {
     const color = LEVEL_COLORS[level];
     const ts = formatTimestamp();
     const prefix = `${color}${level.toUpperCase().padEnd(5)}${RESET}`;
-    const contextStr = ctx ? " " + JSON.stringify(ctx) : "";
+    const contextStr = ctx ? ` ${JSON.stringify(ctx)}` : "";
     const line = `${prefix} ${ts} ${msg}${contextStr}`;
     if (level === "error") {
-      process.stderr.write(line + "\n");
+      process.stderr.write(`${line}\n`);
     } else {
-      process.stdout.write(line + "\n");
+      process.stdout.write(`${line}\n`);
     }
   } else {
     const record: Record<string, unknown> = {
@@ -65,9 +65,9 @@ function write(level: LogLevel, msg: string, ctx?: LogContext): void {
     }
     const line = JSON.stringify(record);
     if (level === "error") {
-      process.stderr.write(line + "\n");
+      process.stderr.write(`${line}\n`);
     } else {
-      process.stdout.write(line + "\n");
+      process.stdout.write(`${line}\n`);
     }
   }
 }

@@ -43,12 +43,12 @@ describe("parseSentryEvent", () => {
     expect(result.type).toBe("exception");
     expect(result.message).toBe("TypeError: Cannot read property 'foo' of undefined");
     expect(result.exception).not.toBeNull();
-    expect(result.exception!.type).toBe("TypeError");
-    expect(result.exception!.stacktrace).toHaveLength(2);
-    expect(result.exception!.stacktrace[1].inApp).toBe(true);
-    expect(result.exception!.stacktrace[1].function).toBe("handleRequest");
+    expect(result.exception?.type).toBe("TypeError");
+    expect(result.exception?.stacktrace).toHaveLength(2);
+    expect(result.exception?.stacktrace[1].inApp).toBe(true);
+    expect(result.exception?.stacktrace[1].function).toBe("handleRequest");
     expect(result.tags.env).toBe("production");
-    expect(result.sdk!.name).toBe("sentry.javascript.node");
+    expect(result.sdk?.name).toBe("sentry.javascript.node");
   });
 
   it("parses a message event (no exception)", () => {

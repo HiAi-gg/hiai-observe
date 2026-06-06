@@ -2,7 +2,7 @@
  * Tests for Alert Rules Engine
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, } from "vitest";
 
 // Mock the database module
 vi.mock("../../src/store/db.js", () => ({
@@ -170,7 +170,7 @@ describe("Resource threshold", () => {
     ["disk", 50, "lte", 80, true],
   ])(
     "%s: value=%d %s %d → %s",
-    (resource, value, operator, threshold, expected) => {
+    (_resource, value, operator, threshold, expected) => {
       const compare = (
         v: number,
         op: string,

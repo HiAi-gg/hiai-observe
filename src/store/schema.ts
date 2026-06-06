@@ -12,6 +12,7 @@ export const projects = pgTable("projects", {
   logoUrl: text("logo_url"),
   description: text("description"),
   autoResolveOnDeploy: boolean("auto_resolve_on_deploy").default(false),
+  apiRole: text("api_role", { enum: ["admin", "member", "readonly"] }).default("member").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("projects_key_prefix_idx").on(t.keyPrefix),
@@ -120,6 +121,11 @@ export const uptimeMonitors = pgTable("uptime_monitors", {
   dnsRecordType: text("dns_record_type"), // 'A'|'AAAA'|'CNAME'|'MX'|'TXT'|'NS'
   dnsExpectedValue: text("dns_expected_value"),
   dnsResolver: text("dns_resolver"),
+  // gRPC check config
+  host: text("host"),
+  port: integer("port"),
+  tls: boolean("tls").default(false),
+  serviceName: text("service_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 }, (t) => [
@@ -289,6 +295,8 @@ export const incidents = pgTable("incidents", {
   monitorId: uuid("monitor_id").references(() => uptimeMonitors.id),
   title: text("title").notNull(),
   status: text("status").default("investigating").notNull(), // investigating, identified, monitoring, resolved
+  severity: text("severity", { enum: ["minor", "major", "critical"] }).default("minor").notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),

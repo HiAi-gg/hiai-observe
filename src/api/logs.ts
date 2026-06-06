@@ -125,7 +125,11 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   })
   .delete(
     "/",
-    async ({ query }) => {
+    async ({ query, set }) => {
+      if (!query.confirm) {
+        set.status = 400;
+        return { error: "Must provide confirm=true to delete logs" };
+      }
       const before = query.before ? new Date(query.before) : undefined;
       const deleted = await clearLogs(before);
       return { deleted };
@@ -133,6 +137,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     {
       query: t.Object({
         before: t.Optional(t.String()),
+        confirm: t.Optional(t.String()),
       }),
     }
   );

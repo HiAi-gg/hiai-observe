@@ -95,6 +95,16 @@ interface SearchLogsRegexParams {
 export async function searchLogsRegex(params: SearchLogsRegexParams) {
   const { pattern, container, level, from, to, limit = 100, offset = 0 } = params;
 
+  if (pattern.length > 300) {
+    return { logs: [], total: 0, limit, offset };
+  }
+  try { new RegExp(pattern); } catch {
+    return { logs: [], total: 0, limit, offset };
+  }
+  if (/\([^)]+\)[+*?][+*?]/.test(pattern)) {
+    return { logs: [], total: 0, limit, offset };
+  }
+
   const conditions = [];
   // Use PostgreSQL ~ operator for regex matching
   conditions.push(sql`${logs.message} ~ ${pattern}`);

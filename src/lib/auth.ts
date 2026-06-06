@@ -89,7 +89,7 @@ export async function lookupProject(apiKey: string): Promise<{ projectId: string
 
   // Find candidates by key prefix (narrows bcrypt verification to a few rows)
   const candidates = await db
-    .select({ id: projects.id, apiKeyHash: projects.apiKeyHash, apiKey: projects.apiKey })
+    .select({ id: projects.id, apiKeyHash: projects.apiKeyHash })
     .from(projects)
     .where(eq(projects.keyPrefix, prefix))
     .limit(10);
@@ -101,11 +101,6 @@ export async function lookupProject(apiKey: string): Promise<{ projectId: string
         cacheSet(apiKey, candidate.id);
         return { projectId: candidate.id };
       }
-    }
-    // Fallback: legacy plaintext apiKey (during migration period)
-    if (candidate.apiKey && candidate.apiKey === apiKey) {
-      cacheSet(apiKey, candidate.id);
-      return { projectId: candidate.id };
     }
   }
 

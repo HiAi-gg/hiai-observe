@@ -12,6 +12,7 @@ import { eq, and } from "drizzle-orm";
 import { sendTelegramAlert } from "../alerts/notifiers/telegram.js";
 import { sendDiscordAlert } from "../alerts/notifiers/discord.js";
 import { sendEmailAlert } from "../alerts/notifiers/email.js";
+import { encrypt, decrypt, hasEncryptionKey } from "../lib/crypto.js";
 
 const VALID_CHANNELS = ["telegram", "discord", "email", "slack", "webhook", "pagerduty", "teams", "ntfy", "gotify", "pushover"] as const;
 
@@ -25,17 +26,19 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
 
     const rows = await db.select().from(notificationConfig).where(where);
 
-    // Mask sensitive values (bot tokens, passwords)
-    const masked = rows.map((r) => ({
-      id: r.id,
-      projectId: r.projectId,
-      channel: r.channel,
-      config: maskSensitive(r.config),
-      enabled: r.enabled,
-      configured: isConfigured(r.config, r.channel),
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    }));
+    const masked = rows.map((r) => {
+      const decrypted = decryptConfig(r.config);
+      return {
+        id: r.id,
+        projectId: r.projectId,
+        channel: r.channel,
+        config: maskSensitive(decrypted),
+        enabled: r.enabled,
+        configured: isConfigured(decrypted, r.channel),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    });
 
     return { notifications: masked };
   }, {
@@ -58,7 +61,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     const [row] = await db.select().from(notificationConfig).where(where).limit(1);
 
     if (!row) {
-      // Check env fallback
       const envConfig = getEnvConfig(params.channel);
       return {
         channel: params.channel,
@@ -68,10 +70,12 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
       };
     }
 
+    const decrypted = decryptConfig(row.config);
+
     return {
       ...row,
-      config: maskSensitive(row.config),
-      configured: isConfigured(row.config, row.channel),
+      config: maskSensitive(decrypted),
+      configured: isConfigured(decrypted, row.channel),
       source: "db",
     };
   }, {
@@ -96,7 +100,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
 
     if (existing) {
       const [updated] = await db.update(notificationConfig)
-        .set({ config: body.config, enabled: body.enabled ?? true, updatedAt: new Date() })
+        .set({ config: encryptConfig(body.config), enabled: body.enabled ?? true, updatedAt: new Date() })
         .where(eq(notificationConfig.id, existing.id))
         .returning();
       return { id: updated?.id, channel: params.channel, updated: true };
@@ -105,7 +109,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     const [created] = await db.insert(notificationConfig).values({
       projectId: body.projectId,
       channel: params.channel,
-      config: body.config,
+      config: encryptConfig(body.config),
       enabled: body.enabled ?? true,
     }).returning();
 
@@ -153,7 +157,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
           eq(notificationConfig.channel, params.channel),
         ))
         .limit(1);
-      config = row?.config ?? null;
+      config = row ? decryptConfig(row.config) : null;
     }
 
     const testPayload = {
@@ -279,6 +283,29 @@ function isConfigured(config: Record<string, string> | null, channel: string): b
     case "pushover": return !!(config.userKey && config.token);
     default: return false;
   }
+}
+
+const SENSITIVE_KEYS = new Set([
+  "botToken", "webhookUrl", "url", "routingKey", "secret",
+  "token", "pass", "password", "userKey", "apiKey",
+]);
+
+function encryptConfig(config: Record<string, string>): Record<string, string> {
+  if (!hasEncryptionKey()) return config;
+  const encrypted: Record<string, string> = {};
+  for (const [k, v] of Object.entries(config)) {
+    encrypted[k] = SENSITIVE_KEYS.has(k) && v ? encrypt(v) : v;
+  }
+  return encrypted;
+}
+
+function decryptConfig(config: Record<string, string>): Record<string, string> {
+  if (!hasEncryptionKey()) return config;
+  const decrypted: Record<string, string> = {};
+  for (const [k, v] of Object.entries(config)) {
+    decrypted[k] = SENSITIVE_KEYS.has(k) && v ? decrypt(v) : v;
+  }
+  return decrypted;
 }
 
 function getEnvConfig(channel: string): Record<string, string> {

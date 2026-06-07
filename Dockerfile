@@ -10,6 +10,8 @@ RUN bun run build
 FROM oven/bun:1-alpine AS backend-build
 WORKDIR /app
 COPY package.json bun.lock* ./
+# Workspace manifests are needed so bun can resolve the workspace graph
+COPY packages/ ./packages/
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 COPY src/ src/
 COPY tsconfig.json ./
@@ -19,6 +21,8 @@ RUN bun build src/index.ts --outdir dist --target bun
 FROM oven/bun:1-alpine AS deps-production
 WORKDIR /app
 COPY package.json bun.lock* ./
+# Workspace manifests are needed so bun can resolve the workspace graph
+COPY packages/ ./packages/
 RUN bun install --production --frozen-lockfile 2>/dev/null || bun install --production
 
 # ── Stage 4: Runtime ──────────────────────────────────────────────────
@@ -37,10 +41,10 @@ COPY --from=backend-build /app/package.json ./
 COPY --from=frontend-build /app/build ./frontend/build
 
 # Copy migrations
-COPY drizzle/ ./drizzle/ 2>/dev/null || true
+COPY drizzle/ ./drizzle/
 
 # Copy scripts
-COPY scripts/ ./scripts/ 2>/dev/null || true
+COPY scripts/ ./scripts/
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

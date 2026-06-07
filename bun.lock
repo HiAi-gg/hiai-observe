@@ -37,6 +37,17 @@
       "name": "@hiai-observe/client",
       "version": "0.1.0",
     },
+    "packages/hiai-mcp": {
+      "name": "@hiai-observe/mcp",
+      "version": "0.1.0",
+      "bin": {
+        "hiai-observe-mcp": "src/index.ts",
+      },
+      "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "zod": "^3.24.4",
+      },
+    },
     "packages/hiai-sdk": {
       "name": "@hiai-observe/sdk",
       "version": "0.1.0",
@@ -167,6 +178,8 @@
     "@hiai-observe/client": ["@hiai-observe/client@workspace:packages/hiai-client"],
 
     "@hiai-observe/mastra-exporter": ["@hiai-observe/mastra-exporter@workspace:packages/mastra-exporter"],
+
+    "@hiai-observe/mcp": ["@hiai-observe/mcp@workspace:packages/hiai-mcp"],
 
     "@hiai-observe/sdk": ["@hiai-observe/sdk@workspace:packages/hiai-sdk"],
 

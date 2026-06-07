@@ -116,6 +116,28 @@ const exporter = new OTLPTraceExporter({
 });
 ```
 
+### AI Agents (MCP)
+
+Agents query Observe more than humans do. The [`@hiai-observe/mcp`](packages/hiai-mcp)
+[Model Context Protocol](https://modelcontextprotocol.io) server exposes the
+read API as tools (`observe_dashboard`, `observe_ai_cost`, `observe_list_issues`,
+`observe_uptime`, …) for Claude Code, Claude Desktop, or any MCP client:
+
+```json
+{
+  "mcpServers": {
+    "hiai-observe": {
+      "command": "bunx",
+      "args": ["@hiai-observe/mcp"],
+      "env": { "HIAI_OBSERVE_URL": "http://localhost:8001", "HIAI_OBSERVE_API_KEY": "ho_your_key" }
+    }
+  }
+}
+```
+
+For code, use the [`@hiai-observe/client`](packages/hiai-client) SDK or the
+OpenAPI spec at `GET /api/openapi.json`.
+
 ## API Endpoints
 
 | Category | Endpoints | Auth |

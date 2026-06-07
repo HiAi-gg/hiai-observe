@@ -19,6 +19,8 @@ Patch release — makes the build deployable and CI real, plus AI cost accuracy.
 ### Added
 - **AI cost estimation** — refreshed the model price table (Claude 4.x, GPT-4.1/5, o-series, Gemini 2.x), prefix-matching for dated model ids, and a `MODEL_PRICING` env override (JSON) for accurate, deployment-specific pricing.
 - **GPU panel** on the Infrastructure page — utilization, VRAM, and temperature per GPU (data was collected via nvidia-smi but never shown).
+- **`@hiai-observe/mcp`** — a Model Context Protocol server so AI agents can query Observe (issues, AI cost, traces, uptime, logs, infrastructure, alerts) directly. 9 read tools, verified end-to-end against a live server.
+- Background auto-refresh (15s) for the live monitoring tabs (issues, traces + agents/models/workflows, alerts, incidents).
 - `docs/ROADMAP.md` — prioritized list of future work (targeting 0.2.0+).
 
 ### Changed

@@ -29,9 +29,9 @@
     return new Date(now - (ranges[timeRange] || 604800000)).toISOString();
   }
 
-  async function load() {
+  async function load(silent = false) {
     try {
-      loading = true;
+      if (!silent) loading = true;
       error = null;
       const result = await getTraces({ limit: 200, from: getTimeFrom() });
       traces = result.traces || [];
@@ -43,6 +43,11 @@
   }
 
   $effect(() => { timeRange; load(); });
+
+  $effect(() => {
+    const interval = setInterval(() => load(true), 15_000);
+    return () => clearInterval(interval);
+  });
 
   interface ModelRow {
     model: string;

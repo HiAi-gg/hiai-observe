@@ -15,9 +15,9 @@
   let page = $state(1);
   const perPage = 25;
 
-  async function load() {
+  async function load(silent = false) {
     try {
-      loading = true;
+      if (!silent) loading = true;
       error = null;
       const params: Record<string, string | number> = { limit: perPage, offset: (page - 1) * perPage };
       if (workflowFilter) params.workflow = workflowFilter;
@@ -39,6 +39,11 @@
     statusFilter;
     page = 1;
     load();
+  });
+
+  $effect(() => {
+    const interval = setInterval(() => load(true), 15_000);
+    return () => clearInterval(interval);
   });
 
   function durationColor(ms: number): string {

@@ -20,6 +20,13 @@
   function pctBar(count: number): string {
     return `${Math.max(4, (count / maxCount()) * 100)}%`;
   }
+
+  const base = "flex items-center justify-between rounded-md px-2 py-1.5 transition-colors";
+  function itemClass(active: boolean): string {
+    return active
+      ? `${base} bg-[var(--color-accent)]/10 text-[var(--color-accent)]`
+      : `${base} text-[var(--color-text-muted)] hover:bg-[var(--color-surface)]`;
+  }
 </script>
 
 <aside class="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3 text-xs">
@@ -30,11 +37,7 @@
 
   <button type="button"
     onclick={() => onSelect?.("")}
-    class="flex items-center justify-between rounded-md px-2 py-1.5 transition-colors"
-    class:bg-[var(--color-accent)]/10={!selected}
-    class:text-[var(--color-accent)]={!selected}
-    class:text-[var(--color-text-muted)]={!!selected}
-    class:hover:bg-[var(--color-surface)]={!!selected}
+    class={itemClass(!selected)}
   >
     <span class="truncate">All containers</span>
     <span class="ml-2 tabular-nums">{totalLogs().toLocaleString()}</span>
@@ -43,11 +46,7 @@
   {#each containers as c (c.name)}
     <button type="button"
       onclick={() => onSelect?.(c.name)}
-      class="flex items-center justify-between rounded-md px-2 py-1.5 transition-colors"
-      class:bg-[var(--color-accent)]/10={selected === c.name}
-      class:text-[var(--color-accent)]={selected === c.name}
-      class:text-[var(--color-text-muted)]={selected !== c.name}
-      class:hover:bg-[var(--color-surface)]={selected !== c.name}
+      class={itemClass(selected === c.name)}
     >
       <span class="truncate" title={c.name}>{c.name}</span>
       <span class="ml-2 tabular-nums">{c.count.toLocaleString()}</span>

@@ -35,9 +35,9 @@
 
   const activeProjectId = $derived(currentProject.current || selectedProjectId);
 
-  async function loadData() {
+  async function loadData(silent = false) {
     try {
-      loading = true;
+      if (!silent) loading = true;
       error = null;
 
       const [channelsResult, projectsResult] = await Promise.all([
@@ -60,6 +60,11 @@
 
   $effect(() => {
     loadData();
+  });
+
+  $effect(() => {
+    const interval = setInterval(() => loadData(true), 15_000);
+    return () => clearInterval(interval);
   });
 
   async function openConfigure(channel: Channel) {

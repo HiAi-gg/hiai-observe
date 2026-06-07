@@ -18,14 +18,14 @@
 
   let submitLoading = $state(false);
 
-  async function loadIncidents() {
+  async function loadIncidents(silent = false) {
     if (!currentProject.current) {
       incidentsList = [];
       loading = false;
       return;
     }
     try {
-      loading = true;
+      if (!silent) loading = true;
       error = null;
       const res = await getIncidents({ projectId: currentProject.current });
       incidentsList = res.items || [];
@@ -55,6 +55,11 @@
       monitorsList = [];
       loading = false;
     }
+  });
+
+  $effect(() => {
+    const interval = setInterval(() => { if (currentProject.current) loadIncidents(true); }, 15_000);
+    return () => clearInterval(interval);
   });
 
   $effect(() => {
@@ -163,7 +168,7 @@
       </svg>
       <h3 class="mt-4 text-lg font-bold text-[var(--color-text-primary)]">Failed to load incidents</h3>
       <p class="mt-2 text-sm text-red-300">{error}</p>
-      <button type="button" onclick={loadIncidents} class="mt-6 inline-flex items-center rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] shadow-sm hover:bg-[var(--color-surface-overlay)] transition-colors">
+      <button type="button" onclick={() => loadIncidents()} class="mt-6 inline-flex items-center rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] shadow-sm hover:bg-[var(--color-surface-overlay)] transition-colors">
         Retry
       </button>
     </div>

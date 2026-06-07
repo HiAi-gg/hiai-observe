@@ -33,9 +33,9 @@
     }
   }
 
-  async function load() {
+  async function load(silent = false) {
     try {
-      loading = true;
+      if (!silent) loading = true;
       error = null;
       const params: Record<string, string | number> = { limit: perPage, offset: (page - 1) * perPage };
       if (statusFilter !== "all") params.status = statusFilter;
@@ -52,7 +52,7 @@
     }
   }
 
-  const debouncedLoad = debounce(load, 300);
+  const debouncedLoad = debounce(() => load(), 300);
 
   $effect(() => {
     loadMetadata();
@@ -65,6 +65,12 @@
     searchQuery;
     page = 1;
     load();
+  });
+
+  // Background auto-refresh (silent — keeps current data/filters, no spinner)
+  $effect(() => {
+    const interval = setInterval(() => load(true), 15_000);
+    return () => clearInterval(interval);
   });
 
   // Client-side reactive filter for Assignee and Fingerprint Rule

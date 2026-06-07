@@ -75,19 +75,9 @@
   {#if !collapsed}
     <button type="button"
       onpointerdown={onPointerDown}
-      class="group relative z-10 shrink-0"
-      class:h-1={direction === "vertical"}
-      class:w-full={direction === "vertical"}
-      class:w-1={direction === "horizontal"}
-      class:h-full={direction === "horizontal"}
-      class:cursor-row-resize={direction === "vertical"}
-      class:cursor-col-resize={direction === "horizontal"}
-      class:bg-[var(--color-border)]={direction === "vertical"}
-      class:hover:bg-[var(--color-accent)]/50={direction === "vertical"}
-      class:bg-[var(--color-border)]={direction === "horizontal"}
-      class:hover:bg-[var(--color-accent)]/50={direction === "horizontal"}
-      class:opacity-50={dragging}
-      class:opacity-100={dragging}
+      class={`group relative z-10 shrink-0 bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]/50 ${
+        direction === "vertical" ? "h-1 w-full cursor-row-resize" : "w-1 h-full cursor-col-resize"
+      } ${dragging ? "bg-[var(--color-accent)]" : ""}`}
       aria-label="Resize panel"
     >
       <div

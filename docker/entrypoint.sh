@@ -2,7 +2,7 @@
 set -e
 
 echo "Running migrations..."
-bunx drizzle-kit migrate
+bun run scripts/migrate.ts
 
 echo "Partitioning tables..."
 bun run scripts/partition-tables.ts || echo "Partitioning skipped (pg_partman may not be installed)"

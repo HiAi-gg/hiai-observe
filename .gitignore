@@ -21,8 +21,9 @@ new.md
 # Local dev overrides (docker-compose.dev.yml uses local infra)
 docker-compose.dev.yml
 
-# Drizzle
-drizzle/
+# Drizzle: track committed SQL migrations (needed by the Docker image), ignore
+# only drizzle-kit's local scratch output.
+drizzle/.drizzle/
 
 # Logs
 *.log

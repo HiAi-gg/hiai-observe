@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
 
 **The simplest, lightest, and most developer-friendly unified observability platform for AI Agents and TypeScript backends.**
 
@@ -271,6 +271,10 @@ HiAi Observe is the official observability layer for:
 - **HiAiKit** — default observability in new projects
 - **HiAi OS** — built-in monitoring module
 - Works standalone in any Bun/Elysia/Mastra/TypeScript project
+
+## Production Deployment
+
+For production setup with TLS, security hardening, and operational best practices, see [docs/production.md](docs/production.md).
 
 ## Contributing
 

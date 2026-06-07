@@ -10,6 +10,7 @@ vi.mock("../../src/store/redis.js", () => ({
 }));
 
 const { healthPlugin } = await import("../../src/api/health.js");
+const pkg = await import("../../package.json");
 
 describe("health endpoint", () => {
   it("returns ok status", async () => {
@@ -18,7 +19,8 @@ describe("health endpoint", () => {
 
     const body = await res.json();
     expect(body.status).toBe("ok");
-    expect(body.version).toBe("0.1.0");
+    // Derive from package.json so version bumps don't break this test
+    expect(body.version).toBe(pkg.default.version);
     expect(typeof body.uptime).toBe("string");
     expect(typeof body.uptimeSeconds).toBe("number");
     expect(body.memory).toBeDefined();

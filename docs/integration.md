@@ -249,6 +249,10 @@ const metricExporter = new OTLPMetricExporter({
 
 ## Troubleshooting
 
+### Production Deployment
+
+For production deployment with TLS, security hardening, and operational best practices, see [production.md](production.md).
+
 ### "Invalid API key" (401/403)
 
 1. Verify the API key exists in the `projects` table:

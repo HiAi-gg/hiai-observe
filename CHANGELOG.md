@@ -5,6 +5,43 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-07
+
+Production hardening, supply-chain hygiene, and accessibility improvements.
+
+### Security
+- Documented handler-level auth on all PUBLIC_PATHS (log stream, OTLP, Sentry paths)
+- Added JSDoc comments explaining why certain paths bypass auth middleware
+- Synced stale `PUBLIC_PATHS` array in auth test suite
+- Production startup warnings for missing/weak secrets (API key, Redis, DB)
+
+### Supply Chain
+- Committed lockfiles (`bun.lock`, `frontend/bun.lock`, `packages/*/bun.lock`) — CI `--frozen-lockfile` now works correctly
+- Normalized all 4 packages to `@hiai-observe/*` scope (`sdk`, `agent`, `client`, `mastra-exporter`)
+- Root `package.json` workspaces expanded to list all 4 packages
+
+### Bug Fixes
+- Fixed `markAlertFired` never using `rule.cooldownSeconds` — now passes correct cooldown to `shouldFireAlert`
+- Removed deprecated `markAlertFired()` function (was dead code due to Redis `SET NX` atomicity)
+
+### Code Quality
+- Replaced 9 `console.log`/`console.error` calls in 3 prod files with structured logger (`src/lib/logger.ts`)
+- Added Zod schema validation to alert rules engine — malformed rules now rejected with clear errors instead of silently cast
+
+### Frontend
+- Added skip-to-content link (WCAG 2.4.1) to layout
+- Added `type="button"` to 135 buttons across 21 Svelte components
+- Added `aria-label="Close"` to 2 icon-only close buttons (alerts + fingerprints)
+- Created 4 new Svelte 5 components: `TimeRangeSelector`, `ContainerSidebar`, `SplitPane`, `ContainerGroup`
+- Fixed 3 duplicate `type` attributes in status and incidents pages
+
+### Documentation
+- New `docs/production.md` — comprehensive deployment guide (secrets, Docker, TLS, Redis auth, backups, network security)
+- New `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1)
+- New `SECURITY.md` (vulnerability reporting policy)
+- Updated `README.md` with production deployment link
+- Updated `docs/integration.md` troubleshooting section
+
 ## [0.1.0] - 2026-05-25
 
 Initial release of HiAi Observe — a unified, self-hosted observability platform for AI Agents and TypeScript backends.
@@ -117,9 +154,9 @@ None — this is the initial release.
 ### Known Limitations
 
 - Single process (no clustering or worker threads)
-- API keys stored in plaintext (encrypted storage planned for v0.2.0)
 - No built-in user authentication (API key only)
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

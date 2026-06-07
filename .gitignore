@@ -14,9 +14,15 @@ packages/*/dist/
 .env.local
 .env.*.local
 
-# Internal planning files (not for open-source)
+# Internal planning / audit files (not for open-source)
 todo.md
 new.md
+AGENTS.md
+AUDIT_*.md
+PARITY_REPORT.md
+PERF_AUDIT.md
+PLAN_TO_10.md
+A11Y_AUDIT.md
 
 # Local dev overrides (docker-compose.dev.yml uses local infra)
 docker-compose.dev.yml

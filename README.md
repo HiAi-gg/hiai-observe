@@ -239,31 +239,22 @@ hiai-observe/
 ## Known Limitations
 
 - **Single process** — no clustering or worker threads. One Bun event loop handles everything. Sufficient for <50 req/sec.
-- **No user authentication** — API key (Bearer token) only. No user accounts, roles, or sessions.
-- **API keys in plaintext** — keys stored as-is in PostgreSQL. Encrypted storage planned for v0.2.0.
-- **PostgreSQL only** — no ClickHouse or TimescaleDB. Partitioning available for large datasets.
-- **Docker socket required** — container monitoring and log streaming need `/var/run/docker.sock` mounted.
+- **No user accounts / SSO** — authentication is per-project API keys (Bearer token), not user logins or sessions. Keys are bcrypt-hashed at rest and carry RBAC roles (`admin` / `member` / `readonly`).
+- **PostgreSQL only** — no ClickHouse or TimescaleDB. Partitioning is available for large datasets.
+- **Docker socket required** — container monitoring and log streaming need `/var/run/docker.sock` (or a socket proxy) mounted.
 - **No SMTP relay** — email notifications require an external SMTP server.
+- **AI cost estimates are approximate** — built-in per-model prices are public list prices and drift over time; override them with `MODEL_PRICING` for accuracy.
 
 ## Roadmap
 
-### v0.2.0 (Planned)
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the full, prioritized list of planned
+work. Highlights:
 
-- User authentication with roles and team permissions
-- Encrypted API key storage
-- Multi-project dashboard with cross-project analytics
-- Advanced AI agent analytics (cost optimization, model comparison)
-- Log aggregation from external sources (syslog, filebeat)
-- Custom dashboard widgets
-- Webhook integrations
-- Alert grouping and escalation policies
-
-### v0.3.0 (Future)
-
-- Export and retention policies with UI configuration
-- Advanced anomaly detection for error patterns and latency spikes
-- Mobile-friendly responsive improvements
-- API rate limiting per project (configurable)
+- User accounts, SSO, and team permissions on top of the existing RBAC roles
+- More uptime monitor types and notification channels (toward Uptime Kuma parity)
+- A first-class multi-host agent with temperature/GPU metrics (toward Beszel parity)
+- Deeper AI analytics: cost optimization, model comparison, eval/score ingestion
+- Custom dashboard widgets and cross-project analytics
 
 ## Ecosystem
 

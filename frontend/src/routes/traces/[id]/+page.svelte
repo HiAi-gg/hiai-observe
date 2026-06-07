@@ -115,7 +115,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -190,7 +190,7 @@
             {#each orderedSpans as span (span.span_id)}
               {@const pct = totalDuration > 0 ? (span.offsetMs / totalDuration) * 100 : 0}
               {@const widthPct = totalDuration > 0 ? Math.max((span.durationMs / totalDuration) * 100, 0.5) : 0}
-              <button
+              <button type="button"
                 class="flex w-full items-center gap-0 px-4 py-2 text-left transition-colors hover:bg-[var(--color-accent)]/5 {selectedSpan?.span_id === span.span_id ? 'bg-[var(--color-accent)]/10' : ''}"
                 onclick={() => selectedSpan = selectedSpan?.span_id === span.span_id ? null : span}
               >

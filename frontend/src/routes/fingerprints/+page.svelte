@@ -182,7 +182,7 @@
           {/each}
         </select>
       {/if}
-      <button
+      <button type="button"
         onclick={openCreate}
         disabled={!activeProjectId}
         class="inline-flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
@@ -202,7 +202,7 @@
         <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -253,7 +253,7 @@
                     </span>
                   </td>
                   <td class="px-4 py-3.5">
-                    <button
+                    <button type="button"
                       onclick={() => handleToggleActive(rule)}
                       class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {rule.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}"
                     >
@@ -262,13 +262,13 @@
                     </button>
                   </td>
                   <td class="px-4 py-3.5 text-right space-x-2">
-                    <button
+                    <button type="button"
                       onclick={() => openEdit(rule)}
                       class="text-xs text-[var(--color-accent)] hover:underline"
                     >
                       Edit
                     </button>
-                    <button
+                    <button type="button"
                       onclick={() => { confirmDeleteId = rule.id; showDeleteDialog = true; }}
                       class="text-xs text-[var(--color-danger)] hover:underline"
                     >
@@ -291,7 +291,7 @@
             <h2 class="text-lg font-bold text-[var(--color-text-primary)]">
               {editingRule ? "Edit Rule" : "Add New Rule"}
             </h2>
-            <button
+            <button type="button" aria-label="Close"
               onclick={() => { showForm = false; }}
               class="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             >
@@ -367,14 +367,14 @@
 
             <!-- Submit -->
             <div class="flex gap-3 pt-4 border-t border-[var(--color-border)]">
-              <button
+              <button type="button"
                 onclick={handleSubmit}
                 disabled={submitting || !name.trim() || !pattern.trim() || !!regexError}
                 class="flex-1 rounded-lg bg-[var(--color-accent)] py-2 text-sm font-semibold text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
               >
                 {submitting ? "Saving..." : "Save Rule"}
               </button>
-              <button
+              <button type="button"
                 onclick={() => { showForm = false; }}
                 class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
               >
@@ -392,7 +392,7 @@
           <p class="text-xs text-[var(--color-text-muted)] leading-relaxed">
             Rules are applied sequentially to incoming error events. The first rule that matches will determine the event's fingerprint and group it accordingly.
           </p>
-          <button
+          <button type="button"
             onclick={openCreate}
             disabled={!activeProjectId}
             class="w-full rounded-lg bg-[var(--color-accent)]/10 py-2 text-xs font-bold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-all duration-150"

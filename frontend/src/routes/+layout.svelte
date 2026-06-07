@@ -112,6 +112,7 @@
     {@render children()}
   </div>
 {:else}
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:bg-[var(--color-accent)] focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:m-2">Skip to content</a>
   <div class="flex h-screen overflow-hidden bg-[var(--color-surface)]">
     <!-- Sidebar -->
     <aside
@@ -124,7 +125,7 @@
       {#if sidebarOpen.current}
         <span class="text-sm font-bold tracking-tight text-[var(--color-text-primary)]">HiAi Observe</span>
       {/if}
-      <button
+      <button type="button"
         onclick={toggleSidebar}
         class="flex min-h-11 min-w-11 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-text-secondary)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
         aria-label="Toggle sidebar"
@@ -142,7 +143,7 @@
     <!-- Project selector -->
     {#if sidebarOpen.current}
       <div class="relative border-b border-[var(--color-border)] px-3 py-2">
-        <button
+        <button type="button"
           onclick={() => { projectDropdownOpen = !projectDropdownOpen; }}
           class="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
         >
@@ -153,14 +154,14 @@
         </button>
         {#if projectDropdownOpen}
           <div class="absolute left-3 right-3 z-50 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-1 shadow-lg">
-            <button
+            <button type="button"
               onclick={() => selectProject("")}
               class="flex w-full items-center px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] {currentProject.current === '' ? 'text-[var(--color-accent)]' : ''}"
             >
               All Projects
             </button>
             {#each projects as project (project.id)}
-              <button
+              <button type="button"
                 onclick={() => selectProject(project.id)}
                 class="flex w-full items-center px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] {currentProject.current === project.id ? 'text-[var(--color-accent)]' : ''}"
               >
@@ -216,7 +217,7 @@
 
     <!-- Dark mode toggle -->
     <div class="border-t border-[var(--color-border)] p-3">
-      <button
+      <button type="button"
         onclick={toggleDarkMode}
         class="flex w-full items-center gap-2 rounded-md px-3 py-3 text-sm font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
         class:justify-center={!sidebarOpen.current}
@@ -239,7 +240,7 @@
   </aside>
 
   <!-- Main content -->
-  <main class="flex-1 overflow-y-auto p-6">
+  <main id="main-content" class="flex-1 overflow-y-auto p-6">
     {@render children()}
   </main>
 </div>

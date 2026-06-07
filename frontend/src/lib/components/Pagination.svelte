@@ -33,13 +33,13 @@
       Showing {startItem}&#8211;{endItem} of {total}
     </span>
     <div class="flex items-center gap-1">
-      <button
+      <button type="button"
         onclick={() => onPageChange(page - 1)}
         disabled={page <= 1}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
       >Previous</button>
       {#each visiblePages as pg (pg)}
-        <button
+        <button type="button"
           onclick={() => onPageChange(pg)}
           class="h-8 w-8 rounded-md text-sm font-medium transition-all"
           class:bg-[var(--color-accent)]={page === pg}
@@ -48,7 +48,7 @@
           class:hover:bg-[var(--color-surface-overlay)]={page !== pg}
         >{pg}</button>
       {/each}
-      <button
+      <button type="button"
         onclick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"

@@ -3,6 +3,7 @@ import type { LogEntry } from "./log-streamer.js";
 import { insertLogs } from "../store/logs.js";
 import { publishLog } from "../store/log-pubsub.js";
 import { recordWorkerRun } from "../workers/health.js";
+import { logger } from "../lib/logger.js";
 
 let cleanup: (() => void) | null = null;
 
@@ -41,7 +42,7 @@ function onBatch(entries: LogEntry[]): void {
       level: detectLevel(e.message, e.stream),
     }))
   ).catch((err) => {
-    console.error("[log-worker] DB insert error:", err);
+    logger.error("[log-worker] DB insert error", { err: String(err) });
   });
 
   // Publish to Redis for real-time WebSocket delivery (fire-and-forget)
@@ -54,16 +55,16 @@ function onBatch(entries: LogEntry[]): void {
 
 export async function startLogWorker(): Promise<void> {
   if (cleanup) return;
-  console.log("[log-worker] Starting — discovering containers...");
+  logger.info("[log-worker] Starting — discovering containers...");
 
   try {
     const containers = await listContainers();
     const ids = containers.map((c) => c.id);
     const nameMap = new Map(containers.map((c) => [c.id, c.name]));
-    console.log(`[log-worker] Streaming logs from ${ids.length} containers: ${containers.map((c) => c.name).join(", ")}`);
+    logger.info("[log-worker] Streaming from containers", { count: ids.length, names: containers.map((c) => c.name).join(", ") });
     cleanup = startLogStreamer(ids, onBatch, undefined, nameMap);
   } catch (err) {
-    console.error("[log-worker] Failed to start:", err);
+    logger.error("[log-worker] Failed to start", { err: String(err) });
   }
 }
 
@@ -71,6 +72,6 @@ export function stopLogWorker(): void {
   if (cleanup) {
     cleanup();
     cleanup = null;
-    console.log("[log-worker] Stopped");
+    logger.info("[log-worker] Stopped");
   }
 }

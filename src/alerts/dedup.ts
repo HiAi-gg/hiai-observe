@@ -21,16 +21,6 @@ export async function shouldFireAlert(alertId: string, cooldownSeconds = 300): P
 }
 
 /**
- * @deprecated Use shouldFireAlert(alertId, cooldownSeconds) which atomically checks and marks.
- */
-export async function markAlertFired(
-  alertId: string,
-  cooldownSeconds: number
-): Promise<void> {
-  await redis.set(`${KEY_PREFIX}:${alertId}`, "1", "EX", cooldownSeconds, "NX");
-}
-
-/**
  * Clear cooldown for a specific alert (e.g., for testing).
  */
 export async function clearCooldown(alertId: string): Promise<void> {

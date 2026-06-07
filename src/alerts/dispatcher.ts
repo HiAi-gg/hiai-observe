@@ -18,8 +18,9 @@ import { sendTeamsAlert } from "./notifiers/teams.js";
 import { sendNtfyAlert } from "./notifiers/ntfy.js";
 import { sendGotifyAlert } from "./notifiers/gotify.js";
 import { sendPushoverAlert } from "./notifiers/pushover.js";
-import { markAlertFired } from "./dedup.js";
+
 import type { AlertRule, AlertChannel, AlertEvaluationResult } from "./rules-engine.js";
+import { logger } from "../lib/logger.js";
 
 export interface DispatchResult {
   alertId: string;
@@ -95,12 +96,6 @@ export async function dispatchAlert(
     });
   }
 
-  const anySucceeded = channelResults.some(r => r.ok);
-
-  if (anySucceeded) {
-    await markAlertFired(rule.id, rule.cooldownSeconds);
-  }
-
   await db.insert(alertHistory).values({
     alertId: rule.id,
     triggeredAt: timestamp,
@@ -115,9 +110,7 @@ export async function dispatchAlert(
     },
   });
 
-  console.log(
-    `[Alert Dispatcher] ${rule.name}: dispatched to ${channelResults.length} channels`
-  );
+  logger.info("[Alert Dispatcher] dispatched", { rule: rule.name, channels: channelResults.length });
 
   return {
     alertId: rule.id,

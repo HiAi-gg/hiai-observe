@@ -131,7 +131,7 @@
       <p class="text-sm text-[var(--color-text-muted)]">Track, update, and resolve active service outages</p>
     </div>
     {#if currentProject.current}
-      <button
+      <button type="button"
         onclick={() => { newIncidentModalOpen = true; }}
         class="inline-flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
       >
@@ -163,7 +163,7 @@
       </svg>
       <h3 class="mt-4 text-lg font-bold text-[var(--color-text-primary)]">Failed to load incidents</h3>
       <p class="mt-2 text-sm text-red-300">{error}</p>
-      <button onclick={loadIncidents} class="mt-6 inline-flex items-center rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] shadow-sm hover:bg-[var(--color-surface-overlay)] transition-colors">
+      <button type="button" onclick={loadIncidents} class="mt-6 inline-flex items-center rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] shadow-sm hover:bg-[var(--color-surface-overlay)] transition-colors">
         Retry
       </button>
     </div>
@@ -245,7 +245,7 @@
                       </select>
                     </div>
                   {/if}
-                  <button
+                  <button type="button"
                     onclick={() => handleDeleteIncident(incident.id)}
                     class="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-danger)] transition-colors"
                     aria-label="Delete incident"
@@ -272,7 +272,7 @@
   <div class="p-6">
     <div class="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
       <h3 class="text-lg font-bold text-[var(--color-text-primary)]">Report New Incident</h3>
-      <button onclick={() => { newIncidentModalOpen = false; }} class="rounded-lg p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] transition-colors">
+      <button type="button" onclick={() => { newIncidentModalOpen = false; }} class="rounded-lg p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] transition-colors">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -333,8 +333,7 @@
       </div>
 
       <div class="mt-6 flex justify-end gap-3 border-t border-[var(--color-border)] pt-4">
-        <button
-          type="button"
+        <button type="button"
           onclick={() => { newIncidentModalOpen = false; }}
           class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)]"
         >

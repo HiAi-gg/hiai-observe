@@ -9,6 +9,8 @@ import { db } from "../store/db.js";
 import { events, traces, maintenanceWindows } from "../store/schema.js";
 import { eq, and, gte, lte, sql, count } from "drizzle-orm";
 import { castDbRows } from "../lib/db-types.js";
+import { z } from "zod";
+import { logger } from "../lib/logger.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,28 +25,30 @@ export type AlertConditionType =
 
 export type ComparisonOperator = "gt" | "lt" | "eq" | "gte" | "lte";
 
-export interface AlertCondition {
-  type: AlertConditionType;
-  threshold: number;
-  duration?: number; // seconds — how long condition must hold
-  operator: ComparisonOperator;
-  // uptime_down: consecutive failed checks
-  consecutiveFailures?: number;
-  // resource_threshold: which resource (cpu, memory, disk)
-  resource?: "cpu" | "memory" | "disk";
-  // token_usage: model filter
-  model?: string;
-  // cert_expiry: host to check
-  host?: string;
-  port?: number;
-}
+// ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
-export interface AlertChannel {
-  type: "telegram" | "discord" | "email" | "slack" | "webhook" | "pagerduty" | "teams" | "ntfy" | "gotify" | "pushover";
-  target: string; // chatId, webhookUrl, email address, or slack webhook URL
-}
+export const AlertConditionSchema = z.object({
+  type: z.enum(["error_rate", "uptime_down", "resource_threshold", "trace_error", "token_usage", "recovery", "cert_expiry"]),
+  threshold: z.number(),
+  duration: z.number().optional(),
+  operator: z.enum(["gt", "lt", "eq", "gte", "lte"]),
+  consecutiveFailures: z.number().optional(),
+  resource: z.enum(["cpu", "memory", "disk"]).optional(),
+  model: z.string().optional(),
+  host: z.string().optional(),
+  port: z.number().optional(),
+});
 
-export type AlertSeverity = "critical" | "warning" | "info";
+export const AlertChannelSchema = z.object({
+  type: z.enum(["telegram", "discord", "email", "slack", "webhook", "pagerduty", "teams", "ntfy", "gotify", "pushover"]),
+  target: z.string(),
+});
+
+export const AlertSeveritySchema = z.enum(["critical", "warning", "info"]);
+
+export type AlertCondition = z.infer<typeof AlertConditionSchema>;
+export type AlertChannel = z.infer<typeof AlertChannelSchema>;
+export type AlertSeverity = z.infer<typeof AlertSeveritySchema>;
 
 export interface AlertRule {
   id: string;
@@ -381,7 +385,7 @@ export async function checkCondition(
         triggered: false,
         currentValue: 0,
         threshold: 0,
-        message: `Unknown condition type: ${(condition as AlertCondition).type}`,
+        message: `Unknown condition type: ${condition.type}`,
       };
   }
 }
@@ -411,15 +415,28 @@ export async function evaluateRules(
   }> = [];
 
   for (const rule of rules) {
-    const baseSeverity: AlertSeverity = (rule.severity as AlertSeverity) ?? "warning";
+    const severityResult = AlertSeveritySchema.safeParse(rule.severity);
+    const baseSeverity: AlertSeverity = severityResult.success ? severityResult.data : "warning";
+
+    const conditionResult = AlertConditionSchema.safeParse(rule.condition);
+    if (!conditionResult.success) {
+      logger.warn("[rules-engine] Invalid condition, skipping rule", { ruleId: rule.id, errors: conditionResult.error.flatten() });
+      continue;
+    }
+
+    const channelsResult = z.array(AlertChannelSchema).safeParse(rule.channels);
+    if (!channelsResult.success) {
+      logger.warn("[rules-engine] Invalid channels, skipping rule", { ruleId: rule.id, errors: channelsResult.error.flatten() });
+      continue;
+    }
 
     const alertRule: AlertRule = {
       id: rule.id,
       name: rule.name,
       projectId: rule.projectId,
       severity: baseSeverity,
-      condition: rule.condition as AlertCondition,
-      channels: rule.channels as AlertChannel[],
+      condition: conditionResult.data,
+      channels: channelsResult.data,
       isActive: rule.isActive,
       cooldownSeconds: rule.cooldownSeconds,
       createdAt: rule.createdAt,

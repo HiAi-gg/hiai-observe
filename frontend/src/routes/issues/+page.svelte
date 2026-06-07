@@ -146,7 +146,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -157,7 +157,7 @@
       <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Status:</span>
       <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
         {#each statusTabs as tab (tab)}
-          <button
+          <button type="button"
             onclick={() => { statusFilter = tab; }}
             class="rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-all duration-150"
             class:bg-[var(--color-accent)]={statusFilter === tab}
@@ -192,7 +192,7 @@
         <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Env:</span>
         <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
           {#each envTabs as tab (tab)}
-            <button
+            <button type="button"
               onclick={() => { environmentFilter = tab; }}
               class="rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-all duration-150"
               class:bg-[var(--color-accent)]={environmentFilter === tab}
@@ -213,7 +213,7 @@
         <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Level:</span>
         <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
           {#each levelTabs as tab (tab)}
-            <button
+            <button type="button"
               onclick={() => { levelFilter = tab; }}
               class="rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-all duration-150"
               class:bg-[var(--color-accent)]={levelFilter === tab}

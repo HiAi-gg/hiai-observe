@@ -46,7 +46,18 @@ function getDbChain() {
 }
 
 // ── Public path helper (mirrors middleware logic) ────────────────────────
-const PUBLIC_PATHS = ["/health", "/metrics", "/api/status", "/v1/traces", "/v1/metrics"];
+const PUBLIC_PATHS = [
+  "/health",
+  "/metrics",
+  "/api/status",
+  "/api/subscribers/public",
+  "/api/badges",
+  "/api/openapi.json",
+  "/v1/traces",
+  "/v1/metrics",
+  "/api/logs/stream",
+  "/api/observe/logs/stream",
+];
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
@@ -226,10 +237,16 @@ describe("isPublicPath", () => {
     "/metrics/prometheus",
     "/api/status",
     "/api/status/overview",
+    "/api/subscribers/public",
+    "/api/badges",
+    "/api/openapi.json",
     "/v1/traces",
     "/v1/traces/batch",
     "/v1/metrics",
     "/v1/metrics/otlp",
+    "/api/logs/stream",
+    "/api/logs/stream?container=nginx",
+    "/api/observe/logs/stream",
   ])("allows public path: %s", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });
@@ -240,6 +257,7 @@ describe("isPublicPath", () => {
     "/api/admin/cleanup",
     "/v1/logs",
     "/dashboard",
+    "/api/projects",
   ])("blocks protected path: %s", (path) => {
     expect(isPublicPath(path)).toBe(false);
   });

@@ -223,7 +223,7 @@
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
       <h1 class="text-2xl font-bold">Uptime Monitoring</h1>
-      <button
+      <button type="button"
         onclick={() => { showAddModal = true; }}
         class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors"
       >
@@ -234,7 +234,7 @@
       <!-- Period tabs -->
       <div class="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5">
         {#each periods as period (period.label)}
-          <button
+          <button type="button"
             onclick={() => { selectedPeriod = period.label; }}
             class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {selectedPeriod === period.label ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'}"
           >{period.label}</button>
@@ -258,7 +258,7 @@
   {#if error}
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -273,7 +273,7 @@
       <svg class="mb-4 h-12 w-12 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       <p class="text-sm font-medium text-[var(--color-text-secondary)]">No monitors configured yet</p>
       <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add uptime monitors to track your services</p>
-      <button onclick={() => { showAddModal = true; }} class="mt-3 inline-block rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors">
+      <button type="button" onclick={() => { showAddModal = true; }} class="mt-3 inline-block rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors">
         Add Monitor
       </button>
     </div>
@@ -287,7 +287,7 @@
               <span class="h-2.5 w-2.5 rounded-full {statusDot(monitor)}"></span>
               <h3 class="font-medium">{monitor.name}</h3>
             </div>
-            <button
+            <button type="button"
               onclick={() => handleDeleteMonitor(monitor.id)}
               class="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors p-1"
               title="Delete Monitor"
@@ -340,7 +340,7 @@
       <div class="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
         <div class="mb-4 flex items-center justify-between">
           <h2 class="text-xl font-bold">Add New Monitor</h2>
-          <button onclick={() => { showAddModal = false; }} class="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]" title="Close">
+          <button type="button" onclick={() => { showAddModal = false; }} class="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]" title="Close">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>

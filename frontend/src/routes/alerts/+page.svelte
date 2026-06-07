@@ -190,7 +190,7 @@
         <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => loadData()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => loadData()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -222,7 +222,7 @@
             <span class="text-xs text-[var(--color-text-muted)]">
               {channel.configFields.length} config fields
             </span>
-            <button
+            <button type="button"
               onclick={() => openConfigure(channel)}
               class="rounded-lg bg-[var(--color-accent)]/10 px-3.5 py-1.5 text-xs font-bold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-all duration-150"
             >
@@ -248,7 +248,7 @@
               Source: <span class="font-semibold capitalize text-[var(--color-text-secondary)]">{configSource}</span>
             </p>
           </div>
-          <button
+          <button type="button" aria-label="Close"
             onclick={() => { modalOpen = false; }}
             class="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
           >
@@ -316,7 +316,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[var(--color-border)]">
           <div class="flex gap-2">
             {#if configSource === "db"}
-              <button
+              <button type="button"
                 onclick={handleDelete}
                 class="rounded-lg border border-[var(--color-danger)]/30 px-3 py-2 text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
               >
@@ -325,14 +325,14 @@
             {/if}
           </div>
           <div class="flex gap-2">
-            <button
+            <button type="button"
               onclick={handleTest}
               disabled={testing || saving || loadingConfig}
               class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors disabled:opacity-40"
             >
               {testing ? "Testing..." : "Send Test"}
             </button>
-            <button
+            <button type="button"
               onclick={handleSave}
               disabled={saving || testing || loadingConfig}
               class="rounded-lg bg-[var(--color-accent)] px-5 py-2 text-xs font-semibold text-white hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-40"

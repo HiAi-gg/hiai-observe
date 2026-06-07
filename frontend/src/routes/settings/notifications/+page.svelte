@@ -246,14 +246,14 @@
 
   <!-- Action Buttons -->
   <div class="flex items-center gap-3">
-    <button
+    <button type="button"
       onclick={handleSaveConfig}
       disabled={saving}
       class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
     >
       {saving ? "Saving..." : "Save Configuration"}
     </button>
-    <button
+    <button type="button"
       onclick={handleTestAll}
       disabled={testing}
       class="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-raised)] disabled:opacity-50"

@@ -121,7 +121,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => loadAlerts()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => loadAlerts()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -137,7 +137,7 @@
         placeholder="New project name..."
         class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
       />
-      <button
+      <button type="button"
         onclick={handleCreateProject}
         disabled={!newProjectName.trim()}
         class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40"
@@ -150,7 +150,7 @@
       <div class="mb-4 rounded-md border border-[var(--color-success)]/30 bg-[var(--color-success-bg)] p-3">
         <p class="text-sm font-medium text-[var(--color-success)]">Project created! Save this API key:</p>
         <code class="mt-1 block break-all text-xs text-[var(--color-text-primary)]">{newProjectKey}</code>
-        <button onclick={() => { newProjectKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
+        <button type="button" onclick={() => { newProjectKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
       </div>
     {/if}
 
@@ -158,7 +158,7 @@
       <div class="mb-4 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-bg)] p-3">
         <p class="text-sm font-medium text-[var(--color-warning)]">New API key (save it now, it won't be shown again):</p>
         <code class="mt-1 block break-all text-xs text-[var(--color-text-primary)]">{rotatedKey}</code>
-        <button onclick={() => { rotatedKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
+        <button type="button" onclick={() => { rotatedKey = null; }} class="mt-2 text-xs text-[var(--color-text-muted)] hover:underline">Dismiss</button>
       </div>
     {/if}
 
@@ -176,13 +176,13 @@
               </p>
             </div>
             <div class="flex items-center gap-2">
-              <button
+              <button type="button"
                 onclick={() => handleRotateKey(project.id)}
                 class="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]"
               >
                 Rotate Key
               </button>
-              <button
+              <button type="button"
                 onclick={() => { confirmDelete = project.id; showDeleteProject = true; }}
                 class="text-xs text-[var(--color-danger)] hover:underline"
               >
@@ -205,7 +205,7 @@
         placeholder="Enter your API key..."
         class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
       />
-      <button
+      <button type="button"
         onclick={saveApiKey}
         class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
       >
@@ -259,7 +259,7 @@
         placeholder="Target (chat ID / webhook / email)..."
         class="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm focus:border-[var(--color-accent)] focus:outline-none sm:col-span-2 lg:col-span-3"
       />
-      <button
+      <button type="button"
         onclick={handleCreateAlert}
         disabled={!newAlertName || !newAlertTarget}
         class="rounded-md bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40"
@@ -287,7 +287,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="h-2 w-2 rounded-full {alert.is_active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'}"></span>
-              <button
+              <button type="button"
                 onclick={() => { confirmDeleteAlert = alert.id; showDeleteAlert = true; }}
                 class="text-xs text-[var(--color-danger)] hover:underline"
               >

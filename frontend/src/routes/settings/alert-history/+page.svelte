@@ -87,7 +87,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -106,7 +106,7 @@
 
     <div class="flex items-center gap-1 rounded-md border border-[var(--color-border)] p-0.5">
       {#each timeRanges as tr (tr.label)}
-        <button
+        <button type="button"
           onclick={() => { selectedRange = tr.label; offset = 0; load(); }}
           class="rounded px-3 py-1.5 text-xs font-medium transition-colors {selectedRange === tr.label ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]'}"
         >{tr.label}</button>
@@ -134,7 +134,7 @@
       {#each entries as entry (entry.id)}
         {@const status = statusDot(entry)}
         <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
-          <button
+          <button type="button"
             onclick={() => toggleExpand(entry.id)}
             class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-overlay)]/30"
           >
@@ -191,14 +191,14 @@
           Page {page} of {totalPages}
         </p>
         <div class="flex items-center gap-2">
-          <button
+          <button type="button"
             onclick={() => { offset = Math.max(0, offset - limit); load(); }}
             disabled={!hasPrev}
             class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)] disabled:opacity-40"
           >
             Previous
           </button>
-          <button
+          <button type="button"
             onclick={() => { offset += limit; load(); }}
             disabled={!hasNext}
             class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)] disabled:opacity-40"

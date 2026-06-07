@@ -247,7 +247,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -276,20 +276,20 @@
       </div>
       <div class="flex items-center gap-2">
         {#if issue.status !== "resolved"}
-          <button onclick={() => setStatus("resolved")} disabled={actionLoading}
+          <button type="button" onclick={() => setStatus("resolved")} disabled={actionLoading}
             class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-success)]/50 bg-[var(--color-success-bg)] px-4 py-2 text-sm font-medium text-[var(--color-success)] transition-all hover:bg-[var(--color-success-bg)] hover:border-[var(--color-success)] disabled:opacity-50">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
             Resolve
           </button>
         {/if}
         {#if issue.status !== "ignored"}
-          <button onclick={() => setStatus("ignored")} disabled={actionLoading}
+          <button type="button" onclick={() => setStatus("ignored")} disabled={actionLoading}
             class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-text-muted)] disabled:opacity-50">
             Ignore
           </button>
         {/if}
         {#if issue.status !== "unresolved"}
-          <button onclick={() => setStatus("unresolved")} disabled={actionLoading}
+          <button type="button" onclick={() => setStatus("unresolved")} disabled={actionLoading}
             class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-warning)]/50 bg-[var(--color-warning-bg)] px-4 py-2 text-sm font-medium text-[var(--color-warning)] transition-all hover:bg-[var(--color-warning-bg)] hover:border-[var(--color-warning)] disabled:opacity-50">
             Reopen
           </button>
@@ -323,18 +323,18 @@
           <div class="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-overlay)]/50 px-4 py-2.5">
             <svg class="h-4 w-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
             <h2 class="text-sm font-semibold text-[var(--color-text-secondary)]">Stack Trace</h2>
-            <button onclick={() => { showRaw = !showRaw; }}
+            <button type="button" onclick={() => { showRaw = !showRaw; }}
               class="ml-auto rounded px-2 py-0.5 text-[10px] font-medium transition-colors {showRaw ? 'bg-[var(--color-accent-bg)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)]'}">
               {showRaw ? "Stack Trace" : "View Raw"}
             </button>
             {#if events.length > 1}
               <span class="flex items-center gap-2">
-                <button onclick={() => { selectedEventIdx = Math.max(0, selectedEventIdx - 1); }} disabled={selectedEventIdx === 0}
+                <button type="button" onclick={() => { selectedEventIdx = Math.max(0, selectedEventIdx - 1); }} disabled={selectedEventIdx === 0}
                   class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
                 </button>
                 <span class="text-xs text-[var(--color-text-muted)]">{selectedEventIdx + 1}/{events.length}</span>
-                <button onclick={() => { selectedEventIdx = Math.min(events.length - 1, selectedEventIdx + 1); }} disabled={selectedEventIdx >= events.length - 1}
+                <button type="button" onclick={() => { selectedEventIdx = Math.min(events.length - 1, selectedEventIdx + 1); }} disabled={selectedEventIdx >= events.length - 1}
                   class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] disabled:opacity-30">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
                 </button>
@@ -407,7 +407,7 @@
             </div>
             <div class="max-h-64 overflow-y-auto">
               {#each events as ev, i (ev.id)}
-                <button
+                <button type="button"
                   onclick={() => { selectedEventIdx = i; }}
                   class="flex w-full items-center gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-overlay)]/50"
                   class:bg-[var(--color-accent-bg)]={i === selectedEventIdx}
@@ -445,7 +445,7 @@
               class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none resize-none"
             ></textarea>
             <div class="flex justify-end">
-              <button
+              <button type="button"
                 onclick={handleSubmitComment}
                 disabled={!commentAuthor.trim() || !commentBody.trim() || submittingComment}
                 class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
@@ -472,7 +472,7 @@
                       <span class="text-sm font-medium text-[var(--color-text-primary)]">{comment.authorName}</span>
                       <span class="text-xs text-[var(--color-text-muted)]">{timeAgo(comment.createdAt)}</span>
                     </div>
-                    <button
+                    <button type="button"
                       onclick={() => { confirmDeleteCommentId = comment.id; showDeleteCommentDialog = true; }}
                       class="text-xs text-[var(--color-danger)] hover:underline"
                     >

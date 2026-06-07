@@ -135,7 +135,7 @@
       </div>
       <h2 class="mt-4 text-lg font-bold text-slate-900">Failed to load status</h2>
       <p class="mt-2 text-sm text-red-700">{error}</p>
-      <button onclick={loadStatus} class="mt-6 inline-flex items-center rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+      <button type="button" onclick={loadStatus} class="mt-6 inline-flex items-center rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
         Try Again
       </button>
     </div>

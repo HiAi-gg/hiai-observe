@@ -108,7 +108,7 @@
     </div>
     <div class="flex gap-1">
       {#each ["24h", "7d", "30d"] as range (range)}
-        <button
+        <button type="button"
           onclick={() => timeRange = range}
           class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors {timeRange === range ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)]'}"
         >{range}</button>
@@ -119,7 +119,7 @@
   {#if error}
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs hover:bg-[var(--color-danger-bg)]">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs hover:bg-[var(--color-danger-bg)]">Retry</button>
     </div>
   {/if}
 

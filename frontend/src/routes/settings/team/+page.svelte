@@ -143,14 +143,14 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
   <!-- Add member button -->
   <div class="flex items-center justify-between">
     <p class="text-sm text-[var(--color-text-muted)]">{total} team members</p>
-    <button
+    <button type="button"
       onclick={() => { showCreateForm = !showCreateForm; }}
       class="inline-flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors"
     >
@@ -195,14 +195,14 @@
         </select>
       </div>
       <div class="flex items-center gap-3">
-        <button
+        <button type="button"
           onclick={handleCreate}
           disabled={!newName.trim() || !newEmail.trim() || !newProjectId || creating}
           class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
         >
           {creating ? "Adding..." : "Add Member"}
         </button>
-        <button
+        <button type="button"
           onclick={() => { showCreateForm = false; }}
           class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
         >
@@ -258,8 +258,8 @@
                 <td class="px-4 py-3 text-xs text-[var(--color-text-muted)]">{getProjectName(member.projectId)}</td>
                 <td class="px-4 py-3 text-right">
                   <div class="flex items-center justify-end gap-2">
-                    <button onclick={saveEdit} class="rounded bg-[var(--color-accent)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--color-accent-hover)]">Save</button>
-                    <button onclick={cancelEdit} class="rounded border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]">Cancel</button>
+                    <button type="button" onclick={saveEdit} class="rounded bg-[var(--color-accent)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--color-accent-hover)]">Save</button>
+                    <button type="button" onclick={cancelEdit} class="rounded border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]">Cancel</button>
                   </div>
                 </td>
               </tr>
@@ -281,13 +281,13 @@
                 <td class="px-4 py-3.5 text-xs text-[var(--color-text-muted)]">{getProjectName(member.projectId)}</td>
                 <td class="px-4 py-3.5 text-right">
                   <div class="flex items-center justify-end gap-2">
-                    <button
+                    <button type="button"
                       onclick={() => startEdit(member)}
                       class="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)]"
                     >
                       Edit
                     </button>
-                    <button
+                    <button type="button"
                       onclick={() => { confirmDeleteId = member.id; showDeleteDialog = true; }}
                       class="text-xs text-[var(--color-danger)] hover:underline"
                     >

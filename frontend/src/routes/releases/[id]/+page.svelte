@@ -109,7 +109,7 @@
 <div class="p-6 max-w-[1400px] mx-auto space-y-6">
   <!-- Back Button & Header -->
   <div class="space-y-4">
-    <button
+    <button type="button"
       onclick={() => goto("/releases")}
       class="inline-flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
     >

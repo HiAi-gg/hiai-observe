@@ -127,7 +127,7 @@
       <h1 class="text-2xl font-bold text-[var(--color-text-primary)]">Releases</h1>
       <p class="mt-1 text-sm text-[var(--color-text-muted)]">{total} releases tracked</p>
     </div>
-    <button
+    <button type="button"
       onclick={() => { showCreateForm = !showCreateForm; }}
       class="inline-flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors"
     >
@@ -141,7 +141,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -175,14 +175,14 @@
         </select>
       </div>
       <div class="flex items-center gap-3">
-        <button
+        <button type="button"
           onclick={handleCreate}
           disabled={!newVersion.trim() || !newProjectId || creating}
           class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 transition-colors"
         >
           {creating ? "Creating..." : "Create"}
         </button>
-        <button
+        <button type="button"
           onclick={() => { showCreateForm = false; }}
           class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
         >
@@ -211,7 +211,7 @@
         {@const health = healthMap[release.id]}
         <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] overflow-hidden">
           <!-- Release row -->
-          <button
+          <button type="button"
             onclick={() => toggleExpand(release.id)}
             class="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-[var(--color-accent)]/5"
           >
@@ -295,7 +295,7 @@
                 </div>
               </div>
               <div class="flex justify-end">
-                <button
+                <button type="button"
                   onclick={() => { confirmDeleteId = release.id; showDeleteDialog = true; }}
                   class="text-xs text-[var(--color-danger)] hover:underline"
                 >

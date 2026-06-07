@@ -73,7 +73,7 @@ async function runEvaluationCycle(): Promise<void> {
 
       for (const { rule, result } of triggered) {
         // Check cooldown before dispatching
-        const canFire = await shouldFireAlert(rule.id);
+        const canFire = await shouldFireAlert(rule.id, rule.cooldownSeconds);
         const isEscalation = !canFire && await checkEscalation(rule);
 
         if (!canFire && !isEscalation) {

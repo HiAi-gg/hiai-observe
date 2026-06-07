@@ -100,7 +100,7 @@
         placeholder="Admin API key..."
         class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
       />
-      <button
+      <button type="button"
         onclick={loadData}
         disabled={!adminKey}
         class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40"
@@ -196,14 +196,14 @@
                     class="w-20 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-sm focus:border-[var(--color-accent)] focus:outline-none"
                   />
                   <span class="text-xs text-[var(--color-text-muted)]">days</span>
-                  <button
+                  <button type="button"
                     onclick={() => saveRetention(table.tableName)}
                     disabled={saving}
                     class="rounded bg-[var(--color-success)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--color-success)]/80 disabled:opacity-40"
                   >
                     {saving ? "..." : "Save"}
                   </button>
-                  <button
+                  <button type="button"
                     onclick={cancelEdit}
                     class="rounded px-2.5 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)]"
                   >
@@ -214,7 +214,7 @@
                 <span class="rounded-full px-2.5 py-0.5 text-xs font-medium {table.retentionDays <= 7 ? 'bg-[var(--color-warning-bg)] text-[var(--color-warning)]' : table.retentionDays <= 30 ? 'bg-[var(--color-surface-overlay)] text-[var(--color-text-secondary)]' : 'bg-[var(--color-success-bg)] text-[var(--color-success)]'}">
                   {table.retentionDays}d
                 </span>
-                <button
+                <button type="button"
                   onclick={() => startEdit(table.tableName, table.retentionDays)}
                   class="rounded border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-overlay)] transition-colors"
                 >

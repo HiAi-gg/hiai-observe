@@ -30,13 +30,13 @@
   </div>
 
   <div class="flex gap-3">
-    <button
+    <button type="button"
       onclick={retry}
       class="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors"
     >
       Retry
     </button>
-    <button
+    <button type="button"
       onclick={goHome}
       class="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-text-primary)] transition-colors"
     >

@@ -63,7 +63,7 @@
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
     {/if}
     <span class="flex-1">{message}</span>
-    <button onclick={dismiss} class="shrink-0 rounded p-1 hover:bg-black/10 dark:hover:bg-white/10" aria-label="Dismiss">
+    <button type="button" onclick={dismiss} class="shrink-0 rounded p-1 hover:bg-black/10 dark:hover:bg-white/10" aria-label="Dismiss">
       <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
     </button>
   </div>

@@ -65,13 +65,13 @@
     <h3 class="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>
     <p class="mt-2 text-sm text-[var(--color-text-secondary)]">{message}</p>
     <div class="mt-6 flex justify-end gap-3">
-      <button
+      <button type="button"
         onclick={handleCancel}
         class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)]"
       >
         {cancelLabel}
       </button>
-      <button
+      <button type="button"
         onclick={handleConfirm}
         class="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
         class:bg-[var(--color-danger)]={variant === "danger"}

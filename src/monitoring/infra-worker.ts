@@ -5,6 +5,7 @@ import { db } from "../store/db.js";
 import { containerStats, hostStats, gpuStats, hostInfo } from "../store/schema.js";
 import { getConfig } from "./config.js";
 import { recordWorkerRun } from "../workers/health.js";
+import { logger } from "../lib/logger.js";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -135,14 +136,14 @@ async function collectAndStore() {
 
     recordWorkerRun("infra");
   } catch (err) {
-    console.error("[infra-worker] Collection error:", err);
+    logger.error("[infra-worker] Collection error", { err: String(err) });
   }
 }
 
 export function startInfraWorker(): void {
   if (intervalId) return;
   const config = getConfig();
-  console.log(`[infra-worker] Started — collecting every ${config.collectionIntervalMs / 1000}s`);
+  logger.info("[infra-worker] Started", { intervalSec: config.collectionIntervalMs / 1000 });
   collectAndStore();
   intervalId = setInterval(collectAndStore, config.collectionIntervalMs);
 }
@@ -151,6 +152,6 @@ export function stopInfraWorker(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log("[infra-worker] Stopped");
+    logger.info("[infra-worker] Stopped");
   }
 }

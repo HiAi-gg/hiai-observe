@@ -112,7 +112,7 @@
             </div>
             <div class="divide-y divide-[var(--color-border)]">
               {#each issues as issue (issue.id)}
-                <button
+                <button type="button"
                   onclick={() => goto(`/issues/${issue.id}`)}
                   class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--color-accent)]/5"
                 >
@@ -156,7 +156,7 @@
         <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Traces ({results.traces.length})</h2>
         <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] overflow-hidden divide-y divide-[var(--color-border)]">
           {#each results.traces as trace (trace.id)}
-            <button
+            <button type="button"
               onclick={() => goto(`/traces/${trace.id}`)}
               class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--color-accent)]/5"
             >

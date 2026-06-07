@@ -363,7 +363,7 @@
     <div class="flex items-center gap-3 rounded-lg border border-[var(--color-danger)]/50 bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
       <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="flex-1">{error}</span>
-      <button onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
+      <button type="button" onclick={() => load()} class="rounded border border-[var(--color-danger)]/50 px-2.5 py-1 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Retry</button>
     </div>
   {/if}
 
@@ -408,7 +408,7 @@
       <div class="flex items-end gap-px" style="height: 48px;">
         {#each volumeData as bucket (bucket.time)}
           {@const pct = Math.max(2, (bucket.count / volumeMaxCount()) * 100)}
-          <button
+          <button type="button"
             onclick={() => jumpToTime(bucket.time)}
             title="{formatBucketLabel(bucket.time)}: {bucket.count} logs"
             class="flex-1 min-w-[4px] rounded-t bg-[var(--color-accent)]/70 hover:bg-[var(--color-accent)] transition-colors cursor-pointer"
@@ -435,14 +435,14 @@
     </div>
     <div class="flex items-center gap-2">
       {#if paused && newCount > 0}
-        <button
+        <button type="button"
           onclick={resume}
           class="rounded-md border border-[var(--color-accent)] bg-[var(--color-accent)]/10 px-3 py-1.5 text-sm text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent)]/20"
         >
           {newCount} new {newCount === 1 ? "entry" : "entries"}
         </button>
       {/if}
-      <button
+      <button type="button"
         onclick={() => { paused = !paused; }}
         class="rounded-md border px-3 py-1.5 text-sm transition-colors"
         class:border-[var(--color-warning)]={paused}
@@ -452,7 +452,7 @@
       >
         {paused ? "Resume" : "Pause"}
       </button>
-      <button
+      <button type="button"
         onclick={toggleAutoRefresh}
         class="rounded-md border px-3 py-1.5 text-sm transition-colors"
         class:border-[var(--color-success)]={autoRefresh}
@@ -466,21 +466,21 @@
         <input type="checkbox" bind:checked={autoScroll} class="rounded" />
         Auto-scroll
       </label>
-      <button
+      <button type="button"
         onclick={clearLogList}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
         title="Clear current logs view"
       >
         Clear
       </button>
-      <button
+      <button type="button"
         onclick={copyLogs}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
         title="Copy logs to clipboard"
       >
         Copy
       </button>
-      <button
+      <button type="button"
         onclick={downloadLogs}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
         title="Download filtered logs as CSV"
@@ -525,7 +525,7 @@
         class="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
         class:border-[var(--color-accent)]={regexMode}
       />
-      <button
+      <button type="button"
         onclick={toggleRegex}
         class="rounded-md border px-2.5 py-1.5 text-xs font-mono transition-colors"
         class:border-[var(--color-accent)]={regexMode}
@@ -538,7 +538,7 @@
         .*
       </button>
       {#if searchQuery}
-        <button
+        <button type="button"
           onclick={() => { searchQuery = ""; oldestLoaded = false; load(); }}
           class="rounded-md border border-[var(--color-border)] px-2 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)]"
           title="Clear search"
@@ -547,7 +547,7 @@
         </button>
       {/if}
     </div>
-    <button
+    <button type="button"
       onclick={() => { showSaveDialog = !showSaveDialog; }}
       class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
       title="Save current search"
@@ -565,14 +565,14 @@
         bind:value={saveName}
         class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
       />
-      <button
+      <button type="button"
         onclick={saveCurrentSearch}
         disabled={!saveName.trim() || !searchQuery.trim()}
         class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
       >
         Save Search
       </button>
-      <button
+      <button type="button"
         onclick={() => { showSaveDialog = false; }}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)]"
       >
@@ -587,13 +587,13 @@
       <span class="text-xs text-[var(--color-text-muted)]">Saved:</span>
       {#each savedSearches as ss (ss.id)}
         <span class="inline-flex items-center gap-1">
-          <button
+          <button type="button"
             onclick={() => applySavedSearch(ss)}
             class="rounded-full border border-[var(--color-border)] px-2.5 py-0.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
           >
             {ss.name}
           </button>
-          <button
+          <button type="button"
             onclick={() => removeSavedSearch(ss.id)}
             class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] px-1"
             title="Delete saved search"
@@ -631,7 +631,7 @@
       <!-- Load older button -->
       {#if !oldestLoaded && total > logs.length}
         <div class="border-b border-[var(--color-border)] p-2 text-center">
-          <button
+          <button type="button"
             onclick={loadOlder}
             disabled={loadingOlder}
             class="rounded-md px-4 py-1.5 text-sm text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-bg)] disabled:opacity-50"
@@ -658,7 +658,7 @@
               <td class="px-3 py-1 text-[var(--color-text-primary)] break-all">
                 {#if isJsonMsg}
                   {@const plainMsg = stripAnsi(log.message)}
-                  <button
+                  <button type="button"
                     onclick={() => toggleJson(log.id)}
                     class="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline"
                   >
@@ -673,7 +673,7 @@
                 {:else if isStack}
                   {@const plainMsg = stripAnsi(log.message)}
                   {@const lines = plainMsg.split("\n")}
-                  <button
+                  <button type="button"
                     onclick={() => toggleStack(log.id)}
                     class="inline-flex items-center gap-1 text-[var(--color-warning)] hover:underline"
                   >

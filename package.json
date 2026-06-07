@@ -2,6 +2,9 @@
   "name": "hiai-observe",
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "packages/hiai-sdk"
+  ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",

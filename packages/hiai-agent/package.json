@@ -1,0 +1,24 @@
+{
+  "name": "hiai-agent",
+  "version": "0.1.0",
+  "description": "Lightweight host metrics collector for HiAi Observe — POSTs CPU/memory/uptime stats every 30s.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "hiai-agent": "src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "echo 'no tests yet'"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.10",
+    "typescript": "^5.8.3"
+  }
+}

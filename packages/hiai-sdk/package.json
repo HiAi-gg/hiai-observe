@@ -1,5 +1,5 @@
 {
-  "name": "@hiai/observe-sdk",
+  "name": "@hiai-observe/sdk",
   "version": "0.1.0",
   "description": "Lightweight TypeScript SDK for HiAi Observe — issues, monitors, dashboard, releases, team.",
   "type": "module",

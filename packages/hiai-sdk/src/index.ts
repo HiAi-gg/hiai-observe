@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { HiAiObserve } from "@hiai/observe-sdk";
+ * import { HiAiObserve } from "@hiai-observe/sdk";
  *
  * const client = new HiAiObserve({
  *   baseUrl: "http://localhost:8001",

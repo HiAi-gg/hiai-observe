@@ -1,5 +1,5 @@
 /**
- * @hiai/observe-sdk — public type contracts.
+ * @hiai-observe/sdk — public type contracts.
  *
  * Only the minimal surface area called out by the E.2 brief is exported here:
  * options, issues (read + create), and monitor check results. The runtime

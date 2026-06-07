@@ -1,5 +1,5 @@
 /**
- * hiai-agent — lightweight host metrics collector for HiAi Observe.
+ * @hiai-observe/agent — lightweight host metrics collector for HiAi Observe.
  *
  * Reads CPU/memory/uptime from the local host via Bun.memoryUsage(),
  * process.uptime(), and /proc on Linux, then POSTs a snapshot to

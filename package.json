@@ -22,6 +22,7 @@
     "format:check": "biome format src/ tests/ packages/",
     "typecheck": "tsc --noEmit",
     "seed": "bun run scripts/seed-demo.ts",
+    "seed:extras": "bun run scripts/seed-extras.ts",
     "reset": "bun run scripts/reset-demo.ts",
     "gen-key": "bun run scripts/generate-api-key.ts",
     "docker:prod": "docker compose -f docker-compose.prod.yml up -d",

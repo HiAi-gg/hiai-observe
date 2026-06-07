@@ -152,7 +152,7 @@ OpenAPI spec at `GET /api/openapi.json`.
 | Monitors | CRUD `/api/monitors`, GET `/api/monitors/groups`, GET `/api/monitors/:id/checks` | API Key |
 | Status Page | GET `/api/status/:slug` (JSON), GET `/status/:slug` (HTML), GET `/api/status/:slug/history` | Public |
 | Badges | GET `/api/badges/uptime/:slug/:id`, GET `/api/badges/incidents/:slug/:id` | Public |
-| Infrastructure | GET `/api/infrastructure/containers`, `/api/infrastructure/hosts`, `/api/infrastructure/containers/:id` | API Key |
+| Infrastructure | GET `/api/infrastructure/containers`, `/api/infrastructure/hosts`, `/api/infrastructure/gpu`, `/api/infrastructure/containers/:id` | API Key |
 | Logs | GET `/api/logs`, GET `/api/logs/stats`, GET `/api/logs/containers`, DELETE `/api/logs`, WS `/ws/logs` | API Key |
 | Traces | GET `/api/traces`, GET `/api/traces/stats`, GET `/api/traces/workflows`, GET `/api/traces/workflows/:id`, GET `/api/traces/:id` | API Key |
 | Alerts | CRUD `/api/alerts`, POST `/api/alerts/:id/test`, POST `/api/alerts/test-all`, GET `/api/alerts/history`, GET `/api/alerts/channels` | API Key |
@@ -253,7 +253,8 @@ hiai-observe/
 | `bun run start` | Start production server |
 | `bun run test` | Run tests (vitest) |
 | `bun run typecheck` | TypeScript type check |
-| `bun run seed` | Seed demo data |
+| `bun run seed` | Seed demo data (destructive — wipes & recreates) |
+| `bun run seed:extras [slug]` | Non-destructively add incidents/releases/team/etc. to one project (default `demo`) |
 | `bun run reset` | Reset all data |
 | `bun run gen-key` | Generate API key for a project |
 | `bun run docker:prod` | Start production Docker stack |

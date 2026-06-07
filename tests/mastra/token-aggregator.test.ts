@@ -38,6 +38,23 @@ describe("estimateCost", () => {
     expect(cost).toBeCloseTo(4.0, 2);
   });
 
+  it("calculates cost for a current model (claude-sonnet-4)", () => {
+    // Claude Sonnet 4: $3 prompt + $15 completion per 1M
+    const cost = estimateCost("claude-sonnet-4", 1000000, 1000000);
+    expect(cost).toBeCloseTo(18.0, 2);
+  });
+
+  it("calculates cost for claude-opus-4", () => {
+    const cost = estimateCost("claude-opus-4", 1000000, 0);
+    expect(cost).toBeCloseTo(15.0, 2);
+  });
+
+  it("matches dated/versioned model ids by longest prefix", () => {
+    // Real API ids carry date/version suffixes, e.g. claude-sonnet-4-20250514
+    const cost = estimateCost("claude-sonnet-4-20250514", 1000000, 0);
+    expect(cost).toBeCloseTo(3.0, 2);
+  });
+
   it("returns 0 for zero tokens", () => {
     const cost = estimateCost("gpt-4o", 0, 0);
     expect(cost).toBe(0);

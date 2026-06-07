@@ -5,6 +5,7 @@
 
 import { db } from "../src/store/db.js";
 import { projects } from "../src/store/schema.js";
+import { hashApiKey } from "../src/lib/auth.js";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
@@ -20,14 +21,18 @@ if (!projectName) {
 async function generateKey() {
   const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const apiKey = `ho_${randomUUID().replace(/-/g, "")}`;
+  // Store only the bcrypt hash + prefix — auth verifies against apiKeyHash.
+  const { hash, prefix } = await hashApiKey(apiKey);
 
   // Check if project exists
   const existing = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
 
   if (existing[0]) {
-    // Update existing project with new key
-    const { eq: eqFn } = await import("drizzle-orm");
-    await db.update(projects).set({ apiKey }).where(eqFn(projects.id, existing[0].id));
+    // Update existing project with new key (clear any legacy plaintext key)
+    await db
+      .update(projects)
+      .set({ apiKeyHash: hash, keyPrefix: prefix, apiKey: null })
+      .where(eq(projects.id, existing[0].id));
     console.log(`\nUpdated API key for existing project:`);
     console.log(`  Project:  ${existing[0].name}`);
     console.log(`  ID:       ${existing[0].id}`);
@@ -35,7 +40,7 @@ async function generateKey() {
   } else {
     // Create new project
     const id = randomUUID();
-    await db.insert(projects).values({ id, name: projectName, slug, apiKey });
+    await db.insert(projects).values({ id, name: projectName, slug, apiKeyHash: hash, keyPrefix: prefix });
     console.log(`\nCreated new project with API key:`);
     console.log(`  Project:  ${projectName}`);
     console.log(`  ID:       ${id}`);

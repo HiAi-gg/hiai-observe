@@ -1,6 +1,6 @@
 # HiAi Observe
 
-[![CI](https://github.com/hiai-tools/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/hiai-tools/hiai-observe/actions/workflows/ci.yml)
+[![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](CHANGELOG.md)
 
@@ -16,7 +16,7 @@ Replaces 5 separate services with one lightweight container. Built for indie dev
 
 ```bash
 # Clone and start
-git clone https://github.com/hiai-tools/hiai-observe.git
+git clone https://github.com/HiAi-gg/hiai-observe.git
 cd hiai-observe
 cp .env.example .env
 docker compose up -d
@@ -26,6 +26,18 @@ curl http://localhost:8001/health
 ```
 
 Open `http://localhost:8001` — that's it.
+
+### Your API key
+
+Set `HIAI_OBSERVE_API_KEY` in `.env` before first start — the server provisions a
+`Default` admin project from it automatically, so the key works immediately as a
+Bearer token or Sentry DSN. Generate one with `openssl rand -hex 24`.
+
+Need more projects (or didn't set the env key)? Create them in the UI, or:
+
+```bash
+bun run gen-key "My Project"   # prints a one-time API key
+```
 
 For local development without Docker:
 

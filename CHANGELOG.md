@@ -122,4 +122,4 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
-[0.1.0]: https://github.com/hiai-tools/hiai-observe/releases/tag/v0.1.0
+[0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

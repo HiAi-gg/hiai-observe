@@ -30,6 +30,7 @@ import { statusPageHtmlRoutes } from "./api/status-page-html.js";
 import { subscribersPlugin } from "./api/subscribers.js";
 import { teamRoutes } from "./api/team.js";
 import { tracesRoutes } from "./api/traces.js";
+import { ensureBootstrapProject } from "./lib/bootstrap.js";
 import { badRequest, internal, notFound } from "./lib/errors.js";
 import { logger } from "./lib/logger.js";
 import { openapiRoutes } from "./lib/openapi.js";
@@ -77,6 +78,10 @@ const app = new Elysia()
   .use(statusPageHtmlRoutes)
   .use(infrastructureRoutes)
   .use(logsPlugin)
+  .get("/api/observe/logs/stream", ({ request, set }) => {
+    const url = new URL(request.url);
+    set.redirect = "/api/logs/stream" + url.search;
+  })
   .use(logsWsPlugin)
   .use(otlpRoutes)
   .use(tracesRoutes)
@@ -119,6 +124,12 @@ const app = new Elysia()
 
 logger.info(`HiAi Observe running at http://localhost:${app.server?.port}`, {
   port: app.server?.port,
+});
+
+// Provision a default project from HIAI_OBSERVE_API_KEY so a fresh install is
+// usable out of the box (idempotent; no-op if unset or already provisioned).
+ensureBootstrapProject(process.env.HIAI_OBSERVE_API_KEY).catch((err) => {
+  logger.error("Bootstrap project provisioning failed", { error: String(err) });
 });
 
 // Start background workers

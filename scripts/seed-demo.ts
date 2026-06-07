@@ -8,6 +8,7 @@ import {
   projects, issues, events, uptimeMonitors, uptimeChecks,
   alerts, alertHistory, traces, logs, hostStats, containerStats,
 } from "../src/store/schema.js";
+import { hashApiKey } from "../src/lib/auth.js";
 import { randomUUID } from "crypto";
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -30,7 +31,8 @@ async function seed() {
   // ── Project ──────────────────────────────────────────────────────────────
   const pid = uuid();
   const apiKey = `ho_${randomUUID().replace(/-/g, "")}`;
-  await db.insert(projects).values({ id: pid, name: "Demo App", slug: "demo", apiKey });
+  const { hash, prefix } = await hashApiKey(apiKey);
+  await db.insert(projects).values({ id: pid, name: "Demo App", slug: "demo", apiKeyHash: hash, keyPrefix: prefix });
   console.log(`  Project: Demo App (${pid})`);
   console.log(`  API Key: ${apiKey}\n`);
 

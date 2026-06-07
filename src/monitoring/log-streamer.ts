@@ -88,7 +88,7 @@ async function attachToContainerLogs(
   const controller = new AbortController();
 
   const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket, controller.signal);
-  const url = `${baseUrl}/v1.41/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
+  const url = `${baseUrl}${getConfig().dockerApiPrefix}/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
 
   try {
     const response = await fetch(url, opts);
@@ -206,7 +206,7 @@ export async function listContainers(
 ): Promise<Array<{ id: string; name: string }>> {
   try {
     const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket);
-    const response = await fetch(`${baseUrl}/v1.41/containers/json`, opts);
+    const response = await fetch(`${baseUrl}${getConfig().dockerApiPrefix}/containers/json`, opts);
 
     if (!response.ok) return [];
 

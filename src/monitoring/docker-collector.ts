@@ -60,12 +60,14 @@ interface DockerStats {
 
 function dockerFetch(path: string): Promise<Response> {
   const cfg = getConfig();
+  // Prepend the configured API version (empty = versionless, daemon's current).
+  const p = `${cfg.dockerApiPrefix}${path}`;
   // TCP mode: connect via Docker socket proxy
   if (cfg.dockerHost) {
-    return fetch(`${cfg.dockerHost}${path}`);
+    return fetch(`${cfg.dockerHost}${p}`);
   }
   // Unix socket mode: direct socket connection
-  return fetch(`http://localhost${path}`, {
+  return fetch(`http://localhost${p}`, {
     unix: cfg.dockerSocket,
   });
 }
@@ -126,7 +128,7 @@ function matchesFilter(name: string): boolean {
 }
 
 export async function collectDockerStats(): Promise<ContainerStats[]> {
-  const containersRes = await dockerFetch("/v1.41/containers/json");
+  const containersRes = await dockerFetch("/containers/json");
   if (!containersRes.ok) {
     throw new Error(`Docker API error: ${containersRes.status}`);
   }
@@ -142,7 +144,7 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
       const name = (container.Names[0] || "").replace(/^\//, "");
       try {
         const statsRes = await dockerFetch(
-          `/v1.41/containers/${container.Id}/stats?stream=false`
+          `/containers/${container.Id}/stats?stream=false`
         );
         if (!statsRes.ok) return null;
         const stats = (await statsRes.json()) as DockerStats;

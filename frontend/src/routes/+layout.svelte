@@ -107,13 +107,18 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex h-screen overflow-hidden bg-[var(--color-surface)]">
-  <!-- Sidebar -->
-  <aside
-    class="flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-raised)] transition-all duration-200"
-    class:w-64={sidebarOpen.current}
-    class:w-16={!sidebarOpen.current}
-  >
+{#if page.url.pathname.startsWith('/status')}
+  <div class="min-h-screen bg-slate-50 text-slate-900 overflow-y-auto">
+    {@render children()}
+  </div>
+{:else}
+  <div class="flex h-screen overflow-hidden bg-[var(--color-surface)]">
+    <!-- Sidebar -->
+    <aside
+      class="flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-raised)] transition-all duration-200"
+      class:w-64={sidebarOpen.current}
+      class:w-16={!sidebarOpen.current}
+    >
     <!-- Logo -->
     <div class="flex h-14 items-center justify-between border-b border-[var(--color-border)] px-4">
       {#if sidebarOpen.current}
@@ -238,6 +243,7 @@
     {@render children()}
   </main>
 </div>
+{/if}
 
 <!-- Toast notifications -->
 <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">

@@ -2,17 +2,21 @@
   import { getContainerStats, getHostStats, type ContainerStats, type HostStats } from "$lib/api";
   import { formatBytes } from "$lib/utils";
   import TimeSeriesChart from "$lib/components/TimeSeriesChart.svelte";
+  import { drawTimeSeriesChart } from "$lib/chart-utils";
 
   let containers = $state<ContainerStats[]>([]);
   let host = $state<HostStats | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  // History data for charts
   let hostHistory = $state<Array<{ time: Date; value: number }>>([]);
   let memHistory = $state<Array<{ time: Date; value: number }>>([]);
   let diskHistory = $state<Array<{ time: Date; value: number }>>([]);
   let containerHistory = $state<Map<string, Array<{ time: Date; value: number }>>>(new Map());
+
+  let cpuCanvas = $state<HTMLCanvasElement | null>(null);
+  let memCanvas = $state<HTMLCanvasElement | null>(null);
+  let diskCanvas = $state<HTMLCanvasElement | null>(null);
 
   type HostHistoryRow = { collectedAt: string; cpuPercent: number; memoryUsedMb: number; memoryTotalMb: number; diskUsedGb: number; diskTotalGb: number };
   type ContainerHistoryRow = { collectedAt: string; cpuPercent: number; name: string };
@@ -36,7 +40,6 @@
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
 
-      // Host history
       const hostRes = await fetch(`/api/infrastructure/host/history?from=${from}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
@@ -53,7 +56,6 @@
         }));
       }
 
-      // Container history (top 5 by CPU)
       const topContainers = [...containers].sort((a, b) => b.cpu_percent - a.cpu_percent).slice(0, 5);
       const cMap = new Map<string, Array<{ time: Date; value: number }>>();
       for (const c of topContainers) {
@@ -67,7 +69,6 @@
       }
       containerHistory = cMap;
     } catch {
-      // History is optional — don't show error
     }
   }
 
@@ -75,6 +76,25 @@
     loadCurrent().then(loadHistory);
     const interval = setInterval(() => { loadCurrent().then(loadHistory); }, 60_000);
     return () => clearInterval(interval);
+  });
+
+  $effect(() => {
+    if (!cpuCanvas || !memCanvas || !diskCanvas) return;
+    const observer = new ResizeObserver(() => {
+      if (cpuCanvas && hostHistory.length > 0) {
+        drawTimeSeriesChart(cpuCanvas, hostHistory.map(h => h.value), { color: "#ef4444", max: 100 });
+      }
+      if (memCanvas && memHistory.length > 0) {
+        drawTimeSeriesChart(memCanvas, memHistory.map(h => h.value), { color: "#3b82f6", max: 100 });
+      }
+      if (diskCanvas && diskHistory.length > 0) {
+        drawTimeSeriesChart(diskCanvas, diskHistory.map(h => h.value), { color: "#f59e0b", max: 100 });
+      }
+    });
+    observer.observe(cpuCanvas);
+    observer.observe(memCanvas);
+    observer.observe(diskCanvas);
+    return () => observer.disconnect();
   });
 
   function cpuColor(pct: number) {
@@ -156,14 +176,14 @@
             </div>
           </div>
         </div>
-        {#if host.swap_total_mb > 0}
+        {#if host.swap_total_mb !== undefined && host.swap_used_mb !== undefined && host.swap_total_mb > 0}
           <div class="mt-4">
             <div class="flex items-center justify-between text-sm">
               <span class="text-[var(--color-text-muted)]">Swap</span>
-              <span class="font-medium">{host.swap_used_mb.toFixed(0)} / {host.swap_total_mb.toFixed(0)} MB</span>
+              <span class="font-medium">{(host.swap_used_mb ?? 0).toFixed(0)} / {(host.swap_total_mb ?? 0).toFixed(0)} MB</span>
             </div>
             <div class="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
-              <div class="h-full rounded-full {cpuColor(memoryPercent(host.swap_used_mb, host.swap_total_mb))}" style="width: {memoryPercent(host.swap_used_mb, host.swap_total_mb)}%"></div>
+              <div class="h-full rounded-full {cpuColor(memoryPercent(host.swap_used_mb ?? 0, host.swap_total_mb ?? 0))}" style="width: {memoryPercent(host.swap_used_mb ?? 0, host.swap_total_mb ?? 0)}%"></div>
             </div>
           </div>
         {/if}
@@ -212,12 +232,38 @@
 
     <!-- Host time-series charts -->
     {#if hostHistory.length > 1}
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
-        <h2 class="mb-4 text-lg font-semibold">Host Metrics (24h)</h2>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <TimeSeriesChart data={hostHistory} label="CPU %" color="var(--color-danger)" unit="%" height={160} />
-          <TimeSeriesChart data={memHistory} label="Memory %" color="var(--color-info)" unit="%" height={160} />
-          <TimeSeriesChart data={diskHistory} label="Disk %" color="var(--color-warning)" unit="%" height={160} />
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+          <h2 class="mb-4 text-lg font-semibold">Host Metrics (24h)</h2>
+          <div class="grid grid-cols-1 gap-6">
+            <TimeSeriesChart data={hostHistory} label="CPU %" color="var(--color-danger)" unit="%" height={160} />
+            <TimeSeriesChart data={memHistory} label="Memory %" color="var(--color-info)" unit="%" height={160} />
+            <TimeSeriesChart data={diskHistory} label="Disk %" color="var(--color-warning)" unit="%" height={160} />
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+          <h2 class="mb-4 text-lg font-semibold">Real-time Trends (Canvas)</h2>
+          <div class="grid grid-cols-1 gap-6">
+            <div class="flex flex-col">
+              <h3 class="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">CPU %</h3>
+              <div class="relative h-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+                <canvas bind:this={cpuCanvas} class="h-full w-full"></canvas>
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <h3 class="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">Memory %</h3>
+              <div class="relative h-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+                <canvas bind:this={memCanvas} class="h-full w-full"></canvas>
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <h3 class="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">Disk %</h3>
+              <div class="relative h-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+                <canvas bind:this={diskCanvas} class="h-full w-full"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     {/if}

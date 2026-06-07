@@ -1,20 +1,37 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { getIssues, type Issue } from "$lib/api";
+  import { getIssues, getTeamMembers, getFingerprintRules, type Issue, type TeamMember, type FingerprintRule } from "$lib/api";
   import { debounce, timeAgo } from "$lib/utils";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
 
   let issues = $state<Issue[]>([]);
+  let teamMembers = $state<TeamMember[]>([]);
+  let fingerprintRules = $state<FingerprintRule[]>([]);
   let total = $state(0);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let statusFilter = $state<string>("all");
   let environmentFilter = $state<string>("all");
   let levelFilter = $state<string>("all");
+  let assignedToFilter = $state<string>("all");
+  let fingerprintRuleFilter = $state<string>("all");
   let searchQuery = $state("");
   let page = $state(1);
   const perPage = 25;
+
+  async function loadMetadata() {
+    try {
+      const [teamResult, rulesResult] = await Promise.all([
+        getTeamMembers({ limit: 100 }).catch(() => ({ data: [] })),
+        getFingerprintRules({ limit: 100 }).catch(() => ({ data: [] })),
+      ]);
+      teamMembers = teamResult.data ?? [];
+      fingerprintRules = rulesResult.data ?? [];
+    } catch {
+      // silent
+    }
+  }
 
   async function load() {
     try {
@@ -38,6 +55,10 @@
   const debouncedLoad = debounce(load, 300);
 
   $effect(() => {
+    loadMetadata();
+  });
+
+  $effect(() => {
     statusFilter;
     environmentFilter;
     levelFilter;
@@ -45,6 +66,56 @@
     page = 1;
     load();
   });
+
+  // Client-side reactive filter for Assignee and Fingerprint Rule
+  const filteredIssues = $derived.by(() => {
+    return issues.filter((issue) => {
+      // Filter by Assignee
+      if (assignedToFilter !== "all") {
+        if (assignedToFilter === "unassigned") {
+          if (issue.assignedTo) return false;
+        } else {
+          if (issue.assignedTo !== assignedToFilter) return false;
+        }
+      }
+
+      // Filter by Fingerprint Rule
+      if (fingerprintRuleFilter !== "all") {
+        const rule = fingerprintRules.find((r) => r.id === fingerprintRuleFilter);
+        if (rule) {
+          try {
+            const regex = new RegExp(rule.pattern, "i");
+            const textToMatch = rule.groupBy === "stack" ? (issue.metadata?.stackTrace as string || "") : rule.groupBy === "type" ? (issue.type || "") : (issue.title || "");
+            if (!regex.test(textToMatch)) return false;
+          } catch {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  });
+
+  function getAssigneeName(assigneeId?: string | null): string {
+    if (!assigneeId) return "Unassigned";
+    return teamMembers.find((m) => m.id === assigneeId)?.name ?? "Unknown";
+  }
+
+  function getMatchingRuleName(issue: Issue): string | null {
+    for (const rule of fingerprintRules) {
+      if (!rule.isActive) continue;
+      try {
+        const regex = new RegExp(rule.pattern, "i");
+        const textToMatch = rule.groupBy === "stack" ? (issue.metadata?.stackTrace as string || "") : rule.groupBy === "type" ? (issue.type || "") : (issue.title || "");
+        if (regex.test(textToMatch)) {
+          return rule.name;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  }
 
   function onSearch(e: Event) {
     searchQuery = (e.target as HTMLInputElement).value;
@@ -157,6 +228,35 @@
           {/each}
         </div>
       </div>
+
+      <!-- Assignee filter -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Assignee:</span>
+        <select
+          bind:value={assignedToFilter}
+          class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none"
+        >
+          <option value="all">All</option>
+          <option value="unassigned">Unassigned</option>
+          {#each teamMembers as member (member.id)}
+            <option value={member.id}>{member.name}</option>
+          {/each}
+        </select>
+      </div>
+
+      <!-- Fingerprint Rule filter -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Rule:</span>
+        <select
+          bind:value={fingerprintRuleFilter}
+          class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] focus:border-[var(--color-accent)] focus:outline-none"
+        >
+          <option value="all">All</option>
+          {#each fingerprintRules as rule (rule.id)}
+            <option value={rule.id}>{rule.name}</option>
+          {/each}
+        </select>
+      </div>
     </div>
   </div>
 
@@ -168,13 +268,13 @@
         <div class="h-14 animate-pulse rounded-lg bg-[var(--color-surface-raised)]" style="opacity: {1 - i * 0.1}"></div>
       {/each}
     </div>
-  {:else if issues.length === 0}
+  {:else if filteredIssues.length === 0}
     <!-- Empty state -->
     <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-raised)] py-20">
       <svg class="mb-4 h-12 w-12 text-[var(--color-text-muted)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       <p class="text-sm font-medium text-[var(--color-text-secondary)]">No issues found</p>
       <p class="mt-1 text-xs text-[var(--color-text-muted)]">
-        {#if searchQuery || statusFilter !== "all" || environmentFilter !== "all" || levelFilter !== "all"}
+        {#if searchQuery || statusFilter !== "all" || environmentFilter !== "all" || levelFilter !== "all" || assignedToFilter !== "all" || fingerprintRuleFilter !== "all"}
           Try adjusting your filters
         {:else}
           Issues will appear here when errors are captured
@@ -189,13 +289,15 @@
           <tr>
             <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider" style="width: 32px"></th>
             <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider">Title</th>
+            <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider">Assignee</th>
+            <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider">Matching Rule</th>
             <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider text-right">Occurrences</th>
             <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider">First seen</th>
             <th class="px-4 py-3 font-medium text-[var(--color-text-muted)] text-xs uppercase tracking-wider">Last seen</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--color-border)]">
-          {#each issues as issue (issue.id)}
+          {#each filteredIssues as issue (issue.id)}
             <tr
               class="cursor-pointer transition-colors hover:bg-[var(--color-accent)]/5 group"
               role="link"
@@ -217,6 +319,18 @@
                   </div>
                 </div>
               </td>
+              <td class="px-4 py-3.5 text-xs text-[var(--color-text-secondary)]">
+                {getAssigneeName(issue.assignedTo)}
+              </td>
+              <td class="px-4 py-3.5 text-xs">
+                {#if getMatchingRuleName(issue)}
+                  <span class="rounded-full bg-[var(--color-accent)]/10 px-2 py-0.5 font-medium text-[var(--color-accent)]">
+                    {getMatchingRuleName(issue)}
+                  </span>
+                {:else}
+                  <span class="text-[var(--color-text-muted)]">None</span>
+                {/if}
+              </td>
               <td class="px-4 py-3.5 text-right tabular-nums text-[var(--color-text-secondary)]">{issue.count.toLocaleString()}</td>
               <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.firstSeen)}</td>
               <td class="px-4 py-3.5 text-[var(--color-text-muted)] text-xs">{timeAgo(issue.lastSeen)}</td>
@@ -226,6 +340,6 @@
       </table>
     </div>
 
-    <Pagination {page} {perPage} {total} onPageChange={(p) => { page = p; load(); }} />
+    <Pagination {page} {perPage} total={filteredIssues.length} onPageChange={(p) => { page = p; load(); }} />
   {/if}
 </div>

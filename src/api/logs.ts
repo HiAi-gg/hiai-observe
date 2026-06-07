@@ -3,6 +3,8 @@ import { searchLogs, getLogContainers, clearLogs, searchLogsRegex, searchLogsFuz
 import { db } from "../store/db.js";
 import { logs } from "../store/schema.js";
 import { sql, gte } from "drizzle-orm";
+import { lookupProject } from "../lib/auth.js";
+import { subscribeLogs, subscribeAllLogs } from "../store/log-pubsub.js";
 
 export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   .get("/stats", async () => {
@@ -116,6 +118,71 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         to: t.Optional(t.String()),
         limit: t.Optional(t.Numeric()),
         offset: t.Optional(t.Numeric()),
+      }),
+    }
+  )
+  .get(
+    "/stream",
+    async ({ query, set }) => {
+      const key = query.key;
+      if (!key) {
+        set.status = 401;
+        return { error: "Authentication required via ?key=<apikey>" };
+      }
+      const project = await lookupProject(key);
+      if (!project) {
+        set.status = 401;
+        return { error: "Invalid API key" };
+      }
+
+      set.headers["Content-Type"] = "text/event-stream";
+      set.headers["Cache-Control"] = "no-cache";
+      set.headers["Connection"] = "keep-alive";
+
+      const container = query.container;
+
+      let unsub: (() => void) | undefined;
+      let pingInterval: any;
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          const sendLog = (entry: any) => {
+            if (container && entry.container_id !== container && entry.container_name !== container) {
+              return;
+            }
+            try {
+              controller.enqueue(`data: ${JSON.stringify(entry)}\n\n`);
+            } catch {
+            }
+          };
+
+          if (container) {
+            unsub = await subscribeLogs(container, sendLog);
+          } else {
+            unsub = await subscribeAllLogs(sendLog);
+          }
+
+          pingInterval = setInterval(() => {
+            try {
+              controller.enqueue(`: ping\n\n`);
+            } catch {
+              if (unsub) unsub();
+              clearInterval(pingInterval);
+            }
+          }, 15000);
+        },
+        cancel() {
+          if (unsub) unsub();
+          if (pingInterval) clearInterval(pingInterval);
+        }
+      });
+
+      return new Response(stream);
+    },
+    {
+      query: t.Object({
+        key: t.Optional(t.String()),
+        container: t.Optional(t.String()),
       }),
     }
   )

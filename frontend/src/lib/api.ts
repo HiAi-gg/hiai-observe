@@ -551,3 +551,288 @@ export async function updateRetention(adminKey: string, table: string, retention
     body: JSON.stringify({ retentionDays }),
   });
 }
+
+export interface StatusPageData {
+  project: { id: string; name: string; slug: string };
+  overall: "operational" | "degraded" | "down";
+  monitors: Array<{
+    id: string;
+    name: string;
+    url: string;
+    active: boolean;
+    uptime24h: number;
+    lastCheck: {
+      status_code: number;
+      response_time_ms: number;
+      checked_at: string;
+      success: boolean;
+    } | null;
+  }>;
+  incidents?: Incident[];
+}
+
+export interface StatusPageHistory {
+  history: Array<{
+    monitorId: string;
+    name: string;
+    uptimePercent: number;
+  }>;
+}
+
+export interface Incident {
+  id: string;
+  projectId: string;
+  monitorId?: string | null;
+  title: string;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  severity: "minor" | "major" | "critical";
+  description?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+  resolvedAt?: string | null;
+}
+
+export interface Subscriber {
+  id: string;
+  projectId: string;
+  email: string;
+  isVerified: boolean;
+  createdAt: string;
+}
+
+export async function getStatusPage(slug: string) {
+  return apiFetch<StatusPageData>(`/api/status/${slug}`);
+}
+
+export async function getStatusPageHistory(slug: string, days?: number) {
+  const qs = new URLSearchParams();
+  if (days !== undefined) qs.set("days", String(days));
+  return apiFetch<StatusPageHistory>(`/api/status/${slug}/history?${qs}`);
+}
+
+export async function createSubscriber(projectId: string, email: string, autoVerify = true) {
+  return apiFetch<Subscriber>("/api/subscribers", {
+    method: "POST",
+    body: JSON.stringify({ projectId, email, autoVerify }),
+  });
+}
+
+export async function createPublicSubscriber(projectId: string, email: string) {
+  return apiFetch<Subscriber>("/api/subscribers/public", {
+    method: "POST",
+    body: JSON.stringify({ projectId, email }),
+  });
+}
+
+export async function getIncidents(params?: { projectId?: string; status?: string; limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.projectId) qs.set("projectId", params.projectId);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ items: Incident[]; total: number; limit: number; offset: number }>(`/api/incidents?${qs}`);
+}
+
+export async function getActiveIncidents(projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<{ items: Incident[] }>(`/api/incidents/active?${qs}`);
+}
+
+export async function createIncident(data: { projectId: string; title: string; status?: string; monitorId?: string; severity?: "minor" | "major" | "critical"; description?: string }) {
+  return apiFetch<Incident>("/api/incidents", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateIncident(id: string, data: { title?: string; status?: string; monitorId?: string; severity?: "minor" | "major" | "critical"; description?: string }) {
+  return apiFetch<Incident>(`/api/incidents/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteIncident(id: string) {
+  return apiFetch<{ deleted: boolean }>(`/api/incidents/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Releases (Single & Update) ---
+
+export async function getRelease(id: string) {
+  return apiFetch<Release>(`/api/releases/${id}`);
+}
+
+export async function updateRelease(id: string, data: { version?: string; environment?: string; deployedAt?: string }) {
+  return apiFetch<Release>(`/api/releases/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// --- Fingerprint Rules ---
+
+export interface FingerprintRule {
+  id: string;
+  projectId: string;
+  name: string;
+  pattern: string;
+  groupBy: "message" | "stack" | "type";
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export async function getFingerprintRules(params?: { projectId?: string; limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.projectId) qs.set("projectId", params.projectId);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  return apiFetch<{ data: FingerprintRule[]; total: number; limit: number; offset: number }>(`/api/fingerprint-rules?${qs}`);
+}
+
+export async function getFingerprintRule(id: string) {
+  return apiFetch<FingerprintRule>(`/api/fingerprint-rules/${id}`);
+}
+
+export async function createFingerprintRule(data: { projectId: string; name: string; pattern: string; groupBy?: "message" | "stack" | "type"; isActive?: boolean }) {
+  return apiFetch<FingerprintRule>("/api/fingerprint-rules", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateFingerprintRule(id: string, data: { name?: string; pattern?: string; groupBy?: "message" | "stack" | "type"; isActive?: boolean }) {
+  return apiFetch<FingerprintRule>(`/api/fingerprint-rules/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteFingerprintRule(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/fingerprint-rules/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Notification Configurations ---
+
+export interface NotificationConfig {
+  id: string;
+  projectId: string;
+  channel: string;
+  config: Record<string, string>;
+  enabled: boolean;
+  configured: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+  source?: "db" | "env";
+}
+
+export async function getNotificationConfigs(projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<{ notifications: NotificationConfig[] }>(`/api/notifications?${qs}`);
+}
+
+export async function getNotificationConfig(channel: string, projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<NotificationConfig & { source?: "db" | "env" }>(`/api/notifications/${channel}?${qs}`);
+}
+
+export async function updateNotificationConfig(channel: string, data: { projectId: string; config: Record<string, string>; enabled?: boolean }) {
+  return apiFetch<{ id: string; channel: string; created?: boolean; updated?: boolean }>(`/api/notifications/${channel}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteNotificationConfig(channel: string, projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<{ deleted: boolean }>(`/api/notifications/${channel}?${qs}`, {
+    method: "DELETE",
+  });
+}
+
+export async function testNotificationChannel(channel: string, projectId?: string) {
+  const qs = new URLSearchParams();
+  if (projectId) qs.set("projectId", projectId);
+  return apiFetch<{ ok: boolean; error?: string }>(`/api/notifications/${channel}/test?${qs}`, {
+    method: "POST",
+  });
+}
+
+export async function getHostHistory(hostId?: string, limit?: number) {
+  const qs = new URLSearchParams();
+  if (hostId) qs.set("hostId", hostId);
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 3600_000);
+  qs.set("from", oneHourAgo.toISOString());
+  qs.set("to", now.toISOString());
+  if (limit) qs.set("limit", String(limit));
+  return apiFetch<{ data: HostStats[]; count: number }>(`/api/infrastructure/host/history?${qs}`);
+}
+
+export async function getMonitor(id: string) {
+  return apiFetch<{ monitor: Monitor & { uptime24h: number } }>(`/api/monitors/${id}`);
+}
+
+export async function createMonitor(data: {
+  name: string;
+  url: string;
+  type?: string;
+  group?: string;
+  interval_seconds?: number;
+  project_id: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  auth_type?: string;
+  auth_value?: string;
+  ignore_ssl?: boolean;
+  max_redirects?: number;
+  keyword?: string;
+  keyword_not?: string;
+  dns_record_type?: string;
+  dns_expected_value?: string;
+  dns_resolver?: string;
+}) {
+  return apiFetch<{ monitor: Monitor }>("/api/monitors", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMonitor(id: string, data: {
+  name?: string;
+  url?: string;
+  interval_seconds?: number;
+  active?: boolean;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  auth_type?: string;
+  auth_value?: string;
+  ignore_ssl?: boolean;
+  max_redirects?: number;
+  keyword?: string;
+  keyword_not?: string;
+  dns_record_type?: string;
+  dns_expected_value?: string;
+  dns_resolver?: string;
+}) {
+  return apiFetch<{ monitor: Monitor }>(`/api/monitors/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMonitor(id: string) {
+  return apiFetch<{ deleted: boolean }>(`/api/monitors/${id}`, {
+    method: "DELETE",
+  });
+}

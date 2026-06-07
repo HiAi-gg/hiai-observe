@@ -125,6 +125,48 @@
 
   const debouncedLoad = debounce(load, 300);
 
+  function clearLogList() {
+    logs = [];
+    total = 0;
+  }
+
+  function copyLogs() {
+    const text = logs.map(l => `[${new Date(l.timestamp).toLocaleTimeString()}] [${l.level.toUpperCase()}] [${l.container}] ${stripAnsi(l.message)}`).join("\n");
+    navigator.clipboard.writeText(text);
+  }
+
+  function ansiToHtml(text: string): string {
+    let html = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    html = html.replace(/\x1b\[0m/g, "</span>");
+    const colors: Record<string, string> = {
+      "30": "ansi-black",
+      "31": "ansi-red",
+      "32": "ansi-green",
+      "33": "ansi-yellow",
+      "34": "ansi-blue",
+      "35": "ansi-magenta",
+      "36": "ansi-cyan",
+      "37": "ansi-white",
+      "90": "ansi-bright-black",
+      "91": "ansi-bright-red",
+      "92": "ansi-bright-green",
+      "93": "ansi-bright-yellow",
+      "94": "ansi-bright-blue",
+      "95": "ansi-bright-magenta",
+      "96": "ansi-bright-cyan",
+      "97": "ansi-bright-white",
+    };
+    for (const [code, cls] of Object.entries(colors)) {
+      const regex = new RegExp(`\\x1b\\[${code}m`, "g");
+      html = html.replace(regex, `<span class="${cls}">`);
+    }
+    html = html.replace(/\x1b\[[0-9;]*m/g, "");
+    return html;
+  }
+
   function onWsMessage(data: unknown) {
     if (paused) {
       newCount++;
@@ -154,13 +196,26 @@
     loadVolume();
     loadSavedSearches();
 
-    wsManager.connect("/ws/logs");
-    const unsub = wsManager.subscribe("*", onWsMessage);
-    const connInterval = setInterval(() => {
-      connected = wsManager.connected;
-    }, 1000);
+    const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+    const sseUrl = `/api/logs/stream?key=${apiKey}` + (containerFilter ? `&container=${containerFilter}` : "");
+    const es = new EventSource(sseUrl);
 
-    // Auto-refresh polling (every 5s when enabled)
+    es.onopen = () => {
+      connected = true;
+    };
+
+    es.onmessage = (event) => {
+      try {
+        const entry = JSON.parse(event.data);
+        onWsMessage(entry);
+      } catch {
+      }
+    };
+
+    es.onerror = () => {
+      connected = false;
+    };
+
     let refreshInterval: ReturnType<typeof setInterval> | null = null;
     if (autoRefresh) {
       refreshInterval = setInterval(() => {
@@ -168,13 +223,10 @@
       }, 5_000);
     }
 
-    // Refresh volume chart every 60s
     const volumeInterval = setInterval(loadVolume, 60_000);
 
     return () => {
-      unsub();
-      wsManager.disconnect("/ws/logs");
-      clearInterval(connInterval);
+      es.close();
       clearInterval(volumeInterval);
       if (refreshInterval) clearInterval(refreshInterval);
     };
@@ -415,6 +467,20 @@
         Auto-scroll
       </label>
       <button
+        onclick={clearLogList}
+        class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
+        title="Clear current logs view"
+      >
+        Clear
+      </button>
+      <button
+        onclick={copyLogs}
+        class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
+        title="Copy logs to clipboard"
+      >
+        Copy
+      </button>
+      <button
         onclick={downloadLogs}
         class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-raised)]"
         title="Download filtered logs as CSV"
@@ -438,13 +504,18 @@
       <option value="info">Info</option>
       <option value="debug">Debug</option>
     </select>
-    <input
-      type="text"
-      placeholder="Container filter..."
+    <select
       bind:value={containerFilter}
-      oninput={() => { oldestLoaded = false; debouncedLoad(); }}
-      class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
-    />
+      onchange={() => { oldestLoaded = false; load(); }}
+      class="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm"
+    >
+      <option value="">All containers</option>
+      {#if stats?.byContainer}
+        {#each stats.byContainer as c}
+          <option value={c.name}>{c.name}</option>
+        {/each}
+      {/if}
+    </select>
     <div class="relative flex-1 flex items-center gap-2">
       <input
         type="text"
@@ -616,7 +687,7 @@
                     <span class="text-[var(--color-text-muted)]">{lines[0]?.slice(0, 120)}...</span>
                   {/if}
                 {:else}
-                  <AnsiText text={log.message} />
+                  {@html ansiToHtml(log.message)}
                 {/if}
               </td>
             </tr>
@@ -626,3 +697,22 @@
     {/if}
   </div>
 </div>
+
+<style>
+  :global(.ansi-black) { color: #000000; }
+  :global(.ansi-red) { color: #ef4444; }
+  :global(.ansi-green) { color: #22c55e; }
+  :global(.ansi-yellow) { color: #eab308; }
+  :global(.ansi-blue) { color: #3b82f6; }
+  :global(.ansi-magenta) { color: #a855f7; }
+  :global(.ansi-cyan) { color: #06b6d4; }
+  :global(.ansi-white) { color: #f8fafc; }
+  :global(.ansi-bright-black) { color: #64748b; }
+  :global(.ansi-bright-red) { color: #f87171; }
+  :global(.ansi-bright-green) { color: #4ade80; }
+  :global(.ansi-bright-yellow) { color: #facc15; }
+  :global(.ansi-bright-blue) { color: #60a5fa; }
+  :global(.ansi-bright-magenta) { color: #c084fc; }
+  :global(.ansi-bright-cyan) { color: #22d3ee; }
+  :global(.ansi-bright-white) { color: #ffffff; }
+</style>

@@ -45,8 +45,8 @@
 
   // Group results by project
   const groupedIssues = $derived.by(() => {
-    if (!results) return new Map<string, typeof results.issues>();
-    const map = new Map<string, typeof results.issues>();
+    if (!results) return new Map<string, SearchResult["issues"]>();
+    const map = new Map<string, SearchResult["issues"]>();
     for (const issue of results.issues) {
       const list = map.get(issue.projectName) ?? [];
       list.push(issue);

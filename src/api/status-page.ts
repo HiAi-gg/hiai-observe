@@ -1,8 +1,8 @@
 import { Elysia, t } from "elysia";
 import { getMonitors, getChecks, getUptimePercentages } from "../store/uptime.js";
 import { db } from "../store/db.js";
-import { projects } from "../store/schema.js";
-import { eq } from "drizzle-orm";
+import { projects, incidents } from "../store/schema.js";
+import { eq, and, ne, desc } from "drizzle-orm";
 
 export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
   .get("/:slug", async ({ params: { slug }, set }) => {
@@ -37,10 +37,15 @@ export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
     if (down.length > 0) overall = "down";
     else if (degraded.length > 0) overall = "degraded";
 
+    const activeIncidents = await db.select().from(incidents)
+      .where(and(eq(incidents.projectId, project.id), ne(incidents.status, "resolved")))
+      .orderBy(desc(incidents.createdAt));
+
     return {
       project: { id: project.id, name: project.name, slug: project.slug },
       overall,
       monitors: monitorStatuses,
+      incidents: activeIncidents,
     };
   })
 

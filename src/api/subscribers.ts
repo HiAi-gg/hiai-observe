@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
-import { statusSubscribers } from "../store/schema.js";
+import { statusSubscribers, projects } from "../store/schema.js";
 import { resolveApiKey, lookupProject } from "../lib/auth.js";
 import { eq, and, desc, count } from "drizzle-orm";
 
@@ -78,6 +78,39 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
       projectId: t.String(),
       email: t.String(),
       autoVerify: t.Optional(t.Boolean()),
+    }),
+  })
+  .post("/public", async ({ body, set }) => {
+    const email = body.email.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      set.status = 400;
+      return { error: "Invalid email address" };
+    }
+    const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId)).limit(1);
+    if (!project) {
+      set.status = 404;
+      return { error: "Project not found" };
+    }
+    const existing = await db.select().from(statusSubscribers)
+      .where(and(eq(statusSubscribers.projectId, body.projectId), eq(statusSubscribers.email, email)));
+    if (existing.length > 0) {
+      set.status = 409;
+      return { error: "Email already subscribed" };
+    }
+    const insertedRows = await db.insert(statusSubscribers).values({
+      projectId: body.projectId,
+      email,
+      isVerified: false,
+    }).returning();
+    if (!insertedRows[0]) {
+      set.status = 500;
+      return { error: "Insert failed" };
+    }
+    return insertedRows[0];
+  }, {
+    body: t.Object({
+      projectId: t.String(),
+      email: t.String(),
     }),
   })
   .delete("/:id", async ({ params, headers, set }) => {

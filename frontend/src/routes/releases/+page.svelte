@@ -75,6 +75,12 @@
     return "bg-blue-900/40 text-blue-300";
   }
 
+  function healthBadgeColor(score: "green" | "yellow" | "red"): string {
+    if (score === "green") return "bg-emerald-900/40 text-emerald-300 border border-emerald-500/20";
+    if (score === "yellow") return "bg-amber-900/40 text-amber-300 border border-amber-500/20";
+    return "bg-red-900/40 text-red-300 border border-red-500/20";
+  }
+
   async function handleCreate() {
     if (!newVersion.trim() || !newProjectId) return;
     try {
@@ -225,6 +231,11 @@
                 <span class="rounded-full px-2 py-0.5 text-xs font-medium {envBadgeColor(release.environment)}">
                   {release.environment}
                 </span>
+                {#if health}
+                  <span class="rounded-full px-2 py-0.5 text-xs font-medium uppercase {healthBadgeColor(health.healthScore)}">
+                    {health.healthScore}
+                  </span>
+                {/if}
               </div>
               <p class="text-xs text-[var(--color-text-muted)]">{getProjectName(release.projectId)}</p>
             </div>
@@ -256,7 +267,7 @@
           <!-- Expanded details -->
           {#if expandedId === release.id && health}
             <div class="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 space-y-3">
-              <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
                 <div>
                   <p class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Error Rate</p>
                   <p class="mt-0.5 text-lg font-semibold text-[var(--color-text-primary)]">{health.errorRate}/hr</p>
@@ -272,6 +283,15 @@
                 <div>
                   <p class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Deployed</p>
                   <p class="mt-0.5 text-sm text-[var(--color-text-secondary)]">{release.deployedAt ? new Date(release.deployedAt).toLocaleString() : "N/A"}</p>
+                </div>
+                <div class="flex flex-col justify-center">
+                  <a
+                    href="/releases/{release.id}"
+                    class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--color-accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-all duration-150"
+                  >
+                    View Detail Page
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </a>
                 </div>
               </div>
               <div class="flex justify-end">

@@ -92,6 +92,8 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
       monitorId: body.monitorId ?? null,
       title: body.title,
       status: body.status ?? "investigating",
+      severity: body.severity ?? "minor",
+      description: body.description ?? null,
     }).returning();
 
     return created;
@@ -101,6 +103,8 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
       monitorId: t.Optional(t.String()),
       title: t.String({ minLength: 1 }),
       status: t.Optional(t.Union(VALID_STATUSES.map(s => t.Literal(s)))),
+      severity: t.Optional(t.Union([t.Literal("minor"), t.Literal("major"), t.Literal("critical")])),
+      description: t.Optional(t.String()),
     }),
   })
 
@@ -137,6 +141,8 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
       }
     }
     if (body.monitorId !== undefined) updateData.monitorId = body.monitorId;
+    if (body.severity !== undefined) updateData.severity = body.severity;
+    if (body.description !== undefined) updateData.description = body.description;
 
     const [updated] = await db.update(incidents)
       .set(updateData)
@@ -150,6 +156,8 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
       title: t.Optional(t.String({ minLength: 1 })),
       status: t.Optional(t.Union(VALID_STATUSES.map(s => t.Literal(s)))),
       monitorId: t.Optional(t.String()),
+      severity: t.Optional(t.Union([t.Literal("minor"), t.Literal("major"), t.Literal("critical")])),
+      description: t.Optional(t.String()),
     }),
   })
 

@@ -6,10 +6,13 @@ export const PUBLIC_PATHS = [
   "/health",
   "/metrics",
   "/api/status",
+  "/api/subscribers/public",
   "/api/badges",
   "/api/openapi.json",
   "/v1/traces",
   "/v1/metrics",
+  "/api/logs/stream",
+  "/api/observe/logs/stream",
 ];
 
 function isPublicPath(path: string): boolean {

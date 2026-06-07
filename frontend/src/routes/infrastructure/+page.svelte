@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { getContainerStats, getHostStats, type ContainerStats, type HostStats } from "$lib/api";
+  import { getContainerStats, getHostStats, getGpuStats, type ContainerStats, type HostStats, type GpuStat } from "$lib/api";
   import { formatBytes } from "$lib/utils";
   import TimeSeriesChart from "$lib/components/TimeSeriesChart.svelte";
   import { drawTimeSeriesChart } from "$lib/chart-utils";
 
   let containers = $state<ContainerStats[]>([]);
   let host = $state<HostStats | null>(null);
+  let gpus = $state<GpuStat[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -25,9 +26,10 @@
     try {
       loading = true;
       error = null;
-      const [cResult, hResult] = await Promise.all([getContainerStats(), getHostStats()]);
+      const [cResult, hResult, gResult] = await Promise.all([getContainerStats(), getHostStats(), getGpuStats()]);
       containers = cResult.containers;
       host = hResult;
+      gpus = gResult.gpus;
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load infrastructure data";
     } finally {
@@ -227,6 +229,39 @@
             </div>
           </div>
         {/if}
+      </div>
+    {/if}
+
+    <!-- GPU resources -->
+    {#if gpus.length > 0}
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <h2 class="mb-4 text-lg font-semibold">GPU</h2>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {#each gpus as gpu}
+            <div class="rounded-md border border-[var(--color-border)] p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-sm font-medium">GPU #{gpu.gpuIndex}</span>
+                {#if gpu.temperatureC != null}
+                  <span class="text-xs text-[var(--color-text-muted)]">{gpu.temperatureC.toFixed(0)}°C</span>
+                {/if}
+              </div>
+              <div class="mb-1 flex justify-between text-sm">
+                <span class="text-[var(--color-text-muted)]">Utilization</span>
+                <span class="font-medium">{gpu.utilizationPercent.toFixed(1)}%</span>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
+                <div class="h-full rounded-full {cpuColor(gpu.utilizationPercent)}" style="width: {Math.min(gpu.utilizationPercent, 100)}%"></div>
+              </div>
+              <div class="mt-3 mb-1 flex justify-between text-sm">
+                <span class="text-[var(--color-text-muted)]">VRAM</span>
+                <span class="font-medium">{gpu.memoryUsedMb.toFixed(0)} / {gpu.memoryTotalMb.toFixed(0)} MB</span>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
+                <div class="h-full rounded-full {cpuColor(memoryPercent(gpu.memoryUsedMb, gpu.memoryTotalMb))}" style="width: {memoryPercent(gpu.memoryUsedMb, gpu.memoryTotalMb)}%"></div>
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
 

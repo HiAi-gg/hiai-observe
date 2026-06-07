@@ -228,8 +228,11 @@ export async function getLatestGpuStats(hostId?: string) {
 
   if (latest.length === 0) return [];
 
+  // Use >= (not =) on the timestamp: Postgres stores microseconds but the JS
+  // Date we read back is truncated to milliseconds, so an equality match would
+  // miss the row. >= returns the latest collection batch (all GPUs share it).
   const latestTime = latest[0]!.collectedAt;
-  const timeConditions = [eq(gpuStats.collectedAt, latestTime)];
+  const timeConditions = [gte(gpuStats.collectedAt, latestTime)];
   if (hostId) timeConditions.push(eq(gpuStats.hostId, hostId));
 
   return db

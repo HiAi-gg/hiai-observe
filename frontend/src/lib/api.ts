@@ -91,6 +91,10 @@ export async function getHostStats() {
   return apiFetch<HostStats>("/api/infrastructure/host");
 }
 
+export async function getGpuStats() {
+  return apiFetch<{ gpus: GpuStat[]; count: number }>("/api/infrastructure/gpu");
+}
+
 export async function getLogs(params?: { container?: string; level?: string; search?: string; regex?: string; limit?: number; offset?: number }) {
   const qs = new URLSearchParams();
   if (params?.container) qs.set("container", params.container);
@@ -340,6 +344,16 @@ export interface HostStats {
   load_avg_15m: number;
   network_rx_bytes: number;
   network_tx_bytes: number;
+}
+
+export interface GpuStat {
+  hostId: string;
+  gpuIndex: number;
+  utilizationPercent: number;
+  memoryUsedMb: number;
+  memoryTotalMb: number;
+  temperatureC: number | null;
+  collectedAt: string;
 }
 
 export interface LogEntry {

@@ -5,7 +5,9 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-06-07
+
+Patch release — makes the build deployable and CI real, plus AI cost accuracy.
 
 ### Fixed
 - **CI never actually ran** — the workflow triggered on `main` but the default branch is `master`. Trigger on both; the pipeline now runs and is green.
@@ -16,13 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **AI cost estimation** — refreshed the model price table (Claude 4.x, GPT-4.1/5, o-series, Gemini 2.x), prefix-matching for dated model ids, and a `MODEL_PRICING` env override (JSON) for accurate, deployment-specific pricing.
-- `docs/ROADMAP.md` — prioritized list of future work.
+- **GPU panel** on the Infrastructure page — utilization, VRAM, and temperature per GPU (data was collected via nvidia-smi but never shown).
+- `docs/ROADMAP.md` — prioritized list of future work (targeting 0.2.0+).
 
 ### Changed
-- Corrected stale README "Known Limitations" (API keys are bcrypt-hashed with RBAC roles, not plaintext) and "Roadmap" (0.2.0 shipped).
+- Corrected stale README "Known Limitations" (API keys are bcrypt-hashed with RBAC roles, not plaintext); "Roadmap" now points to `docs/ROADMAP.md` with 0.2.0+ as the planned line.
 - Removed internal planning/audit docs from the public repository.
 
-## [0.2.0] - 2026-06-07
+## [0.1.0] - 2026-06-07
 
 Production hardening, supply-chain hygiene, and accessibility improvements.
 
@@ -59,7 +62,7 @@ Production hardening, supply-chain hygiene, and accessibility improvements.
 - Updated `README.md` with production deployment link
 - Updated `docs/integration.md` troubleshooting section
 
-## [0.1.0] - 2026-05-25
+## [0.1.0-preview] - 2026-05-25
 
 Initial release of HiAi Observe — a unified, self-hosted observability platform for AI Agents and TypeScript backends.
 
@@ -175,5 +178,5 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
-[0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.2.0
+[0.1.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

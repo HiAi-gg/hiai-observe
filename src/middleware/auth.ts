@@ -2,17 +2,29 @@ import type { Context } from "elysia";
 import { resolveApiKey, lookupProject } from "../lib/auth.js";
 import { checkWriteAccess } from "../lib/rbac.js";
 
+/**
+ * Paths that bypass the Authorization-header middleware check.
+ *
+ * Endpoints that need auth but accept it via a different mechanism
+ * (query param, OTLP headers, Sentry envelope) live here so the
+ * middleware does not reject them — each handler verifies credentials
+ * independently.
+ *
+ * Truly public paths (no auth at all) are also listed here.
+ */
 export const PUBLIC_PATHS = [
+  // Truly public — no auth required
   "/health",
   "/metrics",
   "/api/status",
   "/api/subscribers/public",
   "/api/badges",
   "/api/openapi.json",
-  "/v1/traces",
-  "/v1/metrics",
-  "/api/logs/stream",
-  "/api/observe/logs/stream",
+  // Handler-level auth — bypasses Authorization-header middleware
+  "/v1/traces",        // OTLP handler: resolveApiKey() + lookupProject()
+  "/v1/metrics",       // OTLP handler: resolveApiKey() + lookupProject()
+  "/api/logs/stream",  // SSE handler: ?key=<apikey> query param
+  "/api/observe/logs/stream", // Redirects to /api/logs/stream
 ];
 
 function isPublicPath(path: string): boolean {

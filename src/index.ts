@@ -58,6 +58,24 @@ if (corsOrigin === "*" && process.env.NODE_ENV === "production") {
   );
 }
 
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.REDIS_URL) {
+    logger.warn("REDIS_URL is not set — rate limiting and real-time features will not work.");
+  }
+
+  const apiKey = process.env.HIAI_OBSERVE_API_KEY;
+  if (!apiKey) {
+    logger.warn("HIAI_OBSERVE_API_KEY is not set — no bootstrap project will be created. Set it to enable the default project.");
+  } else if (apiKey.length < 32) {
+    logger.warn("HIAI_OBSERVE_API_KEY is shorter than 32 characters — use a longer key for production.");
+  }
+
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl && /localhost|127\.0\.0\.1/.test(dbUrl)) {
+    logger.warn("DATABASE_URL points to localhost in production — ensure PostgreSQL is properly configured.");
+  }
+}
+
 const app = new Elysia()
   .use(requestIdPlugin)
   .use(secureHeadersPlugin)

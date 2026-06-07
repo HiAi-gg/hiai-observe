@@ -9,11 +9,6 @@ frontend/build/
 frontend/.svelte-kit/
 packages/*/dist/
 
-# Lock files
-bun.lock
-frontend/bun.lock
-packages/*/bun.lock
-
 # Environment
 .env
 .env.local

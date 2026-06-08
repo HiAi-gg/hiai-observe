@@ -7,7 +7,8 @@
     "packages/hiai-agent",
     "packages/hiai-client",
     "packages/mastra-exporter",
-    "packages/hiai-mcp"
+    "packages/hiai-mcp",
+    "packages/hiai-cli"
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",

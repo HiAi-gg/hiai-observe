@@ -135,8 +135,18 @@ read API as tools (`observe_dashboard`, `observe_ai_cost`, `observe_list_issues`
 }
 ```
 
-For code, use the [`@hiai-observe/client`](packages/hiai-client) SDK or the
-OpenAPI spec at `GET /api/openapi.json`.
+Shell / Bash-tool agents can use the [`@hiai-observe/cli`](packages/hiai-cli)
+instead — same data, no MCP setup:
+
+```bash
+HIAI_OBSERVE_API_KEY=ho_your_key bunx @hiai-observe/cli dashboard
+hiai-observe ai-cost --group-by model --json
+```
+
+Drop the [`skills/hiai-observe`](skills/hiai-observe) skill into your agent so it
+knows *when* to consult Observe (before declaring a deploy healthy, after errors,
+to track LLM spend). For code, use the [`@hiai-observe/client`](packages/hiai-client)
+SDK or the OpenAPI spec at `GET /api/openapi.json`.
 
 ## API Endpoints
 

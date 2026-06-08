@@ -33,6 +33,17 @@
         "typescript": "^5.8.3",
       },
     },
+    "packages/hiai-cli": {
+      "name": "@hiai-observe/cli",
+      "version": "0.1.0",
+      "bin": {
+        "hiai-observe": "./src/index.ts",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.2.10",
+        "typescript": "^5.8.3",
+      },
+    },
     "packages/hiai-client": {
       "name": "@hiai-observe/client",
       "version": "0.1.0",
@@ -174,6 +185,8 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
     "@hiai-observe/agent": ["@hiai-observe/agent@workspace:packages/hiai-agent"],
+
+    "@hiai-observe/cli": ["@hiai-observe/cli@workspace:packages/hiai-cli"],
 
     "@hiai-observe/client": ["@hiai-observe/client@workspace:packages/hiai-client"],
 

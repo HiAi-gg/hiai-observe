@@ -44,3 +44,7 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Local screenshots / scratch artifacts
+screenshot-*.png
+/*.png

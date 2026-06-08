@@ -5,6 +5,14 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-06-08
+
+### Fixed
+- **White-screen crash** (`Cannot read properties of undefined (reading 'length')`) on the Traces and Settings pages: `getIssues`/`getTraces`/`getAlerts` expected `{ issues }`/`{ traces }`/`{ alerts }` but the server returns `{ data }`/`{ data }`/`{ items }`. Normalized the client to map the real shape and default to `[]`; added defensive guards on the dashboard and container-detail length checks.
+
+### Added
+- `bun run seed:extras` now also seeds demo alert rules (idempotent), so the Alerts page has data.
+
 ## [0.1.2] - 2026-06-08
 
 Agent access — query Observe from MCP clients, the shell, or via a skill.
@@ -195,6 +203,7 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.1.3]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

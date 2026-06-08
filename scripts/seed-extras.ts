@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "../src/store/db.js";
 import {
   projects, incidents, releases, fingerprintRules, teamMembers,
-  maintenanceWindows, uptimeMonitors, traces,
+  maintenanceWindows, uptimeMonitors, traces, alerts,
 } from "../src/store/schema.js";
 import { and, eq } from "drizzle-orm";
 
@@ -80,7 +80,7 @@ async function main() {
   const monitorId = monitors[0]?.id ?? null;
 
   // Idempotent: only seed a table for this project if it has none yet.
-  const empty = async (table: typeof incidents | typeof releases | typeof fingerprintRules | typeof teamMembers | typeof maintenanceWindows): Promise<boolean> => {
+  const empty = async (table: typeof incidents | typeof releases | typeof fingerprintRules | typeof teamMembers | typeof maintenanceWindows | typeof alerts): Promise<boolean> => {
     const rows = await db.select({ projectId: table.projectId }).from(table).where(eq(table.projectId, pid)).limit(1);
     return rows.length === 0;
   };
@@ -129,6 +129,16 @@ async function main() {
       { projectId: pid, name: "Network migration", description: "Moving to the new VPC.", startsAt: daysFromNow(-1), endsAt: daysFromNow(-0.9) },
     ]);
     added.push("maintenance windows");
+  }
+
+  if (await empty(alerts)) {
+    await db.insert(alerts).values([
+      { projectId: pid, name: "High error rate", severity: "critical", condition: { type: "error_rate", operator: ">", threshold: 10, duration: 300 }, channels: [{ type: "telegram", target: "@oncall" }], isActive: true, cooldownSeconds: 300 },
+      { projectId: pid, name: "Endpoint down", severity: "critical", condition: { type: "uptime_down", operator: "=", threshold: 1 }, channels: [{ type: "discord", target: "https://discord.com/api/webhooks/…" }], isActive: true, cooldownSeconds: 600 },
+      { projectId: pid, name: "High CPU", severity: "warning", condition: { type: "resource_threshold", operator: ">", threshold: 85, duration: 600 }, channels: [{ type: "email", target: "ops@example.com" }], isActive: true, cooldownSeconds: 900 },
+      { projectId: pid, name: "Token budget exceeded", severity: "warning", condition: { type: "token_usage", operator: ">", threshold: 1000000 }, channels: [{ type: "telegram", target: "@oncall" }], isActive: false, cooldownSeconds: 3600 },
+    ]);
+    added.push("alerts");
   }
 
   // LLM token-usage traces: only seed if this project has none yet.

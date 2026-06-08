@@ -7,7 +7,10 @@
   "bin": {
     "hiai-observe-mcp": "src/index.ts"
   },
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "engines": {
     "bun": ">=1.3.0",
     "node": ">=18"
@@ -16,5 +19,16 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.24.4"
   },
-  "keywords": ["hiai", "observe", "observability", "mcp", "model-context-protocol", "ai-agents"]
+  "keywords": [
+    "hiai",
+    "observe",
+    "observability",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

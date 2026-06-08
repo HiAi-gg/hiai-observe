@@ -89,7 +89,19 @@ export async function getContainerStats() {
   return apiFetch<{ containers: ContainerStats[] }>("/api/infrastructure/containers");
 }
 
-export type ContainerHistoryRow = ContainerStats;
+/** A stored container_stats row (camelCase, as the history endpoint returns it). */
+export interface ContainerHistoryRow {
+  collectedAt: string;
+  name: string;
+  image: string;
+  status: string;
+  cpuPercent: number;
+  memoryPercent: number;
+  networkRxBytes: number;
+  networkTxBytes: number;
+  blockReadBytes: number;
+  blockWriteBytes: number;
+}
 
 export async function getContainerDetail(id: string, params?: { from?: string; to?: string }) {
   const qs = new URLSearchParams();

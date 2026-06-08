@@ -37,6 +37,7 @@
       loading = true;
       error = null;
       const id = page.params.id;
+      if (!id) { error = "No container id"; return; }
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       const data = await getContainerDetail(id, { from });

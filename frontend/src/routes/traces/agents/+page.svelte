@@ -81,7 +81,7 @@
 
   const chartData = $derived(
     agentData.slice(0, 7).map((a, i) => ({
-      label: a.name.slice(0, 16),
+      label: (a.name ?? "").slice(0, 16),
       value: a.totalTokens,
       color: CHART_COLORS[i % CHART_COLORS.length],
     }))

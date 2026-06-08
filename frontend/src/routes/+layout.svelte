@@ -241,7 +241,16 @@
 
   <!-- Main content -->
   <main id="main-content" class="flex-1 overflow-y-auto p-6">
-    {@render children()}
+    <svelte:boundary>
+      {@render children()}
+      {#snippet failed(error, reset)}
+        <div class="mx-auto mt-16 max-w-lg rounded-lg border border-[var(--color-danger)]/40 bg-[var(--color-danger-bg)] p-6 text-center">
+          <h2 class="text-lg font-semibold text-[var(--color-danger)]">Something went wrong on this page</h2>
+          <p class="mt-2 text-sm text-[var(--color-text-secondary)]">{error instanceof Error ? error.message : String(error)}</p>
+          <button type="button" onclick={reset} class="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-surface-overlay)] transition-colors">Reload section</button>
+        </div>
+      {/snippet}
+    </svelte:boundary>
   </main>
 </div>
 {/if}

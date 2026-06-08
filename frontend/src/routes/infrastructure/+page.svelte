@@ -154,7 +154,7 @@
           <div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-[var(--color-text-muted)]">CPU</span>
-              <span class="font-medium">{host.cpu_percent.toFixed(1)}%</span>
+              <span class="font-medium">{(host.cpu_percent ?? 0).toFixed(1)}%</span>
             </div>
             <div class="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
               <div class="h-full rounded-full {cpuColor(host.cpu_percent)}" style="width: {Math.min(host.cpu_percent, 100)}%"></div>
@@ -172,7 +172,7 @@
           <div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-[var(--color-text-muted)]">Disk</span>
-              <span class="font-medium">{host.disk_used_gb.toFixed(1)} / {host.disk_total_gb.toFixed(1)} GB</span>
+              <span class="font-medium">{(host.disk_used_gb ?? 0).toFixed(1)} / {(host.disk_total_gb ?? 0).toFixed(1)} GB</span>
             </div>
             <div class="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
               <div class="h-full rounded-full {cpuColor(memoryPercent(host.disk_used_gb, host.disk_total_gb))}" style="width: {memoryPercent(host.disk_used_gb, host.disk_total_gb)}%"></div>
@@ -207,7 +207,7 @@
                   <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
                     <div class="h-full rounded-full {cpuColor(core.percent)}" style="width: {Math.min(core.percent, 100)}%"></div>
                   </div>
-                  <span class="w-8 text-right">{core.percent.toFixed(0)}%</span>
+                  <span class="w-8 text-right">{(core.percent ?? 0).toFixed(0)}%</span>
                 </div>
               {/each}
             </div>
@@ -224,7 +224,7 @@
                   <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
                     <div class="h-full rounded-full {cpuColor(memoryPercent(disk.usedGb, disk.totalGb))}" style="width: {memoryPercent(disk.usedGb, disk.totalGb)}%"></div>
                   </div>
-                  <span class="text-right">{disk.usedGb.toFixed(1)} / {disk.totalGb.toFixed(1)} GB</span>
+                  <span class="text-right">{(disk.usedGb ?? 0).toFixed(1)} / {(disk.totalGb ?? 0).toFixed(1)} GB</span>
                 </div>
               {/each}
             </div>
@@ -248,14 +248,14 @@
               </div>
               <div class="mb-1 flex justify-between text-sm">
                 <span class="text-[var(--color-text-muted)]">Utilization</span>
-                <span class="font-medium">{gpu.utilizationPercent.toFixed(1)}%</span>
+                <span class="font-medium">{(gpu.utilizationPercent ?? 0).toFixed(1)}%</span>
               </div>
               <div class="h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
                 <div class="h-full rounded-full {cpuColor(gpu.utilizationPercent)}" style="width: {Math.min(gpu.utilizationPercent, 100)}%"></div>
               </div>
               <div class="mt-3 mb-1 flex justify-between text-sm">
                 <span class="text-[var(--color-text-muted)]">VRAM</span>
-                <span class="font-medium">{gpu.memoryUsedMb.toFixed(0)} / {gpu.memoryTotalMb.toFixed(0)} MB</span>
+                <span class="font-medium">{(gpu.memoryUsedMb ?? 0).toFixed(0)} / {(gpu.memoryTotalMb ?? 0).toFixed(0)} MB</span>
               </div>
               <div class="h-2 overflow-hidden rounded-full bg-[var(--color-surface-overlay)]">
                 <div class="h-full rounded-full {cpuColor(memoryPercent(gpu.memoryUsedMb, gpu.memoryTotalMb))}" style="width: {memoryPercent(gpu.memoryUsedMb, gpu.memoryTotalMb)}%"></div>
@@ -327,7 +327,7 @@
               <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p class="text-xs text-[var(--color-text-muted)]">CPU</p>
-                  <p class="font-medium">{container.cpu_percent.toFixed(1)}%</p>
+                  <p class="font-medium">{(container.cpu_percent ?? 0).toFixed(1)}%</p>
                 </div>
                 <div>
                   <p class="text-xs text-[var(--color-text-muted)]">Memory</p>

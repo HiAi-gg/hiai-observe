@@ -5,6 +5,12 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-06-08
+
+### Fixed
+- More white-screen crashes from frontend/API contract drift: the Traces list read snake_case fields (`trace_id`, `duration_ms`, …) but the API returns camelCase rows with workflow/agent/tokens inside `attributes`; `getTraces` now maps to the shape the page renders. Guarded null numeric fields on the Infrastructure page (a container with `cpu_percent: null` crashed `.toFixed`) and an undefined agent name.
+- Added a top-level `<svelte:boundary>` so a single page error shows a localized "something went wrong" panel instead of white-screening the whole app.
+
 ## [0.1.3] - 2026-06-08
 
 ### Fixed
@@ -203,6 +209,7 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.1.4]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.1

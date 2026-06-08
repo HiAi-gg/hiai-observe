@@ -175,9 +175,30 @@ export async function getTraces(params?: { workflow?: string; agent?: string; li
   if (params?.offset) qs.set("offset", String(params.offset));
   if (params?.from) qs.set("from", params.from);
   if (params?.to) qs.set("to", params.to);
-  // Server returns { data, total }; normalize to { traces } for callers.
-  const res = await apiFetch<{ data: Trace[]; total: number }>(`/api/traces?${qs}`);
-  return { traces: res.data ?? [], total: res.total ?? 0 };
+  // Server returns raw rows (camelCase + attributes); normalize to the flat,
+  // snake_case Trace shape the pages render.
+  type RawTrace = {
+    id: string; traceId?: string; name?: string; status?: string;
+    durationMs?: number; startTime?: string; createdAt?: string;
+    attributes?: Record<string, unknown> | null;
+  };
+  const res = await apiFetch<{ data: RawTrace[]; total: number }>(`/api/traces?${qs}`);
+  const traces: Trace[] = (res.data ?? []).map((t) => {
+    const a = t.attributes ?? {};
+    const tokens = Number(a["gen_ai.usage.total_tokens"]);
+    return {
+      id: t.id,
+      trace_id: t.traceId ?? t.id ?? "",
+      name: t.name ?? "",
+      workflow: (a["mastra.workflow"] as string) ?? undefined,
+      agent: (a["mastra.agent"] as string) ?? undefined,
+      duration_ms: t.durationMs ?? 0,
+      status: t.status ?? "ok",
+      tokens_used: Number.isFinite(tokens) && tokens > 0 ? tokens : undefined,
+      start_time: t.startTime ?? t.createdAt ?? "",
+    };
+  });
+  return { traces, total: res.total ?? 0 };
 }
 
 export async function getTrace(id: string) {

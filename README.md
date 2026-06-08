@@ -43,13 +43,13 @@ Built for indie developers and small teams who want answers to three questions:
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #1: Hero / Splash              -->
-<!-- Файл:         docs/screenshots/hero.png       -->
-<!-- Что показать: Главный дашборд (светлая тема)  -->
+<!-- File:          docs/screenshots/hero.png       -->
+<!-- What to show: Main dashboard (light theme)    -->
 <!--              — error rate, uptime, containers  -->
 <!--              — AI cost panel, recent issues     -->
-<!-- Размер:       1200×675 (16:9)                 -->
+<!-- Dimensions:   1200x675 (16:9)                 -->
 <!-- alt text:     "HiAi Observe unified dashboard showing error rate, uptime, container stats, and AI cost" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/hero.png" width="100%" alt="HiAi Observe unified dashboard" /> -->
+<!-- Insert here:  <img src="docs/screenshots/hero.png" width="100%" alt="HiAi Observe unified dashboard" /> -->
 <!-- ============================================ -->
 
 ## Quick Start
@@ -148,53 +148,53 @@ Plus: unified dashboard, alert rules engine, maintenance windows, incident manag
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #2: Feature Showcase           -->
-<!-- Файл:         docs/screenshots/features.png    -->
-<!-- Что показать: 2-3 панели рядом (можно монтаж): -->
+<!-- File:          docs/screenshots/features.png    -->
+<!-- What to show: 2-3 panels side by side (montage): -->
 <!--              — Issues list with stack traces    -->
 <!--              — Uptime monitor with response time -->
 <!--              — Log viewer with search           -->
-<!-- Размер:       1200×500 (широкая полоса)       -->
+<!-- Dimensions:   1200x500 (wide strip)           -->
 <!-- alt text:     "HiAi Observe features: issue tracking, uptime monitoring, and log viewer" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/features.png" width="100%" alt="HiAi Observe features" /> -->
+<!-- Insert here:  <img src="docs/screenshots/features.png" width="100%" alt="HiAi Observe features" /> -->
 <!-- ============================================ -->
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #6: Issue Grouping              -->
-<!-- Файл:         docs/screenshots/issues.png      -->
-<!-- Что показать: Issues list page:                  -->
+<!-- File:          docs/screenshots/issues.png      -->
+<!-- What to show: Issues list page:                  -->
 <!--              — Auto-grouped by fingerprint        -->
 <!--              — Event count, last seen, status     -->
 <!--              — Filter by status/level/project     -->
 <!--              — One-click "resolve" / "assign"     -->
-<!-- Размер:       1200×500                         -->
+<!-- Dimensions:   1200x500                         -->
 <!-- alt text:     "HiAi Observe issues list with auto-grouping by fingerprint" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/issues.png" width="100%" alt="HiAi Observe issues list" /> -->
+<!-- Insert here:  <img src="docs/screenshots/issues.png" width="100%" alt="HiAi Observe issues list" /> -->
 <!-- ============================================ -->
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #7: Live Log Viewer             -->
-<!-- Файл:         docs/screenshots/logs.png         -->
-<!-- Что показать: Logs page:                          -->
+<!-- File:          docs/screenshots/logs.png         -->
+<!-- What to show: Logs page:                          -->
 <!--              — Live WebSocket tail                 -->
 <!--              — Container filter (multi-select)     -->
 <!--              — Full-text + regex search            -->
 <!--              — Auto-refresh indicator              -->
-<!-- Размер:       1200×600                         -->
+<!-- Dimensions:   1200x600                         -->
 <!-- alt text:     "HiAi Observe log viewer with live WebSocket streaming and full-text search" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/logs.png" width="100%" alt="HiAi Observe log viewer" /> -->
+<!-- Insert here:  <img src="docs/screenshots/logs.png" width="100%" alt="HiAi Observe log viewer" /> -->
 <!-- ============================================ -->
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #5: Uptime Monitor              -->
-<!-- Файл:         docs/screenshots/uptime.png      -->
-<!-- Что показать: Public status page + monitor list -->
+<!-- File:          docs/screenshots/uptime.png      -->
+<!-- What to show: Public status page + monitor list -->
 <!--              — HTTP monitors with response time  -->
 <!--              — 30-day uptime bar                  -->
 <!--              — SSL expiry                         -->
 <!--              — Status page (JSON + HTML)         -->
-<!-- Размер:       1200×600                         -->
+<!-- Dimensions:   1200x600                         -->
 <!-- alt text:     "HiAi Observe uptime monitoring with response time history and status page" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/uptime.png" width="100%" alt="HiAi Observe uptime monitoring" /> -->
+<!-- Insert here:  <img src="docs/screenshots/uptime.png" width="100%" alt="HiAi Observe uptime monitoring" /> -->
 <!-- ============================================ -->
 
 ## Comparison
@@ -245,15 +245,15 @@ Sentry.init({ dsn: "http://apikey@localhost:8001/1" });
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #3: Error Detail               -->
-<!-- Файл:         docs/screenshots/error-detail.png -->
-<!-- Что показать: Страница ошибки:                  -->
-<!--              — Stack trace с подсветкой          -->
+<!-- File:          docs/screenshots/error-detail.png -->
+<!-- What to show: Error detail page:                  -->
+<!--              - Stack trace with highlighting     -->
 <!--              — Breadcrumbs (user actions)        -->
 <!--              — Tags (browser, OS, release)       -->
 <!--              — Related issues                    -->
-<!-- Размер:       1200×700                         -->
+<!-- Dimensions:   1200x700                         -->
 <!-- alt text:     "HiAi Observe error detail with stack trace, breadcrumbs, and context" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/error-detail.png" width="100%" alt="HiAi Observe error detail" /> -->
+<!-- Insert here:  <img src="docs/screenshots/error-detail.png" width="100%" alt="HiAi Observe error detail" /> -->
 <!-- ============================================ -->
 
 ### OpenTelemetry (Generic)
@@ -300,15 +300,15 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 
 <!-- ============================================ -->
 <!-- 🖼️  SCREENSHOT #4: AI Agent Tracing           -->
-<!-- Файл:         docs/screenshots/ai-tracing.png  -->
-<!-- Что показать: Трейс AI-агента:                 -->
-<!--              — Workflow steps (дерево)          -->
+<!-- File:          docs/screenshots/ai-tracing.png  -->
+<!-- What to show: AI agent trace:                      -->
+<!--              - Workflow steps (tree)             -->
 <!--              — Token usage per step             -->
 <!--              — Latency breakdown                -->
-<!--              — Tool calls (если есть)           -->
-<!-- Размер:       1200×700                         -->
+<!--              - Tool calls (if any)                -->
+<!-- Dimensions:   1200x700                         -->
 <!-- alt text:     "HiAi Observe AI agent trace showing workflow steps and token usage" -->
-<!-- Вставь сюда:  <img src="docs/screenshots/ai-tracing.png" width="100%" alt="HiAi Observe AI agent tracing" /> -->
+<!-- Insert here:  <img src="docs/screenshots/ai-tracing.png" width="100%" alt="HiAi Observe AI agent tracing" /> -->
 <!-- ============================================ -->
 
 ## API Endpoints

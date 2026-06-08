@@ -10,7 +10,7 @@ import { projects, events, issues, traces, uptimeMonitors, uptimeChecks, alerts,
 import { eq } from "drizzle-orm";
 
 export const BASE_URL = process.env.HIAI_OBSERVE_URL || "http://localhost:8001";
-export const MASTER_KEY = process.env.HIAI_OBSERVE_API_KEY || "dev-key-local-testing";
+export const MASTER_KEY = process.env.HIAI_OBSERVE_API_KEY || "test-api-key";
 
 /**
  * Authenticated fetch against the API.

@@ -1,8 +1,9 @@
 # HiAi Observe
 
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/HiAi-gg/hiai-observe?sort=semver)](https://github.com/HiAi-gg/hiai-observe/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.1-green.svg)](CHANGELOG.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **The simplest, lightest, and most developer-friendly unified observability platform for AI Agents and TypeScript backends.**
 

@@ -5,6 +5,21 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-08
+
+Agent access — query Observe from MCP clients, the shell, or via a skill.
+
+### Added
+- **`@hiai-observe/cli`** — a `hiai-observe` command-line client (dashboard, issues, issue, ai-cost, traces, uptime, logs, infra, alerts, health) with `--json`, for shell/Bash-tool agents and CI. Verified end-to-end against a live server.
+- **`skills/hiai-observe`** — an agent skill that tells agents *when* to consult Observe (before claiming a deploy healthy, after errors, to track LLM spend) and *how* (MCP or CLI).
+- **`bun run seed:extras`** now also seeds LLM token-usage traces (model/agent/workflow) so the AI Cost view has data; the script is idempotent and non-destructive.
+
+### Fixed
+- `cli ai-cost` — resolve the project id (the `/api/traces/stats` endpoint requires it) and parse the real `tokenUsage` shape.
+
+### Changed
+- Removed a developer's local API key from the e2e test fallback; use a generic placeholder.
+
 ## [0.1.1] - 2026-06-07
 
 Patch release — makes the build deployable and CI real, plus AI cost accuracy.
@@ -20,8 +35,6 @@ Patch release — makes the build deployable and CI real, plus AI cost accuracy.
 - **AI cost estimation** — refreshed the model price table (Claude 4.x, GPT-4.1/5, o-series, Gemini 2.x), prefix-matching for dated model ids, and a `MODEL_PRICING` env override (JSON) for accurate, deployment-specific pricing.
 - **GPU panel** on the Infrastructure page — utilization, VRAM, and temperature per GPU (data was collected via nvidia-smi but never shown).
 - **`@hiai-observe/mcp`** — a Model Context Protocol server so AI agents can query Observe (issues, AI cost, traces, uptime, logs, infrastructure, alerts) directly. 9 read tools, verified end-to-end against a live server.
-- **`@hiai-observe/cli`** — a `hiai-observe` command-line client (same read surface) for shell/Bash-tool agents and CI, with `--json` output.
-- **`skills/hiai-observe`** — an agent skill that tells agents *when* to consult Observe.
 - Background auto-refresh (15s) for the live monitoring tabs (issues, traces + agents/models/workflows, alerts, incidents).
 - `docs/ROADMAP.md` — prioritized list of future work (targeting 0.2.0+).
 
@@ -182,5 +195,6 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.1.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

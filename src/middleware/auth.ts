@@ -25,6 +25,7 @@ export const PUBLIC_PATHS = [
   "/v1/metrics",       // OTLP handler: resolveApiKey() + lookupProject()
   "/api/logs/stream",  // SSE handler: ?key=<apikey> query param
   "/api/observe/logs/stream", // Redirects to /api/logs/stream
+  "/ws/logs",          // WS handler: authenticates via the first "auth" message
 ];
 
 function isPublicPath(path: string): boolean {

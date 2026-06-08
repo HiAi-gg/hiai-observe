@@ -451,7 +451,7 @@
       <h1 class="text-2xl font-bold">Logs</h1>
       <LiveIndicator {connected} />
       {#if autoRefresh}
-        <span class="rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-xs text-[var(--color-success)]">Live</span>
+        <span class="rounded-full bg-[var(--color-surface-overlay)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">Auto-refresh</span>
       {/if}
     </div>
     <div class="flex items-center gap-2">

@@ -28,7 +28,7 @@
       loading = true;
       error = null;
       const result = await getAlerts();
-      alerts = result.alerts;
+      alerts = result.alerts ?? [];
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load alerts";
     } finally {

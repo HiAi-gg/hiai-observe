@@ -54,7 +54,9 @@ export async function getIssues(params?: { status?: string; search?: string; env
   if (params?.level) qs.set("level", params.level);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
-  return apiFetch<{ issues: Issue[]; total: number }>(`/api/issues?${qs}`);
+  // Server returns { data, total }; normalize to { issues } for callers.
+  const res = await apiFetch<{ data: Issue[]; total: number }>(`/api/issues?${qs}`);
+  return { issues: res.data ?? [], total: res.total ?? 0 };
 }
 
 export async function getIssue(id: string) {
@@ -173,7 +175,9 @@ export async function getTraces(params?: { workflow?: string; agent?: string; li
   if (params?.offset) qs.set("offset", String(params.offset));
   if (params?.from) qs.set("from", params.from);
   if (params?.to) qs.set("to", params.to);
-  return apiFetch<{ traces: Trace[]; total: number }>(`/api/traces?${qs}`);
+  // Server returns { data, total }; normalize to { traces } for callers.
+  const res = await apiFetch<{ data: Trace[]; total: number }>(`/api/traces?${qs}`);
+  return { traces: res.data ?? [], total: res.total ?? 0 };
 }
 
 export async function getTrace(id: string) {
@@ -182,7 +186,9 @@ export async function getTrace(id: string) {
 
 export async function getAlerts() {
   const qs = withProject(new URLSearchParams());
-  return apiFetch<{ alerts: AlertRule[] }>(`/api/alerts?${qs}`);
+  // Server returns { items, total }; normalize to { alerts } for callers.
+  const res = await apiFetch<{ items: AlertRule[]; total: number }>(`/api/alerts?${qs}`);
+  return { alerts: res.items ?? [], total: res.total ?? 0 };
 }
 
 export async function createAlert(data: Omit<AlertRule, "id" | "created_at">) {

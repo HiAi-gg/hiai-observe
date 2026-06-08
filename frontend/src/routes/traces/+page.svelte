@@ -24,7 +24,7 @@
       if (agentFilter) params.agent = agentFilter;
       if (statusFilter) params.status = statusFilter;
       const result = await getTraces(params as any);
-      traces = result.traces;
+      traces = result.traces ?? [];
       total = result.total;
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load traces";

@@ -48,7 +48,7 @@
       }
 
       const data = await res.json() as { data: ContainerHistoryRow[] };
-      if (data.data.length === 0) {
+      if ((data.data ?? []).length === 0) {
         error = "No data found for this container";
         return;
       }

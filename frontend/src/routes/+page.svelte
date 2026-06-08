@@ -205,7 +205,7 @@
           <a href="/issues" class="text-xs font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]">View all</a>
         </div>
         <div class="p-4">
-          {#if data.recentIssues.length === 0}
+          {#if (data.recentIssues ?? []).length === 0}
             <p class="py-8 text-center text-sm text-[var(--color-text-muted)]">No issues found</p>
           {:else}
             <div class="space-y-2">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContainerStats, getHostStats, getGpuStats, type ContainerStats, type HostStats, type GpuStat } from "$lib/api";
+  import { apiKey } from "$lib/stores.svelte";
   import { formatBytes } from "$lib/utils";
   import TimeSeriesChart from "$lib/components/TimeSeriesChart.svelte";
   import { drawTimeSeriesChart } from "$lib/chart-utils";
@@ -27,9 +28,9 @@
       loading = true;
       error = null;
       const [cResult, hResult, gResult] = await Promise.all([getContainerStats(), getHostStats(), getGpuStats()]);
-      containers = cResult.containers;
+      containers = cResult.containers ?? [];
       host = hResult;
-      gpus = gResult.gpus;
+      gpus = gResult.gpus ?? [];
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load infrastructure data";
     } finally {
@@ -40,10 +41,10 @@
   async function loadHistory() {
     try {
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+      const key = apiKey.current;
 
       const hostRes = await fetch(`/api/infrastructure/host/history?from=${from}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${key}` },
       });
       if (hostRes.ok) {
         const data = await hostRes.json() as { data: HostHistoryRow[] };
@@ -62,7 +63,7 @@
       const cMap = new Map<string, Array<{ time: Date; value: number }>>();
       for (const c of topContainers) {
         const cRes = await fetch(`/api/infrastructure/containers/${c.id}?from=${from}`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${key}` },
         });
         if (cRes.ok) {
           const cData = await cRes.json() as { data: ContainerHistoryRow[] };

@@ -5,6 +5,7 @@
     type LogEntry, type LogStats, type LogVolumeBucket, type SavedSearch,
   } from "$lib/api";
   import { wsManager } from "$lib/ws";
+  import { apiKey } from "$lib/stores.svelte";
   import { debounce, stripAnsi, isJson, highlightJson, isStackTrace } from "$lib/utils";
   import LiveIndicator from "$lib/components/LiveIndicator.svelte";
   import AnsiText from "$lib/components/AnsiText.svelte";
@@ -196,8 +197,8 @@
     loadVolume();
     loadSavedSearches();
 
-    const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
-    const sseUrl = `/api/logs/stream?key=${apiKey}` + (containerFilter ? `&container=${containerFilter}` : "");
+    const key = apiKey.current;
+    const sseUrl = `/api/logs/stream?key=${encodeURIComponent(key)}` + (containerFilter ? `&container=${encodeURIComponent(containerFilter)}` : "");
     const es = new EventSource(sseUrl);
 
     es.onopen = () => {
@@ -324,9 +325,29 @@
     } catch { /* ignore */ }
   }
 
-  function downloadLogs() {
+  async function downloadLogs() {
     const url = getLogsDownloadUrl({ container: containerFilter, level: levelFilter, format: "csv" });
-    window.open(url, "_blank");
+    const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+    const headers = new Headers();
+    if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        error = `Download failed: HTTP ${res.status}`;
+        return;
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = "logs.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      error = `Download error: ${(e as Error).message}`;
+    }
   }
 
   // Volume chart helpers

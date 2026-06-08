@@ -235,11 +235,11 @@
           <a href="/uptime" class="text-xs font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]">View all</a>
         </div>
         <div class="p-4">
-          {#if data.monitorStatuses.length === 0}
+          {#if (data.monitorStatuses ?? []).length === 0}
             <p class="py-8 text-center text-sm text-[var(--color-text-muted)]">No monitors</p>
           {:else}
             <div class="space-y-2">
-              {#each data.monitorStatuses as monitor (monitor.name)}
+              {#each (data.monitorStatuses ?? []) as monitor (monitor.name)}
                 <div class="flex items-center gap-3 rounded-md border border-[var(--color-border)] p-3">
                   <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background: {monitor.isUp ? 'var(--color-success)' : 'var(--color-danger)'}"></span>
                   <span class="flex-1 truncate text-sm text-[var(--color-text-secondary)]">{monitor.name}</span>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getMonitors, createMonitor, deleteMonitor, type Monitor } from "$lib/api";
+  import { apiKey } from "$lib/stores.svelte";
 
   let monitors = $state<Monitor[]>([]);
   let loading = $state(true);
@@ -43,9 +44,9 @@
 
   async function loadGroups() {
     try {
-      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+      const key = apiKey.current;
       const res = await fetch("/api/monitors/groups", {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${key}` },
       });
       if (res.ok) {
         const data = await res.json() as { groups: Array<{ group: string; count: number }> };
@@ -59,19 +60,19 @@
       loading = true;
       error = null;
       const groupParam = selectedGroup ? `&group=${encodeURIComponent(selectedGroup)}` : "";
-      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+      const key = apiKey.current;
       const res = await fetch(`/api/monitors?hours=${periodHours()}${groupParam}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${key}` },
       });
       if (!res.ok) throw new Error("Failed to load monitors");
       const result = await res.json() as { monitors: Monitor[] };
-      monitors = result.monitors;
+      monitors = result.monitors ?? [];
 
       const dataMap = new Map<string, number[]>();
       for (const m of monitors) {
         try {
           const res = await fetch(`/api/monitors/${m.id}/checks?limit=48`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
+            headers: { Authorization: `Bearer ${key}` },
           });
           if (res.ok) {
             const data = await res.json() as { checks: Array<{ response_time_ms: number }> };

@@ -43,8 +43,8 @@
       if (levelFilter !== "all") params.level = levelFilter;
       if (searchQuery) params.search = searchQuery;
       const result = await getIssues(params as any);
-      issues = result.issues;
-      total = result.total;
+      issues = result.issues ?? [];
+      total = result.total ?? 0;
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load issues";
     } finally {

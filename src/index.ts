@@ -154,7 +154,9 @@ ensureBootstrapProject(process.env.HIAI_OBSERVE_API_KEY).catch((err) => {
 startUptimeWorker();
 startAlertWorker();
 startInfraWorker();
-startLogWorker();
+if (process.env.HIAI_DISABLE_LOG_WORKER !== "1") {
+  startLogWorker();
+}
 startRetentionWorker();
 startMaintenanceWorker();
 startHealthPinger();

@@ -59,7 +59,7 @@
   bind:this={dialogEl}
   onclose={handleDialogClose}
   onkeydown={handleKeydown}
-  class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0 shadow-2xl backdrop:bg-black/50"
+  class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0 shadow-2xl backdrop:bg-black/50 fixed inset-0 m-auto max-w-md w-[calc(100%-2rem)]"
 >
   <div class="p-6">
     <h3 class="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>

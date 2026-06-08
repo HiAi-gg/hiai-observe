@@ -1,6 +1,6 @@
 {
   "name": "@hiai-observe/cli",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Command-line client for HiAi Observe — query issues, AI cost, traces, uptime, logs and infrastructure from any shell.",
   "type": "module",
   "license": "MIT",

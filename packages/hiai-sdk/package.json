@@ -1,6 +1,6 @@
 {
   "name": "@hiai-observe/sdk",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Lightweight TypeScript SDK for HiAi Observe — issues, monitors, dashboard, releases, team.",
   "type": "module",
   "license": "MIT",

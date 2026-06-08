@@ -1,6 +1,6 @@
 {
   "name": "@hiai-observe/mcp",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Model Context Protocol server for HiAi Observe — lets AI agents query issues, traces, AI cost, uptime, logs and infrastructure.",
   "type": "module",
   "license": "MIT",

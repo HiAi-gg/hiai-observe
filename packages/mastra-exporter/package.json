@@ -1,6 +1,6 @@
 {
   "name": "@hiai-observe/mastra-exporter",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Mastra-compatible observability exporter for HiAi Observe (OTLP HTTP JSON)",
   "type": "module",
   "license": "MIT",

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getConfig } from "./config.js";
+import { logger } from "../lib/logger.js";
 
 export interface LogEntry {
   id: string;
@@ -14,6 +15,49 @@ type LogBatchCallback = (entries: LogEntry[]) => void;
 
 const BATCH_INTERVAL_MS = 100;
 const BATCH_MAX_SIZE = 50;
+
+export class TokenBucket {
+  private tokens: number;
+  private lastRefill: number;
+  private dropCount: number;
+  private lastDropLog: number;
+
+  constructor(
+    private capacity: number,
+    private refillRate: number,
+  ) {
+    this.tokens = capacity;
+    this.lastRefill = Date.now();
+    this.dropCount = 0;
+    this.lastDropLog = 0;
+  }
+
+  consume(): boolean {
+    const now = Date.now();
+    const elapsed = (now - this.lastRefill) / 1000;
+    this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillRate);
+    this.lastRefill = now;
+
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return true;
+    }
+
+    this.dropCount++;
+    if (now - this.lastDropLog >= 60_000) {
+      logger.warn("[log-streamer] Rate limit exceeded, dropping logs", { dropped: this.dropCount });
+      this.dropCount = 0;
+      this.lastDropLog = now;
+    }
+    return false;
+  }
+
+  reset(): void {
+    this.tokens = this.capacity;
+    this.lastRefill = Date.now();
+    this.dropCount = 0;
+  }
+}
 
 /**
  * Parse a Docker multiplexed stream frame.
@@ -83,7 +127,8 @@ async function attachToContainerLogs(
   containerId: string,
   dockerSocket: string,
   onFrame: (entry: LogEntry) => void,
-  containerNames?: Map<string, string>
+  containerNames?: Map<string, string>,
+  canAccept?: () => boolean
 ): Promise<AbortController> {
   const controller = new AbortController();
 
@@ -133,6 +178,10 @@ async function attachToContainerLogs(
     const pump = async () => {
       try {
         while (true) {
+          if (canAccept && !canAccept()) {
+            await new Promise((r) => setTimeout(r, 50));
+            continue;
+          }
           const { done, value } = await reader.read();
           if (done) break;
           buffer = Buffer.concat([buffer, value]);
@@ -166,8 +215,12 @@ export function startLogStreamer(
   dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock",
   containerNames?: Map<string, string>
 ): () => void {
+  const config = getConfig();
   const controllers: AbortController[] = [];
   const batch: LogEntry[] = [];
+  const buckets = new Map<string, TokenBucket>();
+
+  const maxLinesPerSec = config.logMaxLinesPerSec;
 
   const flush = () => {
     if (batch.length > 0) {
@@ -176,15 +229,28 @@ export function startLogStreamer(
     }
   };
 
-  const interval = setInterval(flush, BATCH_INTERVAL_MS);
+  const interval = setInterval(flush, config.logBatchIntervalMs || BATCH_INTERVAL_MS);
 
   for (const containerId of containerIds) {
+    const bucket = maxLinesPerSec > 0
+      ? new TokenBucket(maxLinesPerSec, maxLinesPerSec)
+      : null;
+    if (bucket) buckets.set(containerId, bucket);
+
+    const canAccept = () => {
+      return config.logMaxBufferSize <= 0 || batch.length < config.logMaxBufferSize;
+    };
+
     attachToContainerLogs(containerId, dockerSocket, (entry) => {
+      if (config.logSampleRate < 1.0 && Math.random() >= config.logSampleRate) {
+        return;
+      }
+      if (bucket && !bucket.consume()) return;
       batch.push(entry);
       if (batch.length >= BATCH_MAX_SIZE) {
         flush();
       }
-    }, containerNames).then((controller) => {
+    }, containerNames, canAccept).then((controller) => {
       controllers.push(controller);
     });
   }

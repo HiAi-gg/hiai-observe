@@ -89,6 +89,17 @@ export async function getContainerStats() {
   return apiFetch<{ containers: ContainerStats[] }>("/api/infrastructure/containers");
 }
 
+export type ContainerHistoryRow = ContainerStats;
+
+export async function getContainerDetail(id: string, params?: { from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  return apiFetch<{ containerId: string; data: ContainerHistoryRow[]; count: number }>(
+    `/api/infrastructure/containers/${id}?${qs}`
+  );
+}
+
 export async function getHostStats() {
   return apiFetch<HostStats>("/api/infrastructure/host");
 }
@@ -807,13 +818,11 @@ export async function testNotificationChannel(channel: string, projectId?: strin
   });
 }
 
-export async function getHostHistory(hostId?: string, limit?: number) {
+export async function getHostHistory(hostId?: string, from?: string, to?: string, limit?: number) {
   const qs = new URLSearchParams();
   if (hostId) qs.set("hostId", hostId);
-  const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - 3600_000);
-  qs.set("from", oneHourAgo.toISOString());
-  qs.set("to", now.toISOString());
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
   if (limit) qs.set("limit", String(limit));
   return apiFetch<{ data: HostStats[]; count: number }>(`/api/infrastructure/host/history?${qs}`);
 }

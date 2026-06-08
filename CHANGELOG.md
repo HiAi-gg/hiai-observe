@@ -5,6 +5,27 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-06-08
+
+### Fixed
+- **401 Unauthorized** on container detail, logs download, and uptime pages — frontend now uses `apiKey` Svelte store consistently instead of raw `localStorage.getItem("hiai-observe-api-key")` which produced JSON-encoded Bearer tokens.
+- **Memory exhaustion** in log streaming worker — added 5-layer defense: container filtering (`LOG_INCLUDE_CONTAINERS` / `LOG_EXCLUDE_CONTAINERS`), token bucket rate limiting (`LOG_MAX_LINES_PER_SEC`), concurrent insert semaphore (`LOG_MAX_CONCURRENT_INSERTS`), sampling (`LOG_SAMPLE_RATE`), and backpressure (`LOG_MAX_BUFFER_SIZE`).
+- **DB port** in AGENTS.md corrected from 5432 to 5433.
+
+### Added
+- `docs/configuration.md` — complete environment variable reference with tuning examples (dev / production / small VPS).
+- `docs/production.md` — production deployment guide with TLS, security hardening, and log-limits section.
+- Unit tests for the token bucket rate limiter (`tests/monitoring/token-bucket.test.ts`, 7 tests).
+- **Agentic Quickstart** in `README.md` — copy-paste prompts for OpenCode, Cursor, and GitHub Copilot.
+- **"How AI Agents Should Install This"** section in `AGENTS.md` — 4-step install guide for AI assistants.
+- 7 log streaming env vars in `.env.example` with VPS presets (`LOG_MAX_LINES_PER_SEC=100`, `LOG_SAMPLE_RATE=0.1`, …).
+- `ADMIN_API_KEY`, `ENCRYPTION_KEY`, `RETENTION_DAYS` env vars documented in `AGENTS.md` and `docs/configuration.md`.
+
+### Changed
+- `AGENTS.md`: expanded repo map (27 plugins, `src/workers/`, `src/lib/`, 243 tests), enhanced Critic Guidelines with auth pattern and log defense checks.
+- `README.md`: Changelog section updated with v0.1.6 summary.
+- `docs/ROADMAP.md`: rewritten with structured phases (Quick Wins / Platform Maturation / Strategic Initiatives), dependency chains, KPI targets, and answers to 5 user questions.
+
 ## [0.1.5] - 2026-06-08
 
 ### Fixed

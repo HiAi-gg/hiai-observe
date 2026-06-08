@@ -327,9 +327,9 @@
 
   async function downloadLogs() {
     const url = getLogsDownloadUrl({ container: containerFilter, level: levelFilter, format: "csv" });
-    const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
+    const key = apiKey.current;
     const headers = new Headers();
-    if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
+    if (key) headers.set("Authorization", `Bearer ${key}`);
     try {
       const res = await fetch(url, { headers });
       if (!res.ok) {

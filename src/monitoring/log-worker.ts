@@ -4,8 +4,26 @@ import { insertLogs } from "../store/logs.js";
 import { publishLog } from "../store/log-pubsub.js";
 import { recordWorkerRun } from "../workers/health.js";
 import { logger } from "../lib/logger.js";
+import { getConfig } from "./config.js";
 
 let cleanup: (() => void) | null = null;
+
+function filterContainers(
+  containers: Array<{ id: string; name: string }>,
+  filter: { include: string[]; exclude: string[] }
+): Array<{ id: string; name: string }> {
+  let result = containers;
+
+  if (filter.include.length > 0) {
+    result = result.filter((c) => filter.include.some((name) => c.name.includes(name)));
+  }
+
+  if (filter.exclude.length > 0) {
+    result = result.filter((c) => !filter.exclude.some((name) => c.name.includes(name)));
+  }
+
+  return result;
+}
 
 const LEVEL_PATTERNS: Array<{ pattern: RegExp; level: string }> = [
   { pattern: /\bFATAL\b/i, level: "error" },
@@ -28,11 +46,45 @@ function detectLevel(message: string, stream: string): string {
   return stream === "stderr" ? "error" : "info";
 }
 
+let inFlightInserts = 0;
+
+async function insertWithSemaphore(entries: Array<{
+  containerId: string;
+  containerName: string;
+  stream: string;
+  message: string;
+  timestamp: Date;
+  level: string;
+}>): Promise<void> {
+  const config = getConfig();
+  const max = config.logMaxConcurrentInserts;
+
+  if (max > 0) {
+    while (inFlightInserts >= max) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  inFlightInserts++;
+  try {
+    await insertLogs(entries);
+  } catch (err) {
+    logger.error("[log-worker] DB insert error", { err: String(err) });
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      await insertLogs(entries);
+    } catch (err2) {
+      logger.error("[log-worker] DB insert retry failed", { err: String(err2) });
+    }
+  } finally {
+    inFlightInserts--;
+  }
+}
+
 function onBatch(entries: LogEntry[]): void {
   if (entries.length === 0) return;
 
-  // Insert to DB (fire-and-forget)
-  insertLogs(
+  insertWithSemaphore(
     entries.map((e) => ({
       containerId: e.container_id,
       containerName: e.container_name,
@@ -41,11 +93,8 @@ function onBatch(entries: LogEntry[]): void {
       timestamp: new Date(e.timestamp),
       level: detectLevel(e.message, e.stream),
     }))
-  ).catch((err) => {
-    logger.error("[log-worker] DB insert error", { err: String(err) });
-  });
+  );
 
-  // Publish to Redis for real-time WebSocket delivery (fire-and-forget)
   for (const entry of entries) {
     publishLog(entry).catch(() => {});
   }
@@ -59,10 +108,20 @@ export async function startLogWorker(): Promise<void> {
 
   try {
     const containers = await listContainers();
-    const ids = containers.map((c) => c.id);
-    const nameMap = new Map(containers.map((c) => [c.id, c.name]));
-    logger.info("[log-worker] Streaming from containers", { count: ids.length, names: containers.map((c) => c.name).join(", ") });
+    const config = getConfig();
+    const filtered = filterContainers(containers, config.logContainerFilter);
+    const ids = filtered.map((c) => c.id);
+    const nameMap = new Map(filtered.map((c) => [c.id, c.name]));
+    if (filtered.length < containers.length) {
+      logger.info("[log-worker] Filtered containers", {
+        total: containers.length,
+        streaming: filtered.length,
+        excluded: containers.filter((c) => !filtered.some((f) => f.id === c.id)).map((c) => c.name),
+      });
+    }
+    logger.info("[log-worker] Streaming from containers", { count: ids.length, names: filtered.map((c) => c.name).join(", ") });
     cleanup = startLogStreamer(ids, onBatch, undefined, nameMap);
+    recordWorkerRun("log");
   } catch (err) {
     logger.error("[log-worker] Failed to start", { err: String(err) });
   }

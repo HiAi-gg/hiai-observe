@@ -1,17 +1,56 @@
 # HiAi Observe
 
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/HiAi-gg/hiai-observe)](https://github.com/HiAi-gg/hiai-observe/stargazers)
+[![Docker Pulls](https://img.shields.io/docker/pulls/hiai-observe/hiai-observe)](https://hub.docker.com/r/hiai-observe/hiai-observe)
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/HiAi-gg/hiai-observe?sort=semver)](https://github.com/HiAi-gg/hiai-observe/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Bun](https://img.shields.io/badge/Runtime-Bun_1.3-black?logo=bun&logoColor=white)](https://bun.sh)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-OTLP-425CC7?logo=opentelemetry&logoColor=white)](https://opentelemetry.io)
+[![Sentry-compatible](https://img.shields.io/badge/Sentry-SDK_compatible-FB4226?logo=sentry&logoColor=white)](https://docs.sentry.io)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Made with TypeScript](https://img.shields.io/badge/Made_with-TypeScript-blue.svg)](https://www.typescriptlang.org)
 
-**The simplest, lightest, and most developer-friendly unified observability platform for AI Agents and TypeScript backends.**
+**Lightweight all-in-one observability under MIT license** — Sentry + Uptime Kuma + Beszel + Dozzle + LLM tracing in one container, < 512 MB RAM.
 
-Replaces 5 separate services with one lightweight container. Built for indie developers and small teams who want answers to three questions:
+Built for indie developers and small teams who want answers to three questions:
 
 1. Is everything working?
 2. What broke and why?
 3. What are my agents actually doing?
+
+## Why HiAi Observe
+
+- **MIT + fully self-hosted** — your data never leaves your infrastructure, no AGPL / Polyform / SaaS lock-in
+- **Replaces 5 popular tools** — error tracking (Sentry), uptime (Uptime Kuma), infrastructure (Beszel), logs (Dozzle), and AI tracing in one container
+- **Single binary, single port** — one `docker compose up` gets you a full observability stack with zero external dependencies
+- **Sentry SDK drop-in** — existing projects can switch by changing the DSN; no code rewrite
+- **Mastra-first AI tracing** — native support for Mastra workflows, tools, agents, and token usage, plus generic OTLP for anything else
+- **Built for small VPS** — runs comfortably on < 512 MB RAM, with a dedicated small-VPS env preset in `.env.example`
+- **AI-agent friendly** — first-class MCP server, CLI, and TypeScript SDK so Claude Code / Cursor / Copilot can query your stack
+
+## Supported Protocols
+
+| Protocol | Status | Notes |
+|---|---|---|
+| **OpenTelemetry** (OTLP/HTTP) | ✅ | Traces + metrics over JSON; protobuf in `QW-OTLP-PROTO` |
+| **Sentry SDK** | ✅ | Drop-in replacement, full envelope support |
+| **OTLP Logs** | 🔜 | Ingestion endpoint planned (`PM-OTLP-LOGS`) |
+| **Mastra** | ✅ | First-class, native exporters (`@hiai-observe/mastra-exporter`) |
+| **Model Context Protocol (MCP)** | ✅ | 9 read tools for AI agents (`@hiai-observe/mcp`) |
+| **OpenAPI** | ✅ | Spec at `GET /api/openapi.json` (no auth) |
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #1: Hero / Splash              -->
+<!-- Файл:         docs/screenshots/hero.png       -->
+<!-- Что показать: Главный дашборд (светлая тема)  -->
+<!--              — error rate, uptime, containers  -->
+<!--              — AI cost panel, recent issues     -->
+<!-- Размер:       1200×675 (16:9)                 -->
+<!-- alt text:     "HiAi Observe unified dashboard showing error rate, uptime, container stats, and AI cost" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/hero.png" width="100%" alt="HiAi Observe unified dashboard" /> -->
+<!-- ============================================ -->
 
 ## Quick Start
 
@@ -27,6 +66,52 @@ curl http://localhost:8001/health
 ```
 
 Open `http://localhost:8001` — that's it.
+
+## Agentic Quickstart (AI-Powered Setup)
+
+Don't want to run commands manually? Copy-paste one of these prompts into your AI assistant and let it do the work.
+
+### OpenCode / Claude Code
+
+```
+Install HiAi Observe (https://github.com/HiAi-gg/hiai-observe) for me:
+1. Clone the repo, copy .env.example to .env
+2. Generate a secure API key with openssl rand -hex 24 and set it as HIAI_OBSERVE_API_KEY
+3. Run docker compose up -d and verify health at http://localhost:8001/health
+4. If the server has <512MB RAM, add the small VPS preset to .env:
+   LOG_MAX_LINES_PER_SEC=100
+   LOG_SAMPLE_RATE=0.1
+   LOG_MAX_BUFFER_SIZE=1000
+   LOG_BATCH_INTERVAL_MS=2000
+   LOG_MAX_CONCURRENT_INSERTS=1
+5. Integrate it into my existing project using the Mastra exporter, Sentry SDK, or OTLP — pick whichever matches my stack
+6. Open http://localhost:8001 in browser and confirm the dashboard loads
+```
+
+### Cursor (Agent Mode)
+
+```
+Set up HiAi Observe as a self-hosted observability layer:
+- Repo: https://github.com/HiAi-gg/hiai-observe
+- Steps: clone → cp .env.example .env → generate API key → docker compose up -d
+- For limited RAM servers, use the small VPS preset (LOG_MAX_LINES_PER_SEC=100, LOG_SAMPLE_RATE=0.1, etc.)
+- Connect my existing TypeScript/Node.js app using either:
+  a) @hiai-observe/mastra-exporter for Mastra projects
+  b) @sentry/node with DSN http://apikey@localhost:8001/1 for Sentry
+  c) OTLPTraceExporter pointing to http://localhost:8001/v1/traces
+- Verify: curl http://localhost:8001/health and open UI
+```
+
+### GitHub Copilot (Chat)
+
+```
+I want to add observability to my project. Install HiAi Observe locally:
+1. Clone https://github.com/HiAi-gg/hiai-observe
+2. Set up .env with a generated API key
+3. Start with docker compose up -d
+4. Add the integration to my codebase (choose based on what you see: Mastra, Sentry, or OpenTelemetry)
+5. Confirm everything works
+```
 
 ### Your API key
 
@@ -60,6 +145,57 @@ HiAi Observe bundles 5 observability modules into a single container:
 | **AI Agent Observability** | Mastra-native traces, workflow visualization, token usage, latency percentiles, cost estimation | Custom LLM tracing |
 
 Plus: unified dashboard, alert rules engine, maintenance windows, incident management, and API key auth.
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #2: Feature Showcase           -->
+<!-- Файл:         docs/screenshots/features.png    -->
+<!-- Что показать: 2-3 панели рядом (можно монтаж): -->
+<!--              — Issues list with stack traces    -->
+<!--              — Uptime monitor with response time -->
+<!--              — Log viewer with search           -->
+<!-- Размер:       1200×500 (широкая полоса)       -->
+<!-- alt text:     "HiAi Observe features: issue tracking, uptime monitoring, and log viewer" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/features.png" width="100%" alt="HiAi Observe features" /> -->
+<!-- ============================================ -->
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #6: Issue Grouping              -->
+<!-- Файл:         docs/screenshots/issues.png      -->
+<!-- Что показать: Issues list page:                  -->
+<!--              — Auto-grouped by fingerprint        -->
+<!--              — Event count, last seen, status     -->
+<!--              — Filter by status/level/project     -->
+<!--              — One-click "resolve" / "assign"     -->
+<!-- Размер:       1200×500                         -->
+<!-- alt text:     "HiAi Observe issues list with auto-grouping by fingerprint" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/issues.png" width="100%" alt="HiAi Observe issues list" /> -->
+<!-- ============================================ -->
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #7: Live Log Viewer             -->
+<!-- Файл:         docs/screenshots/logs.png         -->
+<!-- Что показать: Logs page:                          -->
+<!--              — Live WebSocket tail                 -->
+<!--              — Container filter (multi-select)     -->
+<!--              — Full-text + regex search            -->
+<!--              — Auto-refresh indicator              -->
+<!-- Размер:       1200×600                         -->
+<!-- alt text:     "HiAi Observe log viewer with live WebSocket streaming and full-text search" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/logs.png" width="100%" alt="HiAi Observe log viewer" /> -->
+<!-- ============================================ -->
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #5: Uptime Monitor              -->
+<!-- Файл:         docs/screenshots/uptime.png      -->
+<!-- Что показать: Public status page + monitor list -->
+<!--              — HTTP monitors with response time  -->
+<!--              — 30-day uptime bar                  -->
+<!--              — SSL expiry                         -->
+<!--              — Status page (JSON + HTML)         -->
+<!-- Размер:       1200×600                         -->
+<!-- alt text:     "HiAi Observe uptime monitoring with response time history and status page" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/uptime.png" width="100%" alt="HiAi Observe uptime monitoring" /> -->
+<!-- ============================================ -->
 
 ## Comparison
 
@@ -107,6 +243,19 @@ import * as Sentry from "@sentry/node";
 Sentry.init({ dsn: "http://apikey@localhost:8001/1" });
 ```
 
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #3: Error Detail               -->
+<!-- Файл:         docs/screenshots/error-detail.png -->
+<!-- Что показать: Страница ошибки:                  -->
+<!--              — Stack trace с подсветкой          -->
+<!--              — Breadcrumbs (user actions)        -->
+<!--              — Tags (browser, OS, release)       -->
+<!--              — Related issues                    -->
+<!-- Размер:       1200×700                         -->
+<!-- alt text:     "HiAi Observe error detail with stack trace, breadcrumbs, and context" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/error-detail.png" width="100%" alt="HiAi Observe error detail" /> -->
+<!-- ============================================ -->
+
 ### OpenTelemetry (Generic)
 
 ```ts
@@ -148,6 +297,19 @@ Drop the [`skills/hiai-observe`](skills/hiai-observe) skill into your agent so i
 knows *when* to consult Observe (before declaring a deploy healthy, after errors,
 to track LLM spend). For code, use the [`@hiai-observe/client`](packages/hiai-client)
 SDK or the OpenAPI spec at `GET /api/openapi.json`.
+
+<!-- ============================================ -->
+<!-- 🖼️  SCREENSHOT #4: AI Agent Tracing           -->
+<!-- Файл:         docs/screenshots/ai-tracing.png  -->
+<!-- Что показать: Трейс AI-агента:                 -->
+<!--              — Workflow steps (дерево)          -->
+<!--              — Token usage per step             -->
+<!--              — Latency breakdown                -->
+<!--              — Tool calls (если есть)           -->
+<!-- Размер:       1200×700                         -->
+<!-- alt text:     "HiAi Observe AI agent trace showing workflow steps and token usage" -->
+<!-- Вставь сюда:  <img src="docs/screenshots/ai-tracing.png" width="100%" alt="HiAi Observe AI agent tracing" /> -->
+<!-- ============================================ -->
 
 ## API Endpoints
 
@@ -301,9 +463,43 @@ HiAi Observe is the official observability layer for:
 
 For production setup with TLS, security hardening, and operational best practices, see [docs/production.md](docs/production.md).
 
+## Changelog
+
+### v0.1.6 — Log Worker Hardening & 401 Fix
+
+**Fixed:**
+- **401 Unauthorized** on container detail page — frontend now uses `apiKey` store consistently instead of raw `localStorage.getItem`
+- **Memory exhaustion** in log worker — added 5 defensive layers:
+  1. **Container filtering** — `LOG_INCLUDE_CONTAINERS` / `LOG_EXCLUDE_CONTAINERS` to skip noisy containers
+  2. **Token bucket rate limiting** — `LOG_MAX_LINES_PER_SEC` per container (default 1000/sec)
+  3. **Concurrent insert semaphore** — `LOG_MAX_CONCURRENT_INSERTS` prevents DB overload (default 3)
+  4. **Log sampling** — `LOG_SAMPLE_RATE` keeps only a fraction of logs (default 100%)
+  5. **Backpressure** — `LOG_MAX_BUFFER_SIZE` pauses Docker stream when buffer is full
+
+**Added:**
+- `docs/configuration.md` — complete environment variable reference
+- Unit tests for token bucket rate limiter
+- Small VPS tuning presets in `.env.example`
+
+**Migration:**
+For small VPS (<512MB RAM), add these to `.env`:
+```bash
+LOG_MAX_LINES_PER_SEC=100
+LOG_SAMPLE_RATE=0.1
+LOG_MAX_BUFFER_SIZE=1000
+LOG_BATCH_INTERVAL_MS=2000
+LOG_MAX_CONCURRENT_INSERTS=1
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code guidelines, and pull request process.
+
+## Star History
+
+If HiAi Observe saves you from a 3am pager, a ⭐ goes a long way.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=HiAi-gg/hiai-observe&type=Date)](https://star-history.com/#HiAi-gg/hiai-observe&Date)
 
 ## License
 

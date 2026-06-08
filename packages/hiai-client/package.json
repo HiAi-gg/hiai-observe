@@ -14,7 +14,12 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "license": "MIT",
   "keywords": ["hiai", "observe", "observability", "monitoring", "sdk", "client"],

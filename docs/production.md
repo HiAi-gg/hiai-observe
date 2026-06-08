@@ -261,6 +261,27 @@ The production compose sets memory limits:
 
 Adjust based on your traffic. For high-volume ingestion, increase the app limit to 1GB.
 
+### Log Streaming Limits (Critical for Small VPS)
+
+If your VPS has <512MB RAM or you run many containers, add these aggressive limits to `.env`:
+
+```bash
+# Per-container: max 100 lines/sec (default 1000)
+LOG_MAX_LINES_PER_SEC=100
+# Keep only 10% of logs (default 100%)
+LOG_SAMPLE_RATE=0.1
+# Small buffer before backpressure (default 10000)
+LOG_MAX_BUFFER_SIZE=1000
+# Flush every 2 seconds instead of 500ms
+LOG_BATCH_INTERVAL_MS=2000
+# Only 1 concurrent DB insert (default 3)
+LOG_MAX_CONCURRENT_INSERTS=1
+# Exclude noisy containers entirely
+LOG_EXCLUDE_CONTAINERS=postgres,redis,mongo,outline
+```
+
+These settings reduce log worker memory usage by ~500x compared to defaults. The rate limiter and backpressure prevent runaway memory growth even during log storms.
+
 ## 10. Updating
 
 ```bash

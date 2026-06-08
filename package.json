@@ -1,6 +1,6 @@
 {
   "name": "hiai-observe",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "workspaces": [
     "packages/hiai-sdk",

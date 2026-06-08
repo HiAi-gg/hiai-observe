@@ -2,6 +2,8 @@
   import { page } from "$app/state";
   import TimeSeriesChart from "$lib/components/TimeSeriesChart.svelte";
   import { formatBytes } from "$lib/utils";
+  import { apiKey } from "$lib/stores.svelte";
+  import { getContainerDetail } from "$lib/api";
 
   let container = $state<{ name: string; image: string; status: string } | null>(null);
   let cpuData = $state<Array<{ time: Date; value: number }>>([]);
@@ -35,19 +37,9 @@
       loading = true;
       error = null;
       const id = page.params.id;
-      const apiKey = localStorage.getItem("hiai-observe-api-key") ?? "";
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`/api/infrastructure/containers/${id}?from=${from}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-
-      if (!res.ok) {
-        error = `Failed to load container data (${res.status})`;
-        return;
-      }
-
-      const data = await res.json() as { data: ContainerHistoryRow[] };
+      const data = await getContainerDetail(id, { from });
       if ((data.data ?? []).length === 0) {
         error = "No data found for this container";
         return;

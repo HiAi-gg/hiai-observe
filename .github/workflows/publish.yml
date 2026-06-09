@@ -31,7 +31,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd packages/hiai-observe
-          bun publish --access public --provenance --no-git-checks --token "$NODE_AUTH_TOKEN" || {
+          bun publish --access public --no-git-checks || {
             echo "::warning::Publish failed — likely already published at this version"
           }
 

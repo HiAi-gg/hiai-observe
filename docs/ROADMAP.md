@@ -45,7 +45,7 @@ living document — open an issue to propose or reprioritize items.
 - [ ] Create the `hiai-gg` npm org + enable 2FA
 - [ ] Generate `NPM_TOKEN` and add as a GitHub Actions secret
 - [ ] First publish: `cd packages/hiai-observe && bun publish --access public` (then automated by `publish.yml` on `v*` tags)
-- [x] Excluded from publish (internal only): `@hiai-observe/sdk`, `@hiai-observe/agent` (private)
+- [x] Excluded from publish (internal only): `@hiai-observe/agent` (private)
 - [x] CI workflow: `.github/workflows/publish.yml` triggered on `v*` tag push (now publishes the single package)
 
 ### 🟡 Important

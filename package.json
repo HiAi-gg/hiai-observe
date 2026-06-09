@@ -4,7 +4,6 @@
   "type": "module",
   "workspaces": [
     "packages/hiai-observe",
-    "packages/hiai-sdk",
     "packages/hiai-agent"
   ],
   "scripts": {

@@ -18,9 +18,13 @@
   },
   "bin": {
     "hiai-observe": "./dist/cli.js",
-    "hiai-observe-mcp": "./dist/mcp.js"
+    "hiai-observe-mcp": "./dist/mcp.js",
+    "hiai-observe-agent": "./dist/agent.js"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "bun run build",
@@ -35,9 +39,20 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "@types/bun": "^1.2.10"
   },
-  "keywords": ["hiai", "observe", "observability", "monitoring", "cli", "mcp", "sdk", "mastra", "ai-agents"],
+  "keywords": [
+    "hiai",
+    "observe",
+    "observability",
+    "monitoring",
+    "cli",
+    "mcp",
+    "sdk",
+    "mastra",
+    "ai-agents"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true

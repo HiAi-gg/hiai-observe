@@ -77,6 +77,24 @@ const mastra = new Mastra({
 });
 ```
 
+## 5. Host metrics agent — `hiai-observe-agent` (Bun only)
+
+A lightweight collector that reports host CPU/memory/uptime to a central Observe
+instance for multi-host monitoring. It reads `/proc` via Bun APIs, so it
+**requires the Bun runtime** — on Node it exits with a clear message.
+
+```bash
+HIAI_OBSERVE_URL=http://observe-host:8001 API_KEY=ho_your_key \
+  bunx -p @hiai-gg/hiai-observe hiai-observe-agent
+```
+
+Future improvements (disk/network/per-container/temperature/GPU from remote
+hosts) are tracked in the project [ROADMAP](https://github.com/HiAi-gg/hiai-observe/blob/master/docs/ROADMAP.md) (`PM-INF-1`).
+
+> **Runtime support:** the SDK, CLI (`hiai-observe`), and MCP server
+> (`hiai-observe-mcp`) run on **Node ≥ 18 and Bun**. The agent
+> (`hiai-observe-agent`) is **Bun-only**.
+
 ## License
 
 MIT

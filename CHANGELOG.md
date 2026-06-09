@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Consolidated the npm packages into one `@hiai-gg/hiai-observe`** (published under the `@hiai-gg` org, matching `@hiai-gg/hiai-opencode`). The former `@hiai-observe/{client,mastra-exporter,mcp,cli}` are now a single package with two bins (`hiai-observe` CLI, `hiai-observe-mcp` MCP server) and library exports (`.` → client SDK, `./mastra` → Mastra exporter).
-- **Node-compatible build** — the package now compiles to JS with `.d.ts`, so it runs on Node ≥ 18 (`npx`) as well as Bun, and the SDK/exporter are importable by any TS/JS project.
-- `@hiai-observe/{sdk,agent}` remain private/internal (the agent uses Bun-only APIs).
+- **Node-compatible build** — the package compiles to JS with `.d.ts`, so the SDK, CLI (`hiai-observe`), and MCP server (`hiai-observe-mcp`) run on Node ≥ 18 (`npx`) and Bun, and the SDK/exporter import cleanly into any TS/JS project.
+- **Host metrics agent included** as a third bin `hiai-observe-agent` — Bun-only (reads `/proc` via Bun APIs); on Node it exits with a clear "requires Bun" message. Future agent work is tracked in the ROADMAP (`PM-INF-1`).
+- Removed the redundant `@hiai-observe/sdk` (superseded by the bundled client SDK).
 - Aligned all versions to 0.1.7; updated README, skill, and the publish workflow for the single package.
 
 ## [0.1.6] - 2026-06-08

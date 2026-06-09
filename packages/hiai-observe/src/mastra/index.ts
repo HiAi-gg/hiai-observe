@@ -1,5 +1,5 @@
 /**
- * @hiai-observe/mastra-exporter
+ * @hiai-gg/hiai-observe/mastra
  *
  * Mastra-compatible observability exporter that sends traces to HiAi Observe
  * via the OTLP HTTP JSON protocol.
@@ -115,7 +115,7 @@ export class HiaiObserveExporter {
           },
           scopeSpans: [
             {
-              scope: { name: "@hiai-observe/mastra-exporter", version: "0.1.0" },
+              scope: { name: "@hiai-gg/hiai-observe", version: "0.1.7" },
               spans: otlpSpans,
             },
           ],

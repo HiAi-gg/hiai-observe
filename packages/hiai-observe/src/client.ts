@@ -1,5 +1,5 @@
 /**
- * @hiai-observe/client — TypeScript client SDK for HiAi Observe API.
+ * @hiai-gg/hiai-observe — TypeScript client SDK for HiAi Observe API.
  *
  * Provides typed access to all major resources: issues, monitors, alerts,
  * traces, logs, releases, team, dashboard, comments, maintenance, incidents,
@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { HiaiClient } from "@hiai-observe/client";
+ * import { HiaiClient } from "@hiai-gg/hiai-observe";
  *
  * const client = new HiaiClient({
  *   baseUrl: "http://localhost:8001",

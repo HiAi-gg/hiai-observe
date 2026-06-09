@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 /**
- * @hiai-observe/agent — lightweight host metrics collector for HiAi Observe.
+ * @hiai-gg/hiai-observe (hiai-observe-agent) — lightweight host metrics collector for HiAi Observe.
  *
  * Reads CPU/memory/uptime from the local host via Bun.memoryUsage(),
  * process.uptime(), and /proc on Linux, then POSTs a snapshot to
@@ -223,9 +224,17 @@ async function main(): Promise<void> {
   if (typeof handle.unref === "function") handle.unref();
 }
 
-if (import.meta.main) {
-  main().catch((err) => {
-    log("error", "fatal", { error: err instanceof Error ? err.message : String(err) });
-    process.exit(1);
-  });
+// This collector reads host metrics via Bun APIs (Bun.file, Bun.spawnSync).
+// On Node it can't run — fail with a clear message instead of a cryptic crash.
+if (typeof Bun === "undefined") {
+  console.error(
+    "hiai-observe-agent requires the Bun runtime (it reads host metrics via Bun APIs).\n" +
+    "Install Bun (https://bun.sh), then: bunx -p @hiai-gg/hiai-observe hiai-observe-agent",
+  );
+  process.exit(1);
 }
+
+main().catch((err) => {
+  log("error", "fatal", { error: err instanceof Error ? err.message : String(err) });
+  process.exit(1);
+});

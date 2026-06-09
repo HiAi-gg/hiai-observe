@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @hiai-observe/mcp — Model Context Protocol server for HiAi Observe.
+ * @hiai-gg/hiai-observe — Model Context Protocol server for HiAi Observe.
  *
  * Exposes the read-oriented Observe API as MCP tools so AI agents can ask
  * "what's broken / how much am I spending / is everything up" directly.
@@ -9,7 +9,7 @@
  *   HIAI_OBSERVE_URL      base URL (default http://localhost:8001)
  *   HIAI_OBSERVE_API_KEY  Bearer API key (required)
  *
- * Run: HIAI_OBSERVE_API_KEY=ho_... bunx @hiai-observe/mcp
+ * Run: HIAI_OBSERVE_API_KEY=ho_... bunx -p @hiai-gg/hiai-observe hiai-observe-mcp
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

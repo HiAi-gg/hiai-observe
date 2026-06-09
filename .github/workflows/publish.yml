@@ -26,10 +26,6 @@ jobs:
       - name: Build package
         run: cd packages/hiai-observe && bun run build
 
-      - name: Pack package
-        working-directory: packages/hiai-observe
-        run: bun pm pack
-
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

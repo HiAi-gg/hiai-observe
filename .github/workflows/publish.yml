@@ -23,6 +23,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Configure npm auth
+        working-directory: packages/hiai-observe
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+
       - name: Build package
         run: cd packages/hiai-observe && bun run build
 
@@ -44,3 +51,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up .npmrc
+        if: always()
+        run: rm -f packages/hiai-observe/.npmrc

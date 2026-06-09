@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 const BASE_URL = (process.env.HIAI_OBSERVE_URL ?? "http://localhost:8001").replace(/\/$/, "");
 const API_KEY = process.env.HIAI_OBSERVE_API_KEY;
 

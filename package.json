@@ -1,14 +1,11 @@
 {
   "name": "hiai-observe",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "workspaces": [
+    "packages/hiai-observe",
     "packages/hiai-sdk",
-    "packages/hiai-agent",
-    "packages/hiai-client",
-    "packages/mastra-exporter",
-    "packages/hiai-mcp",
-    "packages/hiai-cli"
+    "packages/hiai-agent"
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",

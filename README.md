@@ -37,8 +37,8 @@ Built for indie developers and small teams who want answers to three questions:
 | **OpenTelemetry** (OTLP/HTTP) | ✅ | Traces + metrics over JSON; protobuf in `QW-OTLP-PROTO` |
 | **Sentry SDK** | ✅ | Drop-in replacement, full envelope support |
 | **OTLP Logs** | 🔜 | Ingestion endpoint planned (`PM-OTLP-LOGS`) |
-| **Mastra** | ✅ | First-class, native exporters (`@hiai-observe/mastra-exporter`) |
-| **Model Context Protocol (MCP)** | ✅ | 9 read tools for AI agents (`@hiai-observe/mcp`) |
+| **Mastra** | ✅ | First-class, native exporters (`@hiai-gg/hiai-observe/mastra`) |
+| **Model Context Protocol (MCP)** | ✅ | 9 read tools for AI agents (`@hiai-gg/hiai-observe`) |
 | **OpenAPI** | ✅ | Spec at `GET /api/openapi.json` (no auth) |
 
 <!-- ============================================ -->
@@ -96,7 +96,7 @@ Set up HiAi Observe as a self-hosted observability layer:
 - Steps: clone → cp .env.example .env → generate API key → docker compose up -d
 - For limited RAM servers, use the small VPS preset (LOG_MAX_LINES_PER_SEC=100, LOG_SAMPLE_RATE=0.1, etc.)
 - Connect my existing TypeScript/Node.js app using either:
-  a) @hiai-observe/mastra-exporter for Mastra projects
+  a) @hiai-gg/hiai-observe/mastra for Mastra projects
   b) @sentry/node with DSN http://apikey@localhost:8001/1 for Sentry
   c) OTLPTraceExporter pointing to http://localhost:8001/v1/traces
 - Verify: curl http://localhost:8001/health and open UI
@@ -224,7 +224,7 @@ Plus: unified dashboard, alert rules engine, maintenance windows, incident manag
 ### Mastra (First-Class)
 
 ```ts
-import { HiaiObserveExporter } from "@hiai-observe/mastra-exporter";
+import { HiaiObserveExporter } from "@hiai-gg/hiai-observe/mastra";
 
 const mastra = new Mastra({
   observability: {
@@ -268,7 +268,7 @@ const exporter = new OTLPTraceExporter({
 
 ### AI Agents (MCP)
 
-Agents query Observe more than humans do. The [`@hiai-observe/mcp`](packages/hiai-mcp)
+Agents query Observe more than humans do. The [`@hiai-gg/hiai-observe`](packages/hiai-observe)
 [Model Context Protocol](https://modelcontextprotocol.io) server exposes the
 read API as tools (`observe_dashboard`, `observe_ai_cost`, `observe_list_issues`,
 `observe_uptime`, …) for Claude Code, Claude Desktop, or any MCP client:
@@ -277,25 +277,25 @@ read API as tools (`observe_dashboard`, `observe_ai_cost`, `observe_list_issues`
 {
   "mcpServers": {
     "hiai-observe": {
-      "command": "bunx",
-      "args": ["@hiai-observe/mcp"],
+      "command": "npx",
+      "args": ["-y", "-p", "@hiai-gg/hiai-observe", "hiai-observe-mcp"],
       "env": { "HIAI_OBSERVE_URL": "http://localhost:8001", "HIAI_OBSERVE_API_KEY": "ho_your_key" }
     }
   }
 }
 ```
 
-Shell / Bash-tool agents can use the [`@hiai-observe/cli`](packages/hiai-cli)
+Shell / Bash-tool agents can use the [`@hiai-gg/hiai-observe`](packages/hiai-observe)
 instead — same data, no MCP setup:
 
 ```bash
-HIAI_OBSERVE_API_KEY=ho_your_key bunx @hiai-observe/cli dashboard
+HIAI_OBSERVE_API_KEY=ho_your_key npx @hiai-gg/hiai-observe dashboard
 hiai-observe ai-cost --group-by model --json
 ```
 
 Drop the [`skills/hiai-observe`](skills/hiai-observe) skill into your agent so it
 knows *when* to consult Observe (before declaring a deploy healthy, after errors,
-to track LLM spend). For code, use the [`@hiai-observe/client`](packages/hiai-client)
+to track LLM spend). For code, use the [`@hiai-gg/hiai-observe`](packages/hiai-observe)
 SDK or the OpenAPI spec at `GET /api/openapi.json`.
 
 <!-- ============================================ -->
@@ -408,7 +408,7 @@ hiai-observe/
 │       └── components/ (4 files)   # StatusBadge, MetricCard, DataTable, LiveIndicator
 ├── tests/ (23 files, 216 tests)    # Unit + integration tests
 ├── scripts/ (3 files)              # Seed, reset, API key generator
-├── packages/mastra-exporter/       # @hiai-observe/mastra-exporter npm package
+├── packages/hiai-observe/         # @hiai-gg/hiai-observe (SDK + CLI + MCP + Mastra)
 ├── docs/ (3 files)                 # API reference, integration guide, architecture
 ├── Dockerfile                      # Multi-stage production build
 ├── docker-compose.yml              # Development compose

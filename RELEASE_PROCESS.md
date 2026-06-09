@@ -60,13 +60,9 @@ Required secrets (set in repo Settings → Secrets and variables → Actions):
 
 ### npm
 
-- [ ] Confirm the 4 packages appear on <https://www.npmjs.com/search?q=%40hiai-observe>:
-  - `@hiai-observe/client`
-  - `@hiai-observe/mastra-exporter`
-  - `@hiai-observe/mcp`
-  - `@hiai-observe/cli`
-- [ ] Verify each package's README renders correctly on npmjs.com
-- [ ] Confirm 2FA is enabled on the npm org
+- [ ] Confirm `@hiai-gg/hiai-observe` appears at <https://www.npmjs.com/package/@hiai-gg/hiai-observe> (single package: SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP + `./mastra` exporter)
+- [ ] Verify the package README renders correctly on npmjs.com
+- [ ] Confirm 2FA is enabled on the `hiai-gg` npm org
 
 ### Documentation & community
 

@@ -41,13 +41,12 @@ living document — open an issue to propose or reprioritize items.
 | **QW-PUBLISH** | Publish 4 SDK packages to npm | 3-4h | Blocks ecosystem adoption | QW-V06 |
 
 **`npm publish` checklist (QW-PUBLISH):**
-- [x] All 4 package.json have `"publishConfig": {"access": "public", "provenance": true}` (hiai-client ✅, mastra-exporter needs verification, mcp + cli use `bunx` so OK as-is)
-- [x] `hiai-client` has `"prepublishOnly": "bun run build"` with working `tsc` build (verified: `dist/index.js` + `dist/index.d.ts` produced)
-- [ ] Generate `NPM_TOKEN` (GitHub Actions secret) — CI publish on tag push
-- [ ] Enable 2FA on npm org `@hiai-observe`
-- [ ] First publish: `bun publish --access public` from each package dir (manual, then automate)
-- [ ] Excluded from publish (internal only): `@hiai-observe/sdk`, `@hiai-observe/agent`
-- [ ] CI workflow: `.github/workflows/publish.yml` triggered on `v*` tag push
+- [x] Consolidated into a single `@hiai-gg/hiai-observe` package (SDK + CLI + MCP + Mastra exporter), node-compatible build (`dist/` JS + `.d.ts`), `publishConfig {access: public, provenance}`, `prepublishOnly` build verified
+- [ ] Create the `hiai-gg` npm org + enable 2FA
+- [ ] Generate `NPM_TOKEN` and add as a GitHub Actions secret
+- [ ] First publish: `cd packages/hiai-observe && bun publish --access public` (then automated by `publish.yml` on `v*` tags)
+- [x] Excluded from publish (internal only): `@hiai-observe/sdk`, `@hiai-observe/agent` (private)
+- [x] CI workflow: `.github/workflows/publish.yml` triggered on `v*` tag push (now publishes the single package)
 
 ### 🟡 Important
 
@@ -151,8 +150,8 @@ living document — open an issue to propose or reprioritize items.
 - SVG badges (`GET /api/badges/:slug/status`, `…/uptime/:slug/:id`)
 - Public HTML status pages (`GET /status/:slug`)
 - REST API for any external dashboard
-- CLI (`@hiai-observe/cli`) for shell-based access
-- MCP server (`@hiai-observe/mcp`) for AI agent access
+- CLI (`hiai-observe` bin in `@hiai-gg/hiai-observe`) for shell-based access
+- MCP server (`hiai-observe-mcp` bin) for AI agent access
 
 **Missing for true embedded mode:**
 - iframe widgets

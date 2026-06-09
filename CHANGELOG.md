@@ -5,6 +5,14 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-06-09
+
+### Changed
+- **Consolidated the npm packages into one `@hiai-gg/hiai-observe`** (published under the `@hiai-gg` org, matching `@hiai-gg/hiai-opencode`). The former `@hiai-observe/{client,mastra-exporter,mcp,cli}` are now a single package with two bins (`hiai-observe` CLI, `hiai-observe-mcp` MCP server) and library exports (`.` → client SDK, `./mastra` → Mastra exporter).
+- **Node-compatible build** — the package now compiles to JS with `.d.ts`, so it runs on Node ≥ 18 (`npx`) as well as Bun, and the SDK/exporter are importable by any TS/JS project.
+- `@hiai-observe/{sdk,agent}` remain private/internal (the agent uses Bun-only APIs).
+- Aligned all versions to 0.1.7; updated README, skill, and the publish workflow for the single package.
+
 ## [0.1.6] - 2026-06-08
 
 ### Fixed

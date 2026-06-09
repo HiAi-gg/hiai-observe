@@ -23,26 +23,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build all packages
-        run: |
-          for pkg in packages/hiai-client packages/mastra-exporter; do
-            echo "Building $pkg..."
-            (cd "$pkg" && bun run build) || true
-          done
+      - name: Build package
+        run: cd packages/hiai-observe && bun run build
 
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          set -e
-          for pkg in packages/hiai-client packages/mastra-exporter packages/hiai-mcp packages/hiai-cli; do
-            if [ -f "$pkg/package.json" ]; then
-              echo "Publishing $pkg..."
-              (cd "$pkg" && bun publish --access public --provenance --no-git-checks) || {
-                echo "::warning::Failed to publish $pkg - likely already published or missing scope"
-              }
-            fi
-          done
+          cd packages/hiai-observe
+          bun publish --access public --provenance --no-git-checks || {
+            echo "::warning::Publish failed — likely already published at this version"
+          }
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/v')

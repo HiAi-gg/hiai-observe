@@ -66,7 +66,7 @@ async function seed() {
 
   // ── Events (30) ──────────────────────────────────────────────────────────
   const exTypes = ["TypeError", "NetworkError", "RangeError", "SyntaxError", "Error"];
-  const sdkVersions = ["@sentry/node@8.5.0", "@sentry/browser@8.5.0", "@hiai-observe/mastra@0.1.0"];
+  const sdkVersions = ["@sentry/node@8.5.0", "@sentry/browser@8.5.0", "@hiai-gg/hiai-observe@0.1.6"];
 
   for (let i = 0; i < 30; i++) {
     const idx = i % iids.length;

@@ -1,0 +1,45 @@
+{
+  "name": "@hiai-gg/hiai-observe",
+  "version": "0.1.7",
+  "description": "HiAi Observe — client SDK, CLI, MCP server, and Mastra exporter for the HiAi Observe observability platform.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mastra": {
+      "types": "./dist/mastra/index.d.ts",
+      "import": "./dist/mastra/index.js"
+    }
+  },
+  "bin": {
+    "hiai-observe": "./dist/cli.js",
+    "hiai-observe-mcp": "./dist/mcp.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3"
+  },
+  "keywords": ["hiai", "observe", "observability", "monitoring", "cli", "mcp", "sdk", "mastra", "ai-agents"],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

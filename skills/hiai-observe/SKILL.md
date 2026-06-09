@@ -36,8 +36,8 @@ Config (`.mcp.json` / `claude_desktop_config.json`):
 {
   "mcpServers": {
     "hiai-observe": {
-      "command": "bunx",
-      "args": ["@hiai-observe/mcp"],
+      "command": "npx",
+      "args": ["-y", "-p", "@hiai-gg/hiai-observe", "hiai-observe-mcp"],
       "env": { "HIAI_OBSERVE_URL": "http://localhost:8001", "HIAI_OBSERVE_API_KEY": "ho_your_key" }
     }
   }
@@ -63,7 +63,7 @@ hiai-observe alerts
 
 Add `--json` to any command for machine-readable output you can parse.
 
-Install: `bunx @hiai-observe/cli <command>` (or `bun add -g @hiai-observe/cli`).
+Install: `npx @hiai-gg/hiai-observe <command>` (or `npm i -g @hiai-gg/hiai-observe`).
 
 ## How to interpret results
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * @hiai-observe/mcp — Model Context Protocol server for HiAi Observe.
  *

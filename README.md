@@ -408,7 +408,7 @@ hiai-observe/
 │       └── components/ (4 files)   # StatusBadge, MetricCard, DataTable, LiveIndicator
 ├── tests/ (23 files, 216 tests)    # Unit + integration tests
 ├── scripts/ (3 files)              # Seed, reset, API key generator
-├── packages/hiai-observe/         # @hiai-gg/hiai-observe (SDK + CLI + MCP + Mastra)
+├── packages/hiai-observe/         # @hiai-gg/hiai-observe (SDK + CLI + MCP + agent + Mastra)
 ├── docs/ (3 files)                 # API reference, integration guide, architecture
 ├── Dockerfile                      # Multi-stage production build
 ├── docker-compose.yml              # Development compose
@@ -455,8 +455,8 @@ work. Highlights:
 ## Ecosystem
 
 HiAi Observe is the official observability layer for:
-- **HiAiKit** — default observability in new projects
-- **HiAi OS** — built-in monitoring module
+- **HiAi-Kit** — default observability in new projects
+- **HiAi-Dashboard** — built-in monitoring module
 - Works standalone in any Bun/Elysia/Mastra/TypeScript project
 
 ## Production Deployment
@@ -465,31 +465,12 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-### v0.1.6 — Log Worker Hardening & 401 Fix
+Current: **v0.1.7** — the npm packages are consolidated into a single
+[`@hiai-gg/hiai-observe`](packages/hiai-observe) (client SDK + `hiai-observe` CLI
++ `hiai-observe-mcp` MCP server + `hiai-observe-agent`), with a Node-compatible
+build.
 
-**Fixed:**
-- **401 Unauthorized** on container detail page — frontend now uses `apiKey` store consistently instead of raw `localStorage.getItem`
-- **Memory exhaustion** in log worker — added 5 defensive layers:
-  1. **Container filtering** — `LOG_INCLUDE_CONTAINERS` / `LOG_EXCLUDE_CONTAINERS` to skip noisy containers
-  2. **Token bucket rate limiting** — `LOG_MAX_LINES_PER_SEC` per container (default 1000/sec)
-  3. **Concurrent insert semaphore** — `LOG_MAX_CONCURRENT_INSERTS` prevents DB overload (default 3)
-  4. **Log sampling** — `LOG_SAMPLE_RATE` keeps only a fraction of logs (default 100%)
-  5. **Backpressure** — `LOG_MAX_BUFFER_SIZE` pauses Docker stream when buffer is full
-
-**Added:**
-- `docs/configuration.md` — complete environment variable reference
-- Unit tests for token bucket rate limiter
-- Small VPS tuning presets in `.env.example`
-
-**Migration:**
-For small VPS (<512MB RAM), add these to `.env`:
-```bash
-LOG_MAX_LINES_PER_SEC=100
-LOG_SAMPLE_RATE=0.1
-LOG_MAX_BUFFER_SIZE=1000
-LOG_BATCH_INTERVAL_MS=2000
-LOG_MAX_CONCURRENT_INSERTS=1
-```
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 ## Contributing
 

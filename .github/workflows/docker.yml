@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: hiai-observe/hiai-observe
+  IMAGE_NAME: vgalibov/hiai-observe
 
 jobs:
   docker:

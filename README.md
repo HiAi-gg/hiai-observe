@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/HiAi-gg/hiai-observe)](https://github.com/HiAi-gg/hiai-observe/stargazers)
-[![Docker Pulls](https://img.shields.io/docker/pulls/hiai-observe/hiai-observe)](https://hub.docker.com/r/hiai-observe/hiai-observe)
+[![Docker Pulls](https://img.shields.io/docker/pulls/vgalibov/hiai-observe)](https://hub.docker.com/r/vgalibov/hiai-observe)
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/HiAi-gg/hiai-observe?sort=semver)](https://github.com/HiAi-gg/hiai-observe/releases)
 [![Bun](https://img.shields.io/badge/Runtime-Bun_1.3-black?logo=bun&logoColor=white)](https://bun.sh)

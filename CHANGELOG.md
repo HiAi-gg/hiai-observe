@@ -5,6 +5,15 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-06-09
+
+### Added
+- Deployment pipelines wired up: npm publish of `@hiai-gg/hiai-observe`, multi-arch Docker images to `vgalibov/hiai-observe`, and CI — all green.
+
+### Fixed
+- npm publish step no longer masks real errors (only skips when the exact version already exists).
+- Docker image name corrected to `vgalibov/hiai-observe`; README Docker Pulls badge updated.
+
 ## [0.1.7] - 2026-06-09
 
 ### Changed

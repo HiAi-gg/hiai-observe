@@ -5,6 +5,11 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-06-10
+
+### Infrastructure
+- **npm publish switched to OIDC trusted publishing** (tokenless) in `publish.yml` — fixes the account-2FA `EOTP` failures that forced the manual, unsigned 0.1.8 publish. This release is published automatically from CI **with sigstore provenance**. node 22 + `npm@latest` (OIDC needs npm ≥ 11.5.1); the `NPM_TOKEN` secret is no longer used.
+
 ## [0.1.8] - 2026-06-09
 
 ### Added

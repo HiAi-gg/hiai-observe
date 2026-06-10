@@ -154,7 +154,7 @@ Plus: unified dashboard, alert rules engine, maintenance windows, incident manag
 
 <img width="2539" height="1900" alt="Screenshot 2026-06-07 221755" src="https://github.com/user-attachments/assets/aa4f0596-f210-4688-8a56-0c6506374dfc" />
 
-<img width="2522" height="1919" alt="Screenshot 2026-06-07 221501" src="https://github.com/user-attachments/assets/60b08d26-e34e-4e68-9fdf-1febe1b24791" />
+<img width="2522" height="1919" alt="Screenshot 2026-06-07 221501" src="https://github.com/user-attachments/assets/30c2dd4c-5419-495e-a44e-335038691e56" />
 
 <img width="2530" height="1914" alt="Screenshot 2026-06-07 221528" src="https://github.com/user-attachments/assets/94f5e7df-2976-4637-a216-a31c77b0d51d" />
 

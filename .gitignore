@@ -48,3 +48,7 @@ coverage/
 # Local screenshots / scratch artifacts
 screenshot-*.png
 /*.png
+
+# Bob agent state (local only)
+.bob/
+.opencode/

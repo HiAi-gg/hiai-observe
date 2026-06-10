@@ -2,6 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/HiAi-gg/hiai-observe)](https://github.com/HiAi-gg/hiai-observe/stargazers)
+[![npm](https://img.shields.io/npm/v/@hiai-gg/hiai-observe?logo=npm)](https://www.npmjs.com/package/@hiai-gg/hiai-observe)
 [![Docker Pulls](https://img.shields.io/docker/pulls/vgalibov/hiai-observe)](https://hub.docker.com/r/vgalibov/hiai-observe)
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/HiAi-gg/hiai-observe?sort=semver)](https://github.com/HiAi-gg/hiai-observe/releases)
@@ -12,9 +13,11 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Made with TypeScript](https://img.shields.io/badge/Made_with-TypeScript-blue.svg)](https://www.typescriptlang.org)
 
-**Lightweight all-in-one observability under MIT license** — Sentry + Uptime Kuma + Beszel + Dozzle + LLM tracing in one container, < 512 MB RAM.
+**Lightweight, fast, all-in-one observability under MIT license** — Sentry + Uptime Kuma + Beszel + Dozzle + LLM tracing in one container, < 512 MB RAM.
 
-Built for indie developers and small teams who want answers to three questions:
+**AI-native out of the box:** a built-in MCP server, CLI, agent skill, and TypeScript SDK ship in the same package, so any AI system (Claude Code, Cursor, Copilot, Mastra) can query, use, and integrate it immediately — no glue code.
+
+Built for indie developers, small teams, and AI agents who want answers to three questions:
 
 1. Is everything working?
 2. What broke and why?
@@ -28,7 +31,7 @@ Built for indie developers and small teams who want answers to three questions:
 - **Sentry SDK drop-in** — existing projects can switch by changing the DSN; no code rewrite
 - **Mastra-first AI tracing** — native support for Mastra workflows, tools, agents, and token usage, plus generic OTLP for anything else
 - **Built for small VPS** — runs comfortably on < 512 MB RAM, with a dedicated small-VPS env preset in `.env.example`
-- **AI-agent friendly** — first-class MCP server, CLI, and TypeScript SDK so Claude Code / Cursor / Copilot can query your stack
+- **AI-native, batteries included** — built-in MCP server, CLI, agent skill, and TypeScript SDK in one package, so any AI system (Claude Code / Cursor / Copilot / Mastra) can query, use, and integrate it out of the box
 
 ## Supported Protocols
 
@@ -317,7 +320,7 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 |---|---|---|
 | Health | GET `/health`, GET `/metrics` | Public |
 | Sentry Ingestion | POST `/api/:projectId/store`, `/api/:projectId/envelope` | API Key |
-| Agent Ingestion | POST `/api/agent/:projectId/ingest` | API Key |
+| Agent Ingestion | POST `/api/agent/ingest` | API Key |
 | OTLP | POST `/v1/traces`, POST `/v1/metrics` | API Key |
 | Issues | GET `/api/issues`, GET `/api/issues/:id`, PATCH `/api/issues/:id`, POST `/api/issues/:id/merge`, DELETE `/api/issues/:id` | API Key |
 | Events | GET `/api/events`, GET `/api/events/:id` | API Key |
@@ -465,10 +468,11 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-Current: **v0.1.7** — the npm packages are consolidated into a single
-[`@hiai-gg/hiai-observe`](packages/hiai-observe) (client SDK + `hiai-observe` CLI
-+ `hiai-observe-mcp` MCP server + `hiai-observe-agent`), with a Node-compatible
-build.
+Current: **v0.1.8** — first public release on all three channels:
+[`@hiai-gg/hiai-observe`](https://www.npmjs.com/package/@hiai-gg/hiai-observe) on
+npm (SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP server + `hiai-observe-agent`),
+multi-arch Docker images at [`vgalibov/hiai-observe`](https://hub.docker.com/r/vgalibov/hiai-observe),
+and tagged GitHub releases.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
 

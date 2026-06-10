@@ -37,16 +37,17 @@ living document — open an issue to propose or reprioritize items.
 
 | ID | Task | Est. | Why | Depends On |
 |---|---|---|---|---|
-| **QW-V06** | Cut v0.1.6 release (version bump + CHANGELOG + git tag) | 15min | Prerequisite for npm publish | — |
-| **QW-PUBLISH** | Publish 4 SDK packages to npm | 3-4h | Blocks ecosystem adoption | QW-V06 |
+| **QW-V06** | Cut v0.1.6 release (version bump + CHANGELOG + git tag) | 15min | Prerequisite for npm publish | ~~—~~ ✅ |
+| **QW-PUBLISH** | Publish the consolidated SDK package to npm + Docker + GitHub release | ~~3-4h~~ ✅ done in v0.1.8 | Blocks ecosystem adoption | QW-V06 |
 
-**`npm publish` checklist (QW-PUBLISH):**
+**`npm publish` checklist (QW-PUBLISH):** ✅ shipped in v0.1.8
 - [x] Consolidated into a single `@hiai-gg/hiai-observe` package (SDK + CLI + MCP + Mastra exporter), node-compatible build (`dist/` JS + `.d.ts`), `publishConfig {access: public, provenance}`, `prepublishOnly` build verified
-- [ ] Create the `hiai-gg` npm org + enable 2FA
-- [ ] Generate `NPM_TOKEN` and add as a GitHub Actions secret
-- [ ] First publish: `cd packages/hiai-observe && bun publish --access public` (then automated by `publish.yml` on `v*` tags)
+- [x] Create the `hiai-gg` npm org + enable 2FA
+- [x] Generate `NPM_TOKEN` and add as a GitHub Actions secret
+- [x] First publish — `@hiai-gg/hiai-observe@0.1.8` live on npm; multi-arch Docker at `vgalibov/hiai-observe`; tagged GitHub release. Subsequent `v*` tags are automated by `publish.yml`
 - [x] `hiai-observe-agent` bin bundled (Bun-only; Node prints a clear "requires Bun" message). Improvements tracked in `PM-INF-1`
 - [x] CI workflow: `.github/workflows/publish.yml` triggered on `v*` tag push (now publishes the single package)
+- [ ] **Follow-up:** relax org-level 2FA-on-publish so CI can publish with sigstore provenance (0.1.8 was published manually without it)
 
 ### 🟡 Important
 
@@ -196,7 +197,7 @@ living document — open an issue to propose or reprioritize items.
 |---|---|---|---|
 | Test count | 243 | 300+ | 400+ |
 | Frontend type coverage | ~70% | 100% | 100% |
-| npm packages published | 0 of 4 | 4 of 4 | 4 of 4 + automated CI publish |
+| npm packages published | 1 (consolidated, v0.1.8) | + automated CI publish w/ provenance | stable release cadence |
 | Log worker max RAM | <50MB (VPS preset enforced) | <30MB | <30MB |
 | CI pipeline | typecheck + unit tests | + e2e on booted server | + nightly perf benchmark |
 | OTLP protocols | JSON traces + metrics | + protobuf + logs | + logs + tail-sampling |

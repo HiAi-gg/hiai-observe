@@ -8,11 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.8] - 2026-06-09
 
 ### Added
-- Deployment pipelines wired up: npm publish of `@hiai-gg/hiai-observe`, multi-arch Docker images to `vgalibov/hiai-observe`, and CI — all green.
+- Deployment pipelines wired up across all three channels: `@hiai-gg/hiai-observe` published to npm, multi-arch Docker images pushed to `vgalibov/hiai-observe`, and a tagged GitHub release â€” all green.
 
 ### Fixed
 - npm publish step no longer masks real errors (only skips when the exact version already exists).
 - Docker image name corrected to `vgalibov/hiai-observe`; README Docker Pulls badge updated.
+
+### Notes
+- This `0.1.8` npm tarball was published manually (without sigstore provenance) due to an org-level 2FA-on-publish policy that blocks the CI token; once the policy is relaxed, subsequent releases publish with provenance via `publish.yml`.
 
 ## [0.1.7] - 2026-06-09
 

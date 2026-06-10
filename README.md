@@ -3,6 +3,7 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/HiAi-gg/hiai-observe)](https://github.com/HiAi-gg/hiai-observe/stargazers)
 [![npm](https://img.shields.io/npm/v/@hiai-gg/hiai-observe?logo=npm)](https://www.npmjs.com/package/@hiai-gg/hiai-observe)
+[![npm downloads](https://img.shields.io/npm/dm/@hiai-gg/hiai-observe?logo=npm&label=downloads)](https://www.npmjs.com/package/@hiai-gg/hiai-observe)
 [![Docker Pulls](https://img.shields.io/docker/pulls/vgalibov/hiai-observe)](https://hub.docker.com/r/vgalibov/hiai-observe)
 [![CI](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml/badge.svg)](https://github.com/HiAi-gg/hiai-observe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/HiAi-gg/hiai-observe?sort=semver)](https://github.com/HiAi-gg/hiai-observe/releases)

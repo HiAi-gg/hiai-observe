@@ -15,6 +15,7 @@
 [![Made with TypeScript](https://img.shields.io/badge/Made_with-TypeScript-blue.svg)](https://www.typescriptlang.org)
 
 **Lightweight, fast, all-in-one observability under MIT license** — Sentry + Uptime Kuma + Beszel + Dozzle + LLM tracing in one container, < 512 MB RAM.
+
 <img width="768" height="512" alt="aa1d3ede-e0c2-4377-b2a5-7707f4f42f61" src="https://github.com/user-attachments/assets/79905d16-ca4a-4cfd-9404-dd3cb1e0a3dc" />
 
 **AI-native out of the box:** a built-in MCP server, CLI, agent skill, and TypeScript SDK ship in the same package, so any AI system (Claude Code, Cursor, Copilot, Mastra) can query, use, and integrate it immediately — no glue code.

@@ -15,6 +15,7 @@
 [![Made with TypeScript](https://img.shields.io/badge/Made_with-TypeScript-blue.svg)](https://www.typescriptlang.org)
 
 **Lightweight, fast, all-in-one observability under MIT license** — Sentry + Uptime Kuma + Beszel + Dozzle + LLM tracing in one container, < 512 MB RAM.
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/b0132d61-bd91-4ecd-9801-16a74a2a61e4" />
 
 **AI-native out of the box:** a built-in MCP server, CLI, agent skill, and TypeScript SDK ship in the same package, so any AI system (Claude Code, Cursor, Copilot, Mastra) can query, use, and integrate it immediately — no glue code.
 
@@ -150,56 +151,14 @@ HiAi Observe bundles 5 observability modules into a single container:
 
 Plus: unified dashboard, alert rules engine, maintenance windows, incident management, and API key auth.
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #2: Feature Showcase           -->
-<!-- File:          docs/screenshots/features.png    -->
-<!-- What to show: 2-3 panels side by side (montage): -->
-<!--              — Issues list with stack traces    -->
-<!--              — Uptime monitor with response time -->
-<!--              — Log viewer with search           -->
-<!-- Dimensions:   1200x500 (wide strip)           -->
-<!-- alt text:     "HiAi Observe features: issue tracking, uptime monitoring, and log viewer" -->
-<!-- Insert here:  <img src="docs/screenshots/features.png" width="100%" alt="HiAi Observe features" /> -->
-<!-- ============================================ -->
+<img width="2539" height="1900" alt="Screenshot 2026-06-07 221755" src="https://github.com/user-attachments/assets/aa4f0596-f210-4688-8a56-0c6506374dfc" />
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #6: Issue Grouping              -->
-<!-- File:          docs/screenshots/issues.png      -->
-<!-- What to show: Issues list page:                  -->
-<!--              — Auto-grouped by fingerprint        -->
-<!--              — Event count, last seen, status     -->
-<!--              — Filter by status/level/project     -->
-<!--              — One-click "resolve" / "assign"     -->
-<!-- Dimensions:   1200x500                         -->
-<!-- alt text:     "HiAi Observe issues list with auto-grouping by fingerprint" -->
-<!-- Insert here:  <img src="docs/screenshots/issues.png" width="100%" alt="HiAi Observe issues list" /> -->
-<!-- ============================================ -->
+<img width="2522" height="1919" alt="Screenshot 2026-06-07 221501" src="https://github.com/user-attachments/assets/60b08d26-e34e-4e68-9fdf-1febe1b24791" />
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #7: Live Log Viewer             -->
-<!-- File:          docs/screenshots/logs.png         -->
-<!-- What to show: Logs page:                          -->
-<!--              — Live WebSocket tail                 -->
-<!--              — Container filter (multi-select)     -->
-<!--              — Full-text + regex search            -->
-<!--              — Auto-refresh indicator              -->
-<!-- Dimensions:   1200x600                         -->
-<!-- alt text:     "HiAi Observe log viewer with live WebSocket streaming and full-text search" -->
-<!-- Insert here:  <img src="docs/screenshots/logs.png" width="100%" alt="HiAi Observe log viewer" /> -->
-<!-- ============================================ -->
+<img width="2530" height="1914" alt="Screenshot 2026-06-07 221528" src="https://github.com/user-attachments/assets/94f5e7df-2976-4637-a216-a31c77b0d51d" />
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #5: Uptime Monitor              -->
-<!-- File:          docs/screenshots/uptime.png      -->
-<!-- What to show: Public status page + monitor list -->
-<!--              — HTTP monitors with response time  -->
-<!--              — 30-day uptime bar                  -->
-<!--              — SSL expiry                         -->
-<!--              — Status page (JSON + HTML)         -->
-<!-- Dimensions:   1200x600                         -->
-<!-- alt text:     "HiAi Observe uptime monitoring with response time history and status page" -->
-<!-- Insert here:  <img src="docs/screenshots/uptime.png" width="100%" alt="HiAi Observe uptime monitoring" /> -->
-<!-- ============================================ -->
+<img width="2527" height="1916" alt="Screenshot 2026-06-07 221704" src="https://github.com/user-attachments/assets/2eb19a1a-fc14-46a9-ab60-54f4aa46da24" />
+
 
 ## Comparison
 
@@ -247,19 +206,6 @@ import * as Sentry from "@sentry/node";
 Sentry.init({ dsn: "http://apikey@localhost:8001/1" });
 ```
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #3: Error Detail               -->
-<!-- File:          docs/screenshots/error-detail.png -->
-<!-- What to show: Error detail page:                  -->
-<!--              - Stack trace with highlighting     -->
-<!--              — Breadcrumbs (user actions)        -->
-<!--              — Tags (browser, OS, release)       -->
-<!--              — Related issues                    -->
-<!-- Dimensions:   1200x700                         -->
-<!-- alt text:     "HiAi Observe error detail with stack trace, breadcrumbs, and context" -->
-<!-- Insert here:  <img src="docs/screenshots/error-detail.png" width="100%" alt="HiAi Observe error detail" /> -->
-<!-- ============================================ -->
-
 ### OpenTelemetry (Generic)
 
 ```ts
@@ -301,19 +247,6 @@ Drop the [`skills/hiai-observe`](skills/hiai-observe) skill into your agent so i
 knows *when* to consult Observe (before declaring a deploy healthy, after errors,
 to track LLM spend). For code, use the [`@hiai-gg/hiai-observe`](packages/hiai-observe)
 SDK or the OpenAPI spec at `GET /api/openapi.json`.
-
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #4: AI Agent Tracing           -->
-<!-- File:          docs/screenshots/ai-tracing.png  -->
-<!-- What to show: AI agent trace:                      -->
-<!--              - Workflow steps (tree)             -->
-<!--              — Token usage per step             -->
-<!--              — Latency breakdown                -->
-<!--              - Tool calls (if any)                -->
-<!-- Dimensions:   1200x700                         -->
-<!-- alt text:     "HiAi Observe AI agent trace showing workflow steps and token usage" -->
-<!-- Insert here:  <img src="docs/screenshots/ai-tracing.png" width="100%" alt="HiAi Observe AI agent tracing" /> -->
-<!-- ============================================ -->
 
 ## API Endpoints
 
@@ -469,7 +402,7 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-Current: **v0.1.8** — first public release on all three channels:
+Current: **v0.1.9** — first public release on all three channels:
 [`@hiai-gg/hiai-observe`](https://www.npmjs.com/package/@hiai-gg/hiai-observe) on
 npm (SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP server + `hiai-observe-agent`),
 multi-arch Docker images at [`vgalibov/hiai-observe`](https://hub.docker.com/r/vgalibov/hiai-observe),

@@ -230,7 +230,7 @@ const metricExporter = new OTLPMetricExporter({
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABASE_URL` | Yes | `postgresql://observe:observe@localhost:5432/hiai_observe` | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | `postgresql://observe:observe@localhost:5433/hiai_observe` | PostgreSQL connection string |
 | `REDIS_URL` | Yes | `redis://localhost:6379` | Redis connection string |
 | `HIAI_OBSERVE_API_KEY` | No | — | Default API key for first project |
 | `PORT` | No | `8001` | HTTP server port |
@@ -257,10 +257,90 @@ For production deployment with TLS, security hardening, and operational best pra
 
 1. Verify the API key exists in the `projects` table:
    ```bash
-   psql -h localhost -p 5432 -U observe -d hiai_observe -c "SELECT id, name, api_key FROM projects;"
+   psql -h localhost -p 5433 -U observe -d hiai_observe -c "SELECT id, name, api_key FROM projects;"
    ```
 2. Verify the DSN format: `http://API_KEY@localhost:8001/PROJECT_UUID`
 3. For Sentry SDK, ensure the project UUID in the DSN path matches the `projects.id` column
+
+### Model Context Protocol (MCP) Integration
+
+HiAi Observe includes an MCP server for AI agent integration. The MCP server exposes 9 read tools for querying observability data.
+
+#### Setup
+
+Add to your MCP config (typically in `~/.codex/mcp.json` or your agent's config):
+
+```json
+{
+  "mcpServers": {
+    "hiai-observe": {
+      "command": "npx",
+      "args": ["-y", "-p", "@hiai-gg/hiai-observe", "hiai-observe-mcp"],
+      "env": {
+        "HIAI_OBSERVE_URL": "http://localhost:8001",
+        "HIAI_OBSERVE_API_KEY": "ho_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+#### Available MCP Tools
+
+- `observe_dashboard` — Get dashboard metrics
+- `observe_list_issues` — List issues with filters
+- `observe_get_issue` — Get issue details
+- `observe_ai_cost` — Get AI cost analytics
+- `observe_list_traces` — List traces with filters (use filters to narrow to a specific trace; no single-trace fetch tool exists yet)
+- `observe_uptime` — Get uptime status
+- `observe_infrastructure` — Get infrastructure metrics
+- `observe_alerts` — List alert rules
+- `observe_search_logs` — Search container logs by text/level/container
+
+#### Usage Example
+
+```json
+{
+  "tool": "observe_dashboard",
+  "parameters": {}
+}
+```
+
+### CLI Usage
+
+The `@hiai-gg/hiai-observe` package includes a CLI for shell/Bash-tool agents:
+
+#### Installation
+
+```bash
+npx @hiai-gg/hiai-observe --help
+```
+
+#### Commands
+
+| Command | Description |
+|---|---|
+| `hiai-observe dashboard` | Show dashboard metrics |
+| `hiai-observe issues` | List issues |
+| `hiai-observe issue <id>` | Get issue details |
+| `hiai-observe ai-cost` | Show AI cost analytics |
+| `hiai-observe traces` | List traces |
+| `hiai-observe trace <id>` | Get trace details |
+| `hiai-observe uptime` | Show uptime status |
+| `hiai-observe infra` | Show infrastructure metrics |
+| `hiai-observe alerts` | List alert rules |
+| `hiai-observe health` | Check health status |
+
+#### Example Usage
+
+```bash
+# Set API key and URL
+HIAI_OBSERVE_API_KEY=ho_your_key HIAI_OBSERVE_URL=http://localhost:8001 \
+  npx @hiai-gg/hiai-observe dashboard --json
+
+# Get AI cost analytics grouped by model
+hiai-observe ai-cost --group-by model --json
+```
 
 ### "Docker unavailable" (503)
 
@@ -274,7 +354,7 @@ For production deployment with TLS, security hardening, and operational best pra
 1. Check the OTLP endpoint URL: must be `http://localhost:8001/v1/traces` (not `/v1/trace`)
 2. Verify the API key is valid: `curl -H "Authorization: Bearer YOUR_KEY" http://localhost:8001/health`
 3. Check server logs for ingestion errors
-4. Ensure the OTLP exporter is using JSON format (not protobuf for MVP)
+4. Both JSON (`application/json`) and protobuf (`application/x-protobuf`) are supported — pick whichever your SDK prefers
 
 ### WebSocket connection drops
 

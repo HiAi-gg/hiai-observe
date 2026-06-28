@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ALERT_ID = "550e8400-e29b-41d4-a716-446655440000";
 const PROJECT_ID = "660e8400-e29b-41d4-a716-446655440001";
@@ -30,8 +30,17 @@ const mockHistoryEntry = {
 function createChain(result: any) {
   const chain: any = {};
   const methods = [
-    "from", "where", "orderBy", "limit", "offset",
-    "returning", "set", "values", "for", "delete", "groupBy",
+    "from",
+    "where",
+    "orderBy",
+    "limit",
+    "offset",
+    "returning",
+    "set",
+    "values",
+    "for",
+    "delete",
+    "groupBy",
   ];
   for (const m of methods) {
     chain[m] = vi.fn().mockReturnValue(chain);
@@ -56,15 +65,24 @@ vi.mock("../../src/store/db.js", () => {
 // ── Mock schema ───────────────────────────────────────────────────────
 vi.mock("../../src/store/schema.js", () => ({
   alerts: {
-    id: "id", projectId: "project_id", name: "name",
-    isActive: "is_active", createdAt: "created_at", condition: "condition",
-    channels: "channels", cooldownSeconds: "cooldown_seconds",
-    severity: "severity", lastTriggered: "last_triggered",
+    id: "id",
+    projectId: "project_id",
+    name: "name",
+    isActive: "is_active",
+    createdAt: "created_at",
+    condition: "condition",
+    channels: "channels",
+    cooldownSeconds: "cooldown_seconds",
+    severity: "severity",
+    lastTriggered: "last_triggered",
     escalationMinutes: "escalation_minutes",
   },
   alertHistory: {
-    id: "id", alertId: "alert_id", triggeredAt: "triggered_at",
-    resolvedAt: "resolved_at", context: "context",
+    id: "id",
+    alertId: "alert_id",
+    triggeredAt: "triggered_at",
+    resolvedAt: "resolved_at",
+    context: "context",
   },
 }));
 
@@ -180,9 +198,7 @@ describe("alerts API routes", () => {
       // First select = items, second select = count
       mockSelectSequence([[mockAlert], [{ total: 1 }]]);
 
-      const res = await alertsRoutes.handle(
-        new Request("http://localhost/api/alerts/"),
-      );
+      const res = await alertsRoutes.handle(new Request("http://localhost/api/alerts/"));
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -214,9 +230,7 @@ describe("alerts API routes", () => {
       // First select = alert, second select = history
       mockSelectSequence([[mockAlert], [mockHistoryEntry]]);
 
-      const res = await alertsRoutes.handle(
-        new Request(`http://localhost/api/alerts/${ALERT_ID}`),
-      );
+      const res = await alertsRoutes.handle(new Request(`http://localhost/api/alerts/${ALERT_ID}`));
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -229,9 +243,7 @@ describe("alerts API routes", () => {
     it("returns 404 for non-existent alert", async () => {
       mockSelectSequence([[]]);
 
-      const res = await alertsRoutes.handle(
-        new Request(`http://localhost/api/alerts/${ALERT_ID}`),
-      );
+      const res = await alertsRoutes.handle(new Request(`http://localhost/api/alerts/${ALERT_ID}`));
 
       expect(res.status).toBe(404);
       const body = await res.json();
@@ -386,9 +398,7 @@ describe("alerts API routes", () => {
 
   describe("GET /api/alerts/channels", () => {
     it("returns available notification channels", async () => {
-      const res = await alertsRoutes.handle(
-        new Request("http://localhost/api/alerts/channels"),
-      );
+      const res = await alertsRoutes.handle(new Request("http://localhost/api/alerts/channels"));
 
       expect(res.status).toBe(200);
       const body = await res.json();

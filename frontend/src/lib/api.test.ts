@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the stores module before importing api
 vi.mock("./stores.svelte", () => ({
@@ -7,54 +7,57 @@ vi.mock("./stores.svelte", () => ({
 }));
 
 import {
-  getDashboard,
-  getIssues,
-  getIssue,
-  updateIssue,
-  getEvents,
-  getMonitors,
-  getContainerStats,
-  getHostStats,
-  getLogs,
-  getLogStats,
-  getLogVolume,
-  getSavedSearches,
-  createSavedSearch,
-  deleteSavedSearch,
-  getLogsDownloadUrl,
-  getTraces,
-  getTrace,
-  getAlerts,
   createAlert,
+  createIssueComment,
+  createProject,
+  createRelease,
+  createSavedSearch,
+  createTeamMember,
   deleteAlert,
-  testAlert,
-  testAllAlerts,
+  deleteIssueComment,
+  deleteProject,
+  deleteRelease,
+  deleteSavedSearch,
+  deleteTeamMember,
+  getAlertHistory,
+  getAlerts,
+  getContainerStats,
+  getDashboard,
+  getEvents,
+  getHostStats,
+  getIssue,
+  getIssueComments,
+  getIssues,
+  getLogStats,
+  getLogs,
+  getLogsDownloadUrl,
+  getLogVolume,
+  getMonitors,
   getNotificationChannels,
   getProjects,
-  createProject,
-  deleteProject,
-  rotateApiKey,
-  getAlertHistory,
-  getReleases,
-  createRelease,
   getReleaseHealth,
-  deleteRelease,
-  getTeamMembers,
-  createTeamMember,
-  updateTeamMember,
-  deleteTeamMember,
-  getIssueComments,
-  createIssueComment,
-  deleteIssueComment,
-  searchAll,
-  getStorage,
+  getReleases,
   getRetention,
+  getSavedSearches,
+  getStorage,
+  getTeamMembers,
+  getTrace,
+  getTraces,
+  rotateApiKey,
+  searchAll,
+  testAlert,
+  testAllAlerts,
+  updateIssue,
   updateRetention,
+  updateTeamMember,
 } from "./api";
 import { apiKey, currentProject } from "./stores.svelte";
 
 // Helper to create a mock Response
-function mockResponse(body: unknown, init?: { ok?: boolean; status?: number; statusText?: string }) {
+function mockResponse(
+  body: unknown,
+  init?: { ok?: boolean; status?: number; statusText?: string },
+) {
   const ok = init?.ok ?? true;
   const status = init?.status ?? 200;
   return {
@@ -124,13 +127,17 @@ describe("API client", () => {
 
   describe("error handling", () => {
     it("throws with error message from JSON response on non-200", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(errorResponse(404, "Not Found", { error: "Issue not found" }));
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        errorResponse(404, "Not Found", { error: "Issue not found" }),
+      );
 
       await expect(getIssue("missing-id")).rejects.toThrow("Issue not found");
     });
 
     it("throws with HTTP status fallback when JSON body has no error field", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(errorResponse(500, "Internal Server Error", {}));
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        errorResponse(500, "Internal Server Error", {}),
+      );
 
       await expect(getDashboard()).rejects.toThrow("HTTP 500");
     });
@@ -208,7 +215,9 @@ describe("API client", () => {
     });
 
     it("builds issue query params correctly", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ issues: [], total: 0 }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ issues: [], total: 0 }));
 
       await getIssues({ status: "unresolved", search: "TypeError", limit: 25, offset: 50 });
 
@@ -220,7 +229,9 @@ describe("API client", () => {
     });
 
     it("builds log query params correctly", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ data: { logs: [], total: 0 } }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ data: { logs: [], total: 0 } }));
 
       await getLogs({ container: "nginx", level: "error", limit: 100 });
 
@@ -231,7 +242,9 @@ describe("API client", () => {
     });
 
     it("omits undefined params in getIssues", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ issues: [], total: 0 }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ issues: [], total: 0 }));
 
       await getIssues({ status: "resolved" });
 
@@ -243,7 +256,9 @@ describe("API client", () => {
 
     it("builds trace query params correctly", async () => {
       currentProject.current = "p1";
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ traces: [], total: 0 }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ traces: [], total: 0 }));
 
       await getTraces({ workflow: "my-workflow", agent: "coder", limit: 10 });
 
@@ -272,12 +287,14 @@ describe("API client", () => {
 
   describe("getIssues", () => {
     it("fetches /api/issues with pagination", async () => {
-      const data = { issues: [{ id: "1", title: "Test" }], total: 1 };
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(data));
+      // Server returns { data, total }; getIssues() normalizes to { issues, total }.
+      const serverPayload = { data: [{ id: "1", title: "Test" }], total: 1 };
+      const expected = { issues: [{ id: "1", title: "Test" }], total: 1 };
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(serverPayload));
 
       const result = await getIssues({ limit: 10, offset: 0 });
 
-      expect(result).toEqual(data);
+      expect(result).toEqual(expected);
     });
   });
 
@@ -331,7 +348,9 @@ describe("API client", () => {
 
     it("includes project_id from store", async () => {
       currentProject.current = "proj-1";
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ monitors: [] }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ monitors: [] }));
 
       await getMonitors();
 
@@ -369,7 +388,14 @@ describe("API client", () => {
       const data = { data: { logs: [], total: 0 } };
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(data));
 
-      await getLogs({ container: "app", level: "warn", search: "timeout", regex: "^err", limit: 50, offset: 10 });
+      await getLogs({
+        container: "app",
+        level: "warn",
+        search: "timeout",
+        regex: "^err",
+        limit: 50,
+        offset: 10,
+      });
 
       const url = fetchSpy.mock.calls[0]![0] as string;
       expect(url).toContain("container=app");
@@ -491,7 +517,9 @@ describe("API client", () => {
         cooldown_seconds: 600,
         created_at: "2026-01-01",
       };
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ id: "a1", ...alertData }));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ id: "a1", ...alertData }));
 
       await createAlert(alertData);
 

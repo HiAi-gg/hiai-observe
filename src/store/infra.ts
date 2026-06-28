@@ -2,14 +2,17 @@
  * Infrastructure monitoring data access layer.
  */
 
-import { db } from "./db.js";
-import { containerStats, hostStats, gpuStats, hostInfo } from "./schema.js";
-import { desc, and, gte, lte, eq, sql as sqlFn } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql as sqlFn } from "drizzle-orm";
 import type { ContainerStats } from "../monitoring/docker-collector.js";
-import type { HostStats } from "../monitoring/host-collector.js";
 import type { GpuStat } from "../monitoring/gpu-collector.js";
+import type { HostStats } from "../monitoring/host-collector.js";
+import { db } from "./db.js";
+import { containerStats, gpuStats, hostInfo, hostStats } from "./schema.js";
 
-export async function insertContainerStats(stats: ContainerStats[], hostId = "local"): Promise<void> {
+export async function insertContainerStats(
+  stats: ContainerStats[],
+  hostId = "local",
+): Promise<void> {
   if (stats.length === 0) return;
   await db.insert(containerStats).values(
     stats.map((s) => ({
@@ -31,7 +34,7 @@ export async function insertContainerStats(stats: ContainerStats[], hostId = "lo
       healthStatus: s.health_status,
       status: s.status,
       uptimeSeconds: s.uptime_seconds,
-    }))
+    })),
   );
 }
 
@@ -67,7 +70,7 @@ export async function insertGpuStats(stats: GpuStat[], hostId: string): Promise<
       memoryUsedMb: g.memoryUsedMb,
       memoryTotalMb: g.memoryTotalMb,
       temperatureC: g.temperatureC,
-    }))
+    })),
   );
 }
 
@@ -126,10 +129,7 @@ export async function getContainerStatsByContainer(
 }
 
 export async function getHostStatsHistory(from: Date, to: Date, hostId?: string) {
-  const conditions = [
-    gte(hostStats.collectedAt, from),
-    lte(hostStats.collectedAt, to),
-  ];
+  const conditions = [gte(hostStats.collectedAt, from), lte(hostStats.collectedAt, to)];
   if (hostId) conditions.push(eq(hostStats.hostId, hostId));
 
   return db
@@ -147,11 +147,7 @@ export async function getLatestContainerStats(hostId?: string) {
         .where(eq(containerStats.hostId, hostId))
         .orderBy(desc(containerStats.collectedAt))
         .limit(1)
-    : await db
-        .select()
-        .from(containerStats)
-        .orderBy(desc(containerStats.collectedAt))
-        .limit(1);
+    : await db.select().from(containerStats).orderBy(desc(containerStats.collectedAt)).limit(1);
 
   if (latest.length === 0) return [];
 
@@ -203,10 +199,7 @@ export async function listHosts() {
 
 /** Get GPU stats history for a host. */
 export async function getGpuStatsHistory(from: Date, to: Date, hostId?: string) {
-  const conditions = [
-    gte(gpuStats.collectedAt, from),
-    lte(gpuStats.collectedAt, to),
-  ];
+  const conditions = [gte(gpuStats.collectedAt, from), lte(gpuStats.collectedAt, to)];
   if (hostId) conditions.push(eq(gpuStats.hostId, hostId));
 
   return db

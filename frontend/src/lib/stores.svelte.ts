@@ -1,3 +1,16 @@
+declare const __HIAI_OBSERVE_API_KEY__: string;
+
+function getInjectedApiKey(): string {
+  // Vite replaces `__HIAI_OBSERVE_API_KEY__` with the build-time value at
+  // transform time (via the `hiai-observe-api-key-define` plugin in
+  // vite.config.ts, since SvelteKit's pipeline bypasses Vite's `define`).
+  // The `typeof` guard keeps SSR safe when no value is provided.
+  if (typeof __HIAI_OBSERVE_API_KEY__ !== "undefined" && __HIAI_OBSERVE_API_KEY__) {
+    return __HIAI_OBSERVE_API_KEY__;
+  }
+  return "";
+}
+
 function createLocalStorage<T>(key: string, initial: T) {
   let value = $state<T>(initial);
 
@@ -26,7 +39,7 @@ function createLocalStorage<T>(key: string, initial: T) {
 }
 
 export const darkMode = createLocalStorage("hiai-observe-dark-mode", true);
-export const apiKey = createLocalStorage("hiai-observe-api-key", "");
+export const apiKey = createLocalStorage("hiai-observe-api-key", getInjectedApiKey());
 export const sidebarOpen = createLocalStorage("hiai-observe-sidebar-open", true);
 export const currentProject = createLocalStorage<string>("hiai-observe-current-project", "");
 

@@ -5,6 +5,7 @@
  */
 
 import { createHmac } from "node:crypto";
+import { config as appConfig } from "../../lib/config.js";
 
 interface WebhookAlert {
   title: string;
@@ -35,8 +36,12 @@ interface WebhookPayload {
  */
 export async function sendWebhookAlert(
   url: string,
-  alert: WebhookAlert & { alertId?: string; projectId?: string; projectName?: string },
-  config?: { url?: string; secret?: string }
+  alert: WebhookAlert & {
+    alertId?: string;
+    projectId?: string;
+    projectName?: string;
+  },
+  config?: { url?: string; secret?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   const targetUrl = config?.url || url;
   if (!targetUrl) {
@@ -64,7 +69,7 @@ export async function sendWebhookAlert(
   };
 
   // HMAC-SHA256 signature if secret is configured
-  const secret = config?.secret || process.env.WEBHOOK_SECRET;
+  const secret = config?.secret || appConfig.WEBHOOK_SECRET;
   if (secret) {
     const signature = createHmac("sha256", secret).update(body).digest("hex");
     headers["X-Hiai-Signature"] = signature;

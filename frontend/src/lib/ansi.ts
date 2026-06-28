@@ -8,20 +8,46 @@ export interface AnsiSpan {
   content: string;
 }
 
-// Standard 16-color palette (0-15)
+// Standard 16-color palette (0-15) — semantic colors map to canonical
+// hiai-ui tokens; neutrals (black/white/gray) stay as hex because they
+// have no semantic intent beyond "contrast".
 export const ANSI_16: Record<number, string> = {
-  0: "#000000", 1: "#cc0000", 2: "#4e9a06", 3: "#c4a000",
-  4: "#3465a4", 5: "#75507b", 6: "#06989a", 7: "#d3d7cf",
-  8: "#555753", 9: "#ef2929", 10: "#8ae234", 11: "#fce94f",
-  12: "#729fcf", 13: "#ad7fa8", 14: "#34e2e2", 15: "#eeeeec",
+  0: "#000000",
+  1: "var(--destructive)",
+  2: "var(--success)",
+  3: "var(--warning)",
+  4: "var(--info)",
+  5: "var(--violet)",
+  6: "var(--info)",
+  7: "#d3d7cf",
+  8: "#555753",
+  9: "var(--destructive)",
+  10: "var(--success)",
+  11: "var(--warning)",
+  12: "var(--info)",
+  13: "var(--violet)",
+  14: "var(--info)",
+  15: "#eeeeec",
 };
 
 // Bright variants for bold mode
 export const ANSI_16_BRIGHT: Record<number, string> = {
-  0: "#555753", 1: "#ef2929", 2: "#8ae234", 3: "#fce94f",
-  4: "#729fcf", 5: "#ad7fa8", 6: "#34e2e2", 7: "#eeeeec",
-  8: "#888a85", 9: "#ff6b6b", 10: "#a8ff60", 11: "#ffff80",
-  12: "#9dc6ff", 13: "#d4a0d4", 14: "#80fffe", 15: "#ffffff",
+  0: "#555753",
+  1: "var(--destructive)",
+  2: "var(--success)",
+  3: "var(--warning)",
+  4: "var(--info)",
+  5: "var(--violet)",
+  6: "var(--info)",
+  7: "#eeeeec",
+  8: "#888a85",
+  9: "var(--destructive)",
+  10: "var(--success)",
+  11: "var(--warning)",
+  12: "var(--info)",
+  13: "var(--violet)",
+  14: "var(--info)",
+  15: "#ffffff",
 };
 
 export function color256(n: number): string {
@@ -43,7 +69,7 @@ export function color256(n: number): string {
 export function parseAnsi(rawText: string): AnsiSpan[] {
   const spans: AnsiSpan[] = [];
   // Match ESC[ ... m sequences (SGR)
-  const regex = /\x1b\[([0-9;]*)m/g;
+  const regex = /\u001b\[([0-9;]*)m/g;
   let currentStyle = "";
   let lastIndex = 0;
   let bold = false;
@@ -62,8 +88,8 @@ export function parseAnsi(rawText: string): AnsiSpan[] {
     return parts.join(";");
   }
 
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(rawText)) !== null) {
+  let match = regex.exec(rawText);
+  while (match !== null) {
     // Push text before this escape sequence
     if (match.index > lastIndex) {
       const content = rawText.slice(lastIndex, match.index);
@@ -77,7 +103,11 @@ export function parseAnsi(rawText: string): AnsiSpan[] {
       const code = params[i]!;
       if (code === 0) {
         // Reset all
-        bold = false; italic = false; underline = false; fg = null; bg = null;
+        bold = false;
+        italic = false;
+        underline = false;
+        fg = null;
+        bg = null;
       } else if (code === 1) {
         bold = true;
       } else if (code === 2) {
@@ -95,7 +125,9 @@ export function parseAnsi(rawText: string): AnsiSpan[] {
         underline = false;
       } else if (code >= 30 && code <= 37) {
         const idx = code - 30;
-        fg = bold ? (ANSI_16_BRIGHT[idx] ?? ANSI_16[idx] ?? "#ffffff") : (ANSI_16[idx] ?? "#ffffff");
+        fg = bold
+          ? (ANSI_16_BRIGHT[idx] ?? ANSI_16[idx] ?? "#ffffff")
+          : (ANSI_16[idx] ?? "#ffffff");
       } else if (code === 38) {
         // Extended foreground
         if (params[i + 1] === 5 && params[i + 2] !== undefined) {
@@ -130,6 +162,7 @@ export function parseAnsi(rawText: string): AnsiSpan[] {
 
     currentStyle = buildStyle();
     lastIndex = match.index + match[0].length;
+    match = regex.exec(rawText);
   }
 
   // Push remaining text

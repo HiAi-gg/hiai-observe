@@ -4,6 +4,8 @@
  * Sends alert notifications via Pushover push notification API.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 const PUSHOVER_API = "https://api.pushover.net/1/messages.json";
 
 interface PushoverAlert {
@@ -33,10 +35,10 @@ function getPriority(status: PushoverAlert["status"]): number {
 export async function sendPushoverAlert(
   userKey: string,
   alert: PushoverAlert,
-  config?: { userKey?: string; token?: string; priority?: number }
+  config?: { userKey?: string; token?: string; priority?: number },
 ): Promise<{ ok: boolean; error?: string }> {
-  const targetUserKey = config?.userKey || userKey || process.env.PUSHOVER_USER_KEY;
-  const appToken = config?.token || process.env.PUSHOVER_TOKEN;
+  const targetUserKey = config?.userKey || userKey || appConfig.PUSHOVER_USER_KEY;
+  const appToken = config?.token || appConfig.PUSHOVER_TOKEN;
   if (!targetUserKey) {
     return { ok: false, error: "Pushover user key not configured" };
   }

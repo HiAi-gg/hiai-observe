@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock store layer
 vi.mock("../../src/store/uptime.js", () => ({
@@ -36,11 +36,7 @@ describe("uptime-worker", () => {
     });
 
     it("should return 0% for all failed checks", () => {
-      const checks = [
-        { success: false },
-        { success: false },
-        { success: false },
-      ];
+      const checks = [{ success: false }, { success: false }, { success: false }];
       const total = checks.length;
       const up = checks.filter((c) => c.success).length;
       const percent = Math.round((up / total) * 10000) / 100;
@@ -48,10 +44,7 @@ describe("uptime-worker", () => {
     });
 
     it("should handle partial failure correctly", () => {
-      const checks = [
-        { success: true },
-        { success: false },
-      ];
+      const checks = [{ success: true }, { success: false }];
       const total = checks.length;
       const up = checks.filter((c) => c.success).length;
       const percent = Math.round((up / total) * 10000) / 100;

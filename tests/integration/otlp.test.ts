@@ -9,18 +9,18 @@
  * Skip in CI by default — run with INTEGRATION=1 bun test tests/integration/
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db } from "../../src/store/db.js";
+import { traces } from "../../src/store/schema.js";
 import {
-  createTestProject,
   cleanupTestData,
-  waitForCondition,
+  createTestProject,
   isServerReachable,
   TEST_API_KEY,
   TEST_BASE_URL,
+  waitForCondition,
 } from "./helpers.js";
-import { db } from "../../src/store/db.js";
-import { traces } from "../../src/store/schema.js";
-import { eq } from "drizzle-orm";
 
 const SKIP = !(process.env.INTEGRATION === "1");
 
@@ -96,11 +96,7 @@ describe.skipIf(SKIP)("OTLP Integration", () => {
 
     // Verify trace was stored
     const stored = await waitForCondition(async () => {
-      const rows = await db
-        .select()
-        .from(traces)
-        .where(eq(traces.projectId, projectId))
-        .limit(1);
+      const rows = await db.select().from(traces).where(eq(traces.projectId, projectId)).limit(1);
       return rows.length > 0 ? rows : null;
     }, 5000);
 
@@ -140,9 +136,7 @@ describe.skipIf(SKIP)("OTLP Integration", () => {
                   kind: "INTERNAL",
                   startTimeUnixNano: "1700000001000000000",
                   endTimeUnixNano: "1700000001500000000",
-                  attributes: [
-                    { key: "mastra.step", value: { stringValue: "extract-params" } },
-                  ],
+                  attributes: [{ key: "mastra.step", value: { stringValue: "extract-params" } }],
                   status: { code: "STATUS_CODE_OK" },
                 },
                 {
@@ -161,9 +155,7 @@ describe.skipIf(SKIP)("OTLP Integration", () => {
                     {
                       timeUnixNano: "1700000001600000000",
                       name: "tool.input",
-                      attributes: [
-                        { key: "data", value: { stringValue: '{"query":"AI news"}' } },
-                      ],
+                      attributes: [{ key: "data", value: { stringValue: '{"query":"AI news"}' } }],
                     },
                     {
                       timeUnixNano: "1700000002800000000",

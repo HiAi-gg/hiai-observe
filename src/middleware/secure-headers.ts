@@ -5,7 +5,7 @@
  * - Content-Security-Policy (strict default, opt-in per route for inline)
  * - Strict-Transport-Security (HSTS, production only)
  * - X-Content-Type-Options: nosniff
- * - X-Frame-Options: DENY (anti-clickjacking)
+ * - X-Frame-Options: DENY (anti-clickjacking; per-route override allowed)
  * - Referrer-Policy: strict-origin-when-cross-origin
  * - Permissions-Policy: minimal allowlist
  * - Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy
@@ -15,11 +15,13 @@
  * Per-route override example:
  *   .get('/status-page/:slug', ({ set }) => {
  *     set.headers['Content-Security-Policy'] = "'unsafe-inline'";  // for inline HTML
+ *     set.headers['X-Frame-Options'] = 'SAMEORIGIN';                // allow framing
  *   })
  */
 import { Elysia } from "elysia";
+import { config } from "../lib/config.js";
 
-const IS_PROD = process.env.NODE_ENV === "production";
+const IS_PROD = config.NODE_ENV === "production";
 
 const DEFAULT_CSP = [
   "default-src 'self'",
@@ -50,7 +52,9 @@ export const secureHeadersPlugin = new Elysia({ name: "secure-headers" }).onAfte
 
     if (!h["Content-Security-Policy"]) h["Content-Security-Policy"] = DEFAULT_CSP;
     h["X-Content-Type-Options"] = "nosniff";
-    h["X-Frame-Options"] = "DENY";
+    // X-Frame-Options is overridable per route — embed routes (status pages,
+    // /embed/*) set SAMEORIGIN via set.headers to enable iframe embedding.
+    if (!h["X-Frame-Options"]) h["X-Frame-Options"] = "DENY";
     h["Referrer-Policy"] = "strict-origin-when-cross-origin";
     h["Permissions-Policy"] = PERMISSIONS_POLICY;
     h["Cross-Origin-Opener-Policy"] = "same-origin";

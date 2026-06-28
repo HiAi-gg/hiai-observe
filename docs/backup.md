@@ -10,7 +10,7 @@ Creates a compressed SQL dump at `backups/hiai_observe_YYYY-MM-DD_HH-MM.sql.gz`.
 
 ## What Gets Backed Up
 
-- All 13 tables: `projects`, `issues`, `events`, `traces`, `uptime_monitors`, `uptime_checks`, `container_stats`, `host_stats`, `alerts`, `alert_history`, `logs`, `retention_config`, `sessions`
+- All 23 tables: `projects`, `issues`, `events`, `traces`, `uptime_monitors`, `uptime_checks`, `container_stats`, `host_stats`, `alerts`, `alert_history`, `logs`, `team_members`, `releases`, `issue_comments`, `fingerprint_rules`, `saved_searches`, `status_subscribers`, `gpu_stats`, `host_info`, `notification_config`, `retention_config`, `maintenance_windows`, `incidents`
 - Schema definitions, indexes, constraints, and sequences
 - Alert rules and retention configuration
 

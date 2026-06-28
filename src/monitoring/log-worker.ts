@@ -1,16 +1,16 @@
-import { startLogStreamer, listContainers } from "./log-streamer.js";
-import type { LogEntry } from "./log-streamer.js";
-import { insertLogs } from "../store/logs.js";
-import { publishLog } from "../store/log-pubsub.js";
-import { recordWorkerRun } from "../workers/health.js";
+import { getMonitoringConfig } from "../lib/config.js";
 import { logger } from "../lib/logger.js";
-import { getConfig } from "./config.js";
+import { publishLog } from "../store/log-pubsub.js";
+import { insertLogs } from "../store/logs.js";
+import { recordWorkerRun } from "../workers/health.js";
+import type { LogEntry } from "./log-streamer.js";
+import { listContainers, startLogStreamer } from "./log-streamer.js";
 
 let cleanup: (() => void) | null = null;
 
 function filterContainers(
   containers: Array<{ id: string; name: string }>,
-  filter: { include: string[]; exclude: string[] }
+  filter: { include: string[]; exclude: string[] },
 ): Array<{ id: string; name: string }> {
   let result = containers;
 
@@ -48,15 +48,17 @@ function detectLevel(message: string, stream: string): string {
 
 let inFlightInserts = 0;
 
-async function insertWithSemaphore(entries: Array<{
-  containerId: string;
-  containerName: string;
-  stream: string;
-  message: string;
-  timestamp: Date;
-  level: string;
-}>): Promise<void> {
-  const config = getConfig();
+async function insertWithSemaphore(
+  entries: Array<{
+    containerId: string;
+    containerName: string;
+    stream: string;
+    message: string;
+    timestamp: Date;
+    level: string;
+  }>,
+): Promise<void> {
+  const config = getMonitoringConfig();
   const max = config.logMaxConcurrentInserts;
 
   if (max > 0) {
@@ -92,7 +94,7 @@ function onBatch(entries: LogEntry[]): void {
       message: e.message,
       timestamp: new Date(e.timestamp),
       level: detectLevel(e.message, e.stream),
-    }))
+    })),
   );
 
   for (const entry of entries) {
@@ -108,7 +110,7 @@ export async function startLogWorker(): Promise<void> {
 
   try {
     const containers = await listContainers();
-    const config = getConfig();
+    const config = getMonitoringConfig();
     const filtered = filterContainers(containers, config.logContainerFilter);
     const ids = filtered.map((c) => c.id);
     const nameMap = new Map(filtered.map((c) => [c.id, c.name]));
@@ -119,7 +121,10 @@ export async function startLogWorker(): Promise<void> {
         excluded: containers.filter((c) => !filtered.some((f) => f.id === c.id)).map((c) => c.name),
       });
     }
-    logger.info("[log-worker] Streaming from containers", { count: ids.length, names: filtered.map((c) => c.name).join(", ") });
+    logger.info("[log-worker] Streaming from containers", {
+      count: ids.length,
+      names: filtered.map((c) => c.name).join(", "),
+    });
     cleanup = startLogStreamer(ids, onBatch, undefined, nameMap);
     recordWorkerRun("log");
   } catch (err) {

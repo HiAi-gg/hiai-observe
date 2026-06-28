@@ -1,15 +1,16 @@
+import { and, count, desc, eq, ilike } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { parseLimit, parseOffset } from "../lib/pagination.js";
 import { db } from "../store/db.js";
-import { issues, events, teamMembers } from "../store/schema.js";
-import { eq, and, ilike, desc, count, } from "drizzle-orm";
+import { events, issues, teamMembers } from "../store/schema.js";
 
 export const issuesPlugin = new Elysia({ prefix: "/api" })
   .get(
     "/issues",
     async ({ query }) => {
       const { projectId, status, search, environment, level, limit = "50", offset = "0" } = query;
-      const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-      const off = Math.max(parseInt(offset, 10) || 0, 0);
+      const lim = parseLimit(limit);
+      const off = parseOffset(offset);
 
       const conditions = [];
       if (projectId) conditions.push(eq(issues.projectId, projectId));
@@ -36,6 +37,11 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
     {
       query: t.Object({
         projectId: t.Optional(t.String({ format: "uuid" })),
+        // tenantId is accepted as an alias for projectId. tenantScopePlugin
+        // resolves it to the bound project UUID before the handler runs.
+        // We accept untyped strings (no UUID format) so non-UUID tenant
+        // identifiers used by hiai-admin work transparently.
+        tenantId: t.Optional(t.String()),
         status: t.Optional(t.String()),
         search: t.Optional(t.String()),
         environment: t.Optional(t.String()),
@@ -49,10 +55,14 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
     "/issues/:id",
     async ({ params, set }) => {
       const issue = await db.select().from(issues).where(eq(issues.id, params.id)).limit(1);
-      if (!issue[0]) { set.status = 404; return { error: "Issue not found" }; }
+      if (!issue[0]) {
+        set.status = 404;
+        return { error: "Issue not found" };
+      }
 
       const latestEvents = await db
-        .select().from(events)
+        .select()
+        .from(events)
         .where(eq(events.issueId, params.id))
         .orderBy(desc(events.createdAt))
         .limit(5);
@@ -68,7 +78,7 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
 
       if (body.status !== undefined) {
         const validStatuses = ["unresolved", "resolved", "ignored"] as const;
-        if (!validStatuses.includes(body.status as typeof validStatuses[number])) {
+        if (!validStatuses.includes(body.status as (typeof validStatuses)[number])) {
           set.status = 400;
           return { error: "Invalid status. Must be: unresolved, resolved, ignored" };
         }
@@ -80,7 +90,8 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
           updateData.assignedTo = null;
         } else {
           // Verify team member exists
-          const member = await db.select({ id: teamMembers.id })
+          const member = await db
+            .select({ id: teamMembers.id })
             .from(teamMembers)
             .where(eq(teamMembers.id, body.assignedTo))
             .limit(1);
@@ -103,7 +114,10 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
         .where(eq(issues.id, params.id))
         .returning();
 
-      if (!updated[0]) { set.status = 404; return { error: "Issue not found" }; }
+      if (!updated[0]) {
+        set.status = 404;
+        return { error: "Issue not found" };
+      }
       return updated[0];
     },
     {
@@ -122,13 +136,26 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
 
       // Verify target exists
       const target = await db.select().from(issues).where(eq(issues.id, targetIssueId)).limit(1);
-      if (!target[0]) { set.status = 404; return { error: "Target issue not found" }; }
+      if (!target[0]) {
+        set.status = 404;
+        return { error: "Target issue not found" };
+      }
 
       // Verify sources exist
       for (const srcId of sourceIssueIds) {
-        if (srcId === targetIssueId) { set.status = 400; return { error: "Cannot merge issue with itself" }; }
-        const src = await db.select({ id: issues.id }).from(issues).where(eq(issues.id, srcId)).limit(1);
-        if (!src[0]) { set.status = 404; return { error: `Source issue ${srcId} not found` }; }
+        if (srcId === targetIssueId) {
+          set.status = 400;
+          return { error: "Cannot merge issue with itself" };
+        }
+        const src = await db
+          .select({ id: issues.id })
+          .from(issues)
+          .where(eq(issues.id, srcId))
+          .limit(1);
+        if (!src[0]) {
+          set.status = 404;
+          return { error: `Source issue ${srcId} not found` };
+        }
       }
 
       // Move events, update target count, delete sources — all in one transaction
@@ -169,8 +196,15 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
   .delete(
     "/issues/:id",
     async ({ params, set }) => {
-      const existing = await db.select({ id: issues.id }).from(issues).where(eq(issues.id, params.id)).limit(1);
-      if (!existing[0]) { set.status = 404; return { error: "Issue not found" }; }
+      const existing = await db
+        .select({ id: issues.id })
+        .from(issues)
+        .where(eq(issues.id, params.id))
+        .limit(1);
+      if (!existing[0]) {
+        set.status = 404;
+        return { error: "Issue not found" };
+      }
 
       await db.transaction(async (tx) => {
         await tx.delete(events).where(eq(events.issueId, params.id));

@@ -5,9 +5,21 @@
  * Skipped by default. Set INTEGRATION=1 to enable.
  */
 
-import { db } from "../../src/store/db.js";
-import { projects, events, issues, traces, uptimeMonitors, uptimeChecks, alerts, alertHistory, logs, containerStats, hostStats } from "../../src/store/schema.js";
 import { eq } from "drizzle-orm";
+import { db } from "../../src/store/db.js";
+import {
+  alertHistory,
+  alerts,
+  containerStats,
+  events,
+  hostStats,
+  issues,
+  logs,
+  projects,
+  traces,
+  uptimeChecks,
+  uptimeMonitors,
+} from "../../src/store/schema.js";
 
 export const BASE_URL = process.env.HIAI_OBSERVE_URL || "http://localhost:8001";
 export const MASTER_KEY = process.env.HIAI_OBSERVE_API_KEY || "test-api-key";
@@ -37,13 +49,15 @@ export async function apiFetch(
 /**
  * Create a project via API and return its id + apiKey.
  */
-export async function createTestProjectViaApi(name = "e2e-test-project"): Promise<{ id: string; apiKey: string }> {
+export async function createTestProjectViaApi(
+  name = "e2e-test-project",
+): Promise<{ id: string; apiKey: string }> {
   const res = await apiFetch("/api/projects", {
     method: "POST",
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error(`Failed to create project: ${res.status} ${await res.text()}`);
-  const data = await res.json() as { project: { id: string }; apiKey: string };
+  const data = (await res.json()) as { project: { id: string }; apiKey: string };
   return { id: data.project.id, apiKey: data.apiKey };
 }
 
@@ -86,7 +100,12 @@ export function sentryExceptionPayload(overrides?: Record<string, unknown>) {
           stacktrace: {
             frames: [
               { filename: "app.ts", function: "main", lineno: 42, in_app: true },
-              { filename: "node_modules/elysia/src/index.ts", function: "handle", lineno: 312, in_app: false },
+              {
+                filename: "node_modules/elysia/src/index.ts",
+                function: "handle",
+                lineno: 312,
+                in_app: false,
+              },
             ],
           },
         },
@@ -115,9 +134,7 @@ export function otlpTracePayload(_projectId: string) {
     resourceSpans: [
       {
         resource: {
-          attributes: [
-            { key: "service.name", value: { stringValue: "e2e-test-service" } },
-          ],
+          attributes: [{ key: "service.name", value: { stringValue: "e2e-test-service" } }],
         },
         scopeSpans: [
           {

@@ -35,4 +35,3 @@ export async function getRemainingCooldown(alertId: string): Promise<number> {
   const ttl = await redis.ttl(`${KEY_PREFIX}:${alertId}`);
   return Math.max(ttl, 0);
 }
-

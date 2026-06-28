@@ -1,12 +1,18 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema.js";
+import { config } from "../lib/config.js";
 import { setDbPoolStats } from "../middleware/metrics.js";
+import * as schema from "./schema.js";
 
-const connectionString = process.env.DATABASE_URL
-  ?? (process.env.NODE_ENV === "production"
-    ? (() => { throw new Error("DATABASE_URL is required in production"); })()
-    : "postgresql://observe:observe@localhost:5432/hiai_observe");
+const DEFAULT_DEV_DATABASE_URL = "postgresql://observe:observe@localhost:5432/hiai_observe";
+
+const connectionString =
+  config.DATABASE_URL ??
+  (config.NODE_ENV === "production"
+    ? (() => {
+        throw new Error("DATABASE_URL is required in production");
+      })()
+    : DEFAULT_DEV_DATABASE_URL);
 
 export const client = postgres(connectionString, {
   max: 20,

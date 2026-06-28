@@ -5,7 +5,9 @@
  * In production, detail is omitted from internal errors.
  */
 
-const isProd = process.env.NODE_ENV === "production";
+import { config } from "./config.js";
+
+const isProd = config.NODE_ENV === "production";
 
 export function badRequest(message: string, detail?: string) {
   return { error: message, detail };

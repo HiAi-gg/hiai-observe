@@ -5,6 +5,52 @@ All notable changes to HiAi Observe will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-06-27
+
+### Production Readiness
+- **Zero-friction install:** Quickstart now generates API key automatically. Pre-built Docker image option (`vgalibov/hiai-observe:latest`) for instant start.
+- **Complete API documentation:** 30 endpoint categories documented in `docs/api.md` (was 17).
+- **Critical test coverage:** 4 new test suites for traces, agent-ingest, projects, events.
+- **Coverage thresholds:** branches 20%, functions 20% now enforced.
+
+### Ecosystem Unification (OBS0-OBS2)
+- OBS0: Centralized Zod config, `/api/health` alias, zero `process.env` outside `config.ts`.
+- OBS1: `@hiai/ui` theme unification with `.theme-observe` design tokens.
+- OBS2: Embed contract (`EMBED.md` 1072 lines), plugin manifest (`plugin.json` 204 lines), tenant-scope middleware, tenant-health endpoint.
+
+### Verified Quality Gates
+- `tsc --noEmit`: 0 errors
+- `bunx vitest run`: 535+ tests
+- `bun run lint`: 0 errors
+- Coverage: 27.25% lines (threshold 25%)
+
+### What's in this release
+
+### Added
+- **OTLP logs endpoint** (`POST /v1/logs`) — JSON + protobuf. Field mapping: `body` → `message`, `severityText` → `level` (with `severityNumber` → text fallback 1–24 → TRACE/DEBUG/INFO/WARN/ERROR/FATAL), `timeUnixNano` → `timestamp` (ns ÷ 1 000 000), `service.instance.id` → `containerId`, `service.name` → `containerName`, full envelope → `raw` jsonb. Stream set to `"otel"` to distinguish from Docker worker rows. (`src/api/otlp.ts:414`)
+- **Log download endpoint** (`GET /api/logs/download`) — JSON-lines export of log entries with `container`, `level`, `from`, `to`, and `limit` (capped at 10 000) filters. `Content-Type: application/x-ndjson`.
+- **Per-project rate limiting** (3-bucket defense-in-depth: IP + API-key + Project). Effective limit is the tightest of the three. Redis key format `rl:proj:{projectId}:{ip}:{path}:{windowMs}`. 60s LRU cache for project lookups, invalidated on `PUT`. Fail-open on DB errors. Drizzle migration `0001_per_project_rate_limit.sql`; middleware in `src/middleware/tenant-scope.ts`. Note: Elysia 1.4 `onBeforeHandle` without `as: "global"` is local-scoped and silently no-ops on parent routes — the limiter hook is registered with `as: "global"`.
+- **AI enrichment for generic OTLP GenAI spans** — dual naming for pre-stable (`gen_ai.system`, `prompt_tokens`, `completion_tokens`, `finish_reason`) and current semconv (`gen_ai.provider.name`, `gen_ai.operation.name`, `input_tokens`, `output_tokens`, `finish_reasons[]`). Framework label inferred from `otel.scope.name`. (`src/mastra/{trace-parser,token-aggregator,latency-analyzer}.ts`)
+- **TCP port monitoring** — `Bun.connect` + `setTimeout` race, hard cap 10s, `parseTcpTarget()` accepts both `tcp://host:port` and `host:port`. (`src/monitoring/checks/tcp-check.ts`)
+- **Per-model pricing** — refreshed price table with `MODEL_PRICING` env override (JSON) for deployment-specific pricing. (Wave 5 W5.5)
+- **99 API route tests** — covers all 32 route plugins. (Wave 5 W5.7)
+- **Coverage threshold** — `vitest.config.ts` enforces `thresholds.lines: 25`; current 27.25%. (Wave 5 W5.6)
+- **Tenant health endpoint** (`GET /api/tenant/:tenantId/health`) — cross-project aggregate: projects count, total/open issues, avg uptime, last error. Admin-key auth. (`src/api/tenant-health.ts`, Wave 4 OBS2.3c)
+- **Embed + Admin Bridge routes** — `GET /api/embed/*` (proxied views) and `/api/admin-bridge/*` (cross-tenant admin operations), used by `hiai-dashboard` and `hiai-admin` to avoid re-implementing API clients. (Wave 4 OBS2.4)
+- **Tenant-scope middleware** — `?tenantId=` filtering on list endpoints. (`src/middleware/tenant-scope.ts`, Wave 4 OBS2.3b)
+- **Startup configuration summary log** — `src/lib/config.ts` now exposes `summarizeConfig()` / `formatConfigSummary()` and `src/index.ts` emits a single structured info-level line at boot reporting how many env vars are *set* (provided in env), *defaulted* (schema fallback applied), and *missing optional* (`.optional()` and absent). Important notifier omissions (TELEGRAM_, DISCORD_, SMTP_, SLACK_, WEBHOOK_, PAGERDUTY, TEAMS, NTFY, GOTIFY, PUSHOVER) get a separate `warn`-level line so operators see what's not configured without boot failing. Schema validation at module load was already in place; this surfaces its outcome as a single, structured banner.
+- **Schema coverage tests** — `tests/lib/config.test.ts` covers happy-path parsing, defaults, coercion (`PORT=8001` → number), `NODE_ENV` / `LOG_LEVEL` enums, frozen-config immutability, all four failure modes (bad enum / bad URL / non-numeric / invalid PORT path reporting), `summarizeConfig()` partitioning (set vs defaulted vs missing, empty-string-is-set, post-coerce values), and `formatConfigSummary()` rendering. 15 tests, all passing.
+- **Centralized config via Zod** — `src/lib/config.ts` is the single source of truth. `process.env` count in `src/` outside `config.ts`: **0** (verified by `grep -r 'process.env' src/ --include='*.ts' | grep -v config.ts`).
+- **Vite API-key injection for dev mode** — `frontend/vite.config.ts` reads `HIAI_OBSERVE_API_KEY` at build time and uses `define` + a custom transform plugin to substitute `__HIAI_OBSERVE_API_KEY__` in `.svelte.ts` modules (Svelte's compiler bypasses Vite's `define` for those). Replaces the prior 401-on-fresh-load issue.
+
+### Quality Gates
+- `tsc --noEmit`: 0 errors
+- `bunx vitest run`: 500 passed / 35 skipped (535 total)
+- Coverage: 27.25% lines (threshold 25%)
+- `bun build`: 2.15 MB / 630 modules
+
 ## [0.1.9] - 2026-06-10
 
 ### Infrastructure
@@ -261,9 +307,14 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.9...v0.2.0
+[0.1.9]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.6
 [0.1.5]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.2...v0.1.3
+[0.1.3]: https://github.com/HiAi-gg/hiai-observe/compare/v.1.2...v0.1.3
 [0.1.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HiAi-gg/hiai-observe/releases/tag/v0.1.0

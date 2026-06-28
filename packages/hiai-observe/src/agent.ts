@@ -54,11 +54,7 @@ async function readLoadAvg(): Promise<[number, number, number]> {
   try {
     const content = await Bun.file("/proc/loadavg").text();
     const parts = content.trim().split(/\s+/);
-    return [
-      parseFloat(parts[0] ?? "0"),
-      parseFloat(parts[1] ?? "0"),
-      parseFloat(parts[2] ?? "0"),
-    ];
+    return [parseFloat(parts[0] ?? "0"), parseFloat(parts[1] ?? "0"), parseFloat(parts[2] ?? "0")];
   } catch {
     return [0, 0, 0];
   }
@@ -229,7 +225,7 @@ async function main(): Promise<void> {
 if (typeof Bun === "undefined") {
   console.error(
     "hiai-observe-agent requires the Bun runtime (it reads host metrics via Bun APIs).\n" +
-    "Install Bun (https://bun.sh), then: bunx -p @hiai-gg/hiai-observe hiai-observe-agent",
+      "Install Bun (https://bun.sh), then: bunx -p @hiai-gg/hiai-observe hiai-observe-agent",
   );
   process.exit(1);
 }

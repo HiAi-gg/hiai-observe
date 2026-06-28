@@ -1,27 +1,31 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-  let { data = [], title = "" }: {
-    data: Array<{ label: string; value: number; color: string }>;
-    title?: string;
-  } = $props();
+let {
+  data = [],
+  title = "",
+}: {
+  data: Array<{ label: string; value: number; color: string }>;
+  title?: string;
+} = $props();
 
-  let mounted = $state(false);
-  let prefersReduced = $state(false);
+let mounted = $state(false);
+let prefersReduced = $state(false);
 
-  onMount(() => {
-    mounted = true;
-    prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  });
+onMount(() => {
+  mounted = true;
+  prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+});
 
-  const total = $derived(data.reduce((sum, d) => sum + d.value, 0));
+const total = $derived(data.reduce((sum, d) => sum + d.value, 0));
 
-  function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
-    const rad = ((angle - 90) * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-  }
+function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
+  const rad = ((angle - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
 
-  const slices = $derived((() => {
+const slices = $derived(
+  (() => {
     if (total === 0) return [];
     let startAngle = 0;
     return data.map((item) => {
@@ -35,15 +39,16 @@
       startAngle += angle;
       return { ...item, path, labelPos, percent: ((item.value / total) * 100).toFixed(1) };
     });
-  })());
+  })(),
+);
 </script>
 
 {#if title}
-  <h3 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
+  <h3 class="mb-3 text-sm font-semibold text-[var(--foreground)]">{title}</h3>
 {/if}
 
 {#if data.length === 0 || total === 0}
-  <p class="py-4 text-center text-sm text-[var(--color-text-muted)]">No data</p>
+  <p class="py-4 text-center text-sm text-[var(--muted-foreground)]">No data</p>
 {:else}
   <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
     <svg
@@ -58,7 +63,7 @@
           d={slice.path}
           fill={slice.color}
           opacity={mounted || prefersReduced ? 0.85 : 0}
-          stroke="var(--color-surface)"
+          stroke="var(--background)"
           stroke-width="2"
           class:animate-slice={mounted && !prefersReduced}
           style="animation-delay: {i * 80}ms"
@@ -72,7 +77,7 @@
             text-anchor="middle"
             dominant-baseline="central"
             class="text-[10px] font-bold"
-            fill="white"
+            fill="var(--primary-foreground)"
           >{slice.percent}%</text>
         {/if}
       {/each}
@@ -82,8 +87,8 @@
       {#each slices as slice (slice.label)}
         <div class="flex items-center gap-2">
           <span class="h-3 w-3 shrink-0 rounded-sm" style="background: {slice.color}"></span>
-          <span class="text-xs text-[var(--color-text-secondary)]">{slice.label}</span>
-          <span class="ml-auto text-xs font-medium tabular-nums text-[var(--color-text-primary)]">{slice.percent}%</span>
+          <span class="text-xs text-[var(--muted-foreground)]">{slice.label}</span>
+          <span class="ml-auto text-xs font-medium tabular-nums text-[var(--foreground)]">{slice.percent}%</span>
         </div>
       {/each}
     </div>

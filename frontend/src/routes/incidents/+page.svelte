@@ -1,144 +1,154 @@
 <script lang="ts">
-  import { currentProject, showToast } from "$lib/stores.svelte";
-  import { getIncidents, createIncident, updateIncident, deleteIncident, getMonitors, type Incident, type Monitor } from "$lib/api";
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
+import {
+  createIncident,
+  deleteIncident,
+  getIncidents,
+  getMonitors,
+  type Incident,
+  type Monitor,
+  updateIncident,
+} from "$lib/api";
+import { currentProject, showToast } from "$lib/stores.svelte";
 
-  let incidentsList = $state<Incident[]>([]);
-  let monitorsList = $state<Monitor[]>([]);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
+let incidentsList = $state<Incident[]>([]);
+let monitorsList = $state<Monitor[]>([]);
+let loading = $state(true);
+let error = $state<string | null>(null);
 
-  let newIncidentModalOpen = $state(false);
-  let dialogEl = $state<HTMLDialogElement | null>(null);
+let newIncidentModalOpen = $state(false);
+let dialogEl = $state<HTMLDialogElement | null>(null);
 
-  let newTitle = $state("");
-  let newDescription = $state("");
-  let newSeverity = $state<"minor" | "major" | "critical">("minor");
-  let newMonitorId = $state("");
+let newTitle = $state("");
+let newDescription = $state("");
+let newSeverity = $state<"minor" | "major" | "critical">("minor");
+let newMonitorId = $state("");
 
-  let submitLoading = $state(false);
+let submitLoading = $state(false);
 
-  async function loadIncidents(silent = false) {
-    if (!currentProject.current) {
-      incidentsList = [];
-      loading = false;
-      return;
-    }
-    try {
-      if (!silent) loading = true;
-      error = null;
-      const res = await getIncidents({ projectId: currentProject.current });
-      incidentsList = res.items || [];
-    } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load incidents";
-    } finally {
-      loading = false;
+async function loadIncidents(silent = false) {
+  if (!currentProject.current) {
+    incidentsList = [];
+    loading = false;
+    return;
+  }
+  try {
+    if (!silent) loading = true;
+    error = null;
+    const res = await getIncidents({ projectId: currentProject.current });
+    incidentsList = res.items || [];
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to load incidents";
+  } finally {
+    loading = false;
+  }
+}
+
+async function loadMonitors() {
+  if (!currentProject.current) return;
+  try {
+    const res = await getMonitors();
+    monitorsList = res.monitors || [];
+  } catch {
+    monitorsList = [];
+  }
+}
+
+$effect(() => {
+  if (currentProject.current) {
+    loadIncidents();
+    loadMonitors();
+  } else {
+    incidentsList = [];
+    monitorsList = [];
+    loading = false;
+  }
+});
+
+$effect(() => {
+  const interval = setInterval(() => {
+    if (currentProject.current) loadIncidents(true);
+  }, 15_000);
+  return () => clearInterval(interval);
+});
+
+$effect(() => {
+  if (dialogEl) {
+    if (newIncidentModalOpen && !dialogEl.open) {
+      dialogEl.showModal();
+    } else if (!newIncidentModalOpen && dialogEl.open) {
+      dialogEl.close();
     }
   }
+});
 
-  async function loadMonitors() {
-    if (!currentProject.current) return;
-    try {
-      const res = await getMonitors();
-      monitorsList = res.monitors || [];
-    } catch {
-      monitorsList = [];
-    }
+async function handleCreateIncident(e: SubmitEvent) {
+  e.preventDefault();
+  if (!currentProject.current || !newTitle.trim()) return;
+
+  try {
+    submitLoading = true;
+    const data = {
+      projectId: currentProject.current,
+      title: newTitle.trim(),
+      severity: newSeverity,
+      description: newDescription.trim() || undefined,
+      monitorId: newMonitorId || undefined,
+    };
+    await createIncident(data);
+    showToast("Incident created successfully", "success");
+    newIncidentModalOpen = false;
+    newTitle = "";
+    newDescription = "";
+    newSeverity = "minor";
+    newMonitorId = "";
+    await loadIncidents();
+  } catch (e) {
+    showToast(e instanceof Error ? e.message : "Failed to create incident", "error");
+  } finally {
+    submitLoading = false;
   }
+}
 
-  $effect(() => {
-    if (currentProject.current) {
-      loadIncidents();
-      loadMonitors();
-    } else {
-      incidentsList = [];
-      monitorsList = [];
-      loading = false;
-    }
-  });
-
-  $effect(() => {
-    const interval = setInterval(() => { if (currentProject.current) loadIncidents(true); }, 15_000);
-    return () => clearInterval(interval);
-  });
-
-  $effect(() => {
-    if (dialogEl) {
-      if (newIncidentModalOpen && !dialogEl.open) {
-        dialogEl.showModal();
-      } else if (!newIncidentModalOpen && dialogEl.open) {
-        dialogEl.close();
-      }
-    }
-  });
-
-  async function handleCreateIncident(e: SubmitEvent) {
-    e.preventDefault();
-    if (!currentProject.current || !newTitle.trim()) return;
-
-    try {
-      submitLoading = true;
-      const data = {
-        projectId: currentProject.current,
-        title: newTitle.trim(),
-        severity: newSeverity,
-        description: newDescription.trim() || undefined,
-        monitorId: newMonitorId || undefined,
-      };
-      await createIncident(data);
-      showToast("Incident created successfully", "success");
-      newIncidentModalOpen = false;
-      newTitle = "";
-      newDescription = "";
-      newSeverity = "minor";
-      newMonitorId = "";
-      await loadIncidents();
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Failed to create incident", "error");
-    } finally {
-      submitLoading = false;
-    }
+async function handleStatusTransition(incident: Incident, nextStatus: string) {
+  try {
+    await updateIncident(incident.id, { status: nextStatus });
+    showToast(`Incident status updated to ${nextStatus}`, "success");
+    await loadIncidents();
+  } catch (e) {
+    showToast(e instanceof Error ? e.message : "Failed to update status", "error");
   }
+}
 
-  async function handleStatusTransition(incident: Incident, nextStatus: string) {
-    try {
-      await updateIncident(incident.id, { status: nextStatus });
-      showToast(`Incident status updated to ${nextStatus}`, "success");
-      await loadIncidents();
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Failed to update status", "error");
-    }
+async function handleDeleteIncident(id: string) {
+  if (!confirm("Are you sure you want to delete this incident?")) return;
+  try {
+    await deleteIncident(id);
+    showToast("Incident deleted", "success");
+    await loadIncidents();
+  } catch (e) {
+    showToast(e instanceof Error ? e.message : "Failed to delete incident", "error");
   }
+}
 
-  async function handleDeleteIncident(id: string) {
-    if (!confirm("Are you sure you want to delete this incident?")) return;
-    try {
-      await deleteIncident(id);
-      showToast("Incident deleted", "success");
-      await loadIncidents();
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Failed to delete incident", "error");
-    }
-  }
-
-  function getStatusTransitions(status: string): string[] {
-    if (status === "investigating") return ["identified", "monitoring", "resolved"];
-    if (status === "identified") return ["investigating", "monitoring", "resolved"];
-    if (status === "monitoring") return ["investigating", "identified", "resolved"];
-    return [];
-  }
+function getStatusTransitions(status: string): string[] {
+  if (status === "investigating") return ["identified", "monitoring", "resolved"];
+  if (status === "identified") return ["investigating", "monitoring", "resolved"];
+  if (status === "monitoring") return ["investigating", "identified", "resolved"];
+  return [];
+}
 </script>
 
 <div class="space-y-6">
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-[var(--color-text-primary)]">Incident Management</h1>
-      <p class="text-sm text-[var(--color-text-muted)]">Track, update, and resolve active service outages</p>
+      <h1 class="text-2xl font-bold text-[var(--foreground)]">Incident Management</h1>
+      <p class="text-sm text-[var(--muted-foreground)]">Track, update, and resolve active service outages</p>
     </div>
     {#if currentProject.current}
       <button type="button"
         onclick={() => { newIncidentModalOpen = true; }}
-        class="inline-flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        class="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--primary-hover)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
       >
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -149,62 +159,62 @@
   </div>
 
   {#if !currentProject.current}
-    <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-12 text-center">
-      <svg class="mx-auto h-12 w-12 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
+      <svg class="mx-auto h-12 w-12 text-[var(--muted-foreground)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
-      <h3 class="mt-4 text-lg font-bold text-[var(--color-text-primary)]">No project selected</h3>
-      <p class="mt-2 text-sm text-[var(--color-text-muted)]">Please select a project from the sidebar to manage its incidents.</p>
+      <h3 class="mt-4 text-lg font-bold text-[var(--foreground)]">No project selected</h3>
+      <p class="mt-2 text-sm text-[var(--muted-foreground)]">Please select a project from the sidebar to manage its incidents.</p>
     </div>
   {:else if loading}
     <div class="flex flex-col items-center justify-center py-24 space-y-4">
-      <div class="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-accent)] border-t-transparent"></div>
-      <p class="text-sm font-medium text-[var(--color-text-muted)]">Loading incidents...</p>
+      <div class="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent"></div>
+      <p class="text-sm font-medium text-[var(--muted-foreground)]">Loading incidents...</p>
     </div>
   {:else if error}
     <div class="rounded-xl border border-red-900/30 bg-red-950/20 p-8 text-center">
       <svg class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
       </svg>
-      <h3 class="mt-4 text-lg font-bold text-[var(--color-text-primary)]">Failed to load incidents</h3>
+      <h3 class="mt-4 text-lg font-bold text-[var(--foreground)]">Failed to load incidents</h3>
       <p class="mt-2 text-sm text-red-300">{error}</p>
-      <button type="button" onclick={() => loadIncidents()} class="mt-6 inline-flex items-center rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] shadow-sm hover:bg-[var(--color-surface-overlay)] transition-colors">
+      <button type="button" onclick={() => loadIncidents()} class="mt-6 inline-flex items-center rounded-lg bg-[var(--card)] border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--muted-foreground)] shadow-sm hover:bg-[var(--accent)] transition-colors">
         Retry
       </button>
     </div>
   {:else if incidentsList.length === 0}
-    <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-12 text-center">
-      <svg class="mx-auto h-12 w-12 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
+      <svg class="mx-auto h-12 w-12 text-[var(--muted-foreground)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="mt-4 text-lg font-bold text-[var(--color-text-primary)]">No incidents found</h3>
-      <p class="mt-2 text-sm text-[var(--color-text-muted)]">All systems are operational. Create a new incident to report an issue.</p>
+      <h3 class="mt-4 text-lg font-bold text-[var(--foreground)]">No incidents found</h3>
+      <p class="mt-2 text-sm text-[var(--muted-foreground)]">All systems are operational. Create a new incident to report an issue.</p>
     </div>
   {:else}
-    <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
-      <table class="min-w-full divide-y divide-[var(--color-border)]">
-        <thead class="bg-[var(--color-surface-overlay)]">
+    <div class="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <table class="min-w-full divide-y divide-[var(--border)]">
+        <thead class="bg-[var(--accent)]">
           <tr>
-            <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Incident</th>
-            <th scope="col" class="px-6 py-3.5 class:hidden sm:table-cell text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Severity</th>
-            <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Status</th>
-            <th scope="col" class="px-6 py-3.5 class:hidden md:table-cell text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Created At</th>
-            <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Actions</th>
+            <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Incident</th>
+            <th scope="col" class="px-6 py-3.5 class:hidden sm:table-cell text-left text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Severity</th>
+            <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Status</th>
+            <th scope="col" class="px-6 py-3.5 class:hidden md:table-cell text-left text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Created At</th>
+            <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-[var(--color-border)]">
+        <tbody class="divide-y divide-[var(--border)]">
           {#each incidentsList as incident (incident.id)}
-            <tr class="hover:bg-[var(--color-surface-overlay)] transition-colors">
+            <tr class="hover:bg-[var(--accent)] transition-colors">
               <td class="px-6 py-4">
                 <div class="flex flex-col">
-                  <span class="font-semibold text-[var(--color-text-primary)]">{incident.title}</span>
+                  <span class="font-semibold text-[var(--foreground)]">{incident.title}</span>
                   {#if incident.description}
-                    <span class="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">{incident.description}</span>
+                    <span class="text-xs text-[var(--muted-foreground)] mt-1 line-clamp-1">{incident.description}</span>
                   {/if}
                   {#if incident.monitorId}
                     {@const mon = monitorsList.find(m => m.id === incident.monitorId)}
                     {#if mon}
-                      <span class="inline-flex items-center gap-1 text-[10px] text-[var(--color-accent)] mt-1.5 font-medium">
+                      <span class="inline-flex items-center gap-1 text-[10px] text-[var(--primary)] mt-1.5 font-medium">
                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -232,7 +242,7 @@
                   </span>
                 </div>
               </td>
-              <td class="px-6 py-4 class:hidden md:table-cell whitespace-nowrap text-sm text-[var(--color-text-muted)]">
+              <td class="px-6 py-4 class:hidden md:table-cell whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                 {new Date(incident.createdAt).toLocaleString()}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -241,7 +251,7 @@
                     <div class="relative inline-block text-left">
                       <select
                         onchange={(e) => handleStatusTransition(incident, e.currentTarget.value)}
-                        class="block w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                        class="block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-1.5 text-xs text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                       >
                         <option value="" disabled selected>Update Status</option>
                         {#each getStatusTransitions(incident.status) as nextStatus}
@@ -252,7 +262,7 @@
                   {/if}
                   <button type="button"
                     onclick={() => handleDeleteIncident(incident.id)}
-                    class="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-danger)] transition-colors"
+                    class="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--destructive)] transition-colors"
                     aria-label="Delete incident"
                   >
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -272,12 +282,12 @@
 <dialog
   bind:this={dialogEl}
   onclose={() => { newIncidentModalOpen = false; }}
-  class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0 shadow-2xl backdrop:bg-black/50 w-full max-w-lg"
+  class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-0 shadow-2xl backdrop:bg-black/50 w-full max-w-lg"
 >
   <div class="p-6">
-    <div class="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
-      <h3 class="text-lg font-bold text-[var(--color-text-primary)]">Report New Incident</h3>
-      <button type="button" onclick={() => { newIncidentModalOpen = false; }} class="rounded-lg p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-overlay)] transition-colors">
+    <div class="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      <h3 class="text-lg font-bold text-[var(--foreground)]">Report New Incident</h3>
+      <button type="button" onclick={() => { newIncidentModalOpen = false; }} class="rounded-lg p-1 text-[var(--muted-foreground)] hover:bg-[var(--accent)] transition-colors">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -286,35 +296,35 @@
 
     <form onsubmit={handleCreateIncident} class="mt-4 space-y-4">
       <div>
-        <label for="title" class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Title</label>
+        <label for="title" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Title</label>
         <input
           type="text"
           id="title"
           required
           bind:value={newTitle}
           placeholder="e.g. Major Database Latency Spike"
-          class="mt-1.5 block w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          class="mt-1.5 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         />
       </div>
 
       <div>
-        <label for="description" class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Description</label>
+        <label for="description" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Description</label>
         <textarea
           id="description"
           bind:value={newDescription}
           placeholder="Describe the symptoms, impact, and current investigation steps..."
           rows="3"
-          class="mt-1.5 block w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          class="mt-1.5 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         ></textarea>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label for="severity" class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Severity</label>
+          <label for="severity" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Severity</label>
           <select
             id="severity"
             bind:value={newSeverity}
-            class="mt-1.5 block w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+            class="mt-1.5 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="minor">Minor</option>
             <option value="major">Major</option>
@@ -323,11 +333,11 @@
         </div>
 
         <div>
-          <label for="monitor" class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Linked Monitor</label>
+          <label for="monitor" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Linked Monitor</label>
           <select
             id="monitor"
             bind:value={newMonitorId}
-            class="mt-1.5 block w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+            class="mt-1.5 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm text-[var(--foreground)] shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="">None</option>
             {#each monitorsList as monitor}
@@ -337,17 +347,17 @@
         </div>
       </div>
 
-      <div class="mt-6 flex justify-end gap-3 border-t border-[var(--color-border)] pt-4">
+      <div class="mt-6 flex justify-end gap-3 border-t border-[var(--border)] pt-4">
         <button type="button"
           onclick={() => { newIncidentModalOpen = false; }}
-          class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-overlay)]"
+          class="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)]"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitLoading}
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+          class="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-50"
         >
           {#if submitLoading}
             Creating...

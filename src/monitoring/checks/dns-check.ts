@@ -78,9 +78,7 @@ export async function runDnsCheck(config: DnsCheckConfig): Promise<CheckResult> 
 
     // Validate expected value if provided
     if (config.expectedValue) {
-      const matches = records.some(
-        (r) => r.toLowerCase() === config.expectedValue?.toLowerCase()
-      );
+      const matches = records.some((r) => r.toLowerCase() === config.expectedValue?.toLowerCase());
       if (!matches) {
         return {
           status: "down",

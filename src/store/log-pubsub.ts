@@ -1,4 +1,6 @@
 import { Redis } from "ioredis";
+import { config } from "../lib/config.js";
+import { logger } from "../lib/logger.js";
 import type { LogEntry } from "../monitoring/log-streamer.js";
 import { redis } from "./redis.js";
 
@@ -12,8 +14,7 @@ let subscriber: Redis | null = null;
 
 function getSubscriber(): Redis {
   if (!subscriber) {
-    const url = process.env.REDIS_URL || "redis://localhost:6379";
-    subscriber = new Redis(url, { lazyConnect: true });
+    subscriber = new Redis(config.REDIS_URL, { lazyConnect: true });
   }
   return subscriber;
 }
@@ -34,7 +35,9 @@ export async function publishLog(entry: LogEntry): Promise<void> {
     await redis.lpush(key, payload);
     await redis.ltrim(key, 0, MAX_RECENT_LOGS - 1);
   } catch (err) {
-    console.error("[log-pubsub] Publish error:", err);
+    logger.error("[log-pubsub] Publish error", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -44,7 +47,7 @@ export async function publishLog(entry: LogEntry): Promise<void> {
  */
 export async function subscribeLogs(
   containerId: string,
-  callback: (entry: LogEntry) => void
+  callback: (entry: LogEntry) => void,
 ): Promise<() => void> {
   const sub = getSubscriber();
   const channel = `${LOGS_CHANNEL_PREFIX}${containerId}`;
@@ -72,9 +75,7 @@ export async function subscribeLogs(
  * Subscribe to all container logs via pattern subscription.
  * Returns unsubscribe function.
  */
-export async function subscribeAllLogs(
-  callback: (entry: LogEntry) => void
-): Promise<() => void> {
+export async function subscribeAllLogs(callback: (entry: LogEntry) => void): Promise<() => void> {
   const sub = getSubscriber();
 
   const handler = (_pattern: string, ch: string, message: string) => {
@@ -98,10 +99,7 @@ export async function subscribeAllLogs(
 /**
  * Get recent logs from Redis for a container (last N entries).
  */
-export async function getRecentLogs(
-  containerId: string,
-  count = 100
-): Promise<LogEntry[]> {
+export async function getRecentLogs(containerId: string, count = 100): Promise<LogEntry[]> {
   const key = `${LOGS_RECENT_PREFIX}${containerId}`;
   const raw = await redis.lrange(key, 0, count - 1);
 

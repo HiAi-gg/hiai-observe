@@ -41,13 +41,13 @@ Two workflows run automatically on the `v*` tag push:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `.github/workflows/publish.yml` | tag `v*` | Publishes 4 npm packages with provenance |
-| `.github/workflows/docker.yml` | tag `v*` | Builds and pushes multi-arch Docker image to `hiai-observe/hiai-observe` on Docker Hub |
+| `.github/workflows/publish.yml` | tag `v*` | Publishes 1 npm package (`@hiai-gg/hiai-observe`) with provenance |
+| `.github/workflows/docker.yml` | tag `v*` | Builds and pushes multi-arch Docker image to `vgalibov/hiai-observe` on Docker Hub |
 
 Required secrets (set in repo Settings → Secrets and variables → Actions):
 
-- `NPM_TOKEN` — npm automation token, scope `@hiai-observe`
-- `DOCKERHUB_USERNAME` — Docker Hub account that owns the `hiai-observe` org
+- `NPM_TOKEN` — npm automation token, scope `@hiai-gg`
+- `DOCKERHUB_USERNAME` — Docker Hub account that owns the `vgalibov` org
 - `DOCKERHUB_TOKEN` — Docker Hub access token
 
 ## 5. Manual post-release tasks

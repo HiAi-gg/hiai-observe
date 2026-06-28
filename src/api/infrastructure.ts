@@ -7,14 +7,14 @@ import { Elysia, t } from "elysia";
 import { collectDockerStats } from "../monitoring/docker-collector.js";
 import { collectHostStats } from "../monitoring/host-collector.js";
 import {
-  getContainerStatsByContainer,
-  getLatestContainerStats,
-  getHostStatsHistory,
-  getLatestHostStats,
   getContainerLogCounts,
-  listHosts,
+  getContainerStatsByContainer,
   getGpuStatsHistory,
+  getHostStatsHistory,
+  getLatestContainerStats,
   getLatestGpuStats,
+  getLatestHostStats,
+  listHosts,
 } from "../store/infra.js";
 
 export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" })
@@ -42,7 +42,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       query: t.Object({
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .get(
@@ -60,7 +60,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
         to: t.Optional(t.String()),
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .get(
@@ -88,7 +88,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       query: t.Object({
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .get(
@@ -106,7 +106,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
         to: t.Optional(t.String()),
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .get(
@@ -142,7 +142,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       query: t.Object({
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   // List all known hosts
@@ -163,7 +163,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       query: t.Object({
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   // GPU stats history
@@ -182,5 +182,5 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
         to: t.Optional(t.String()),
         hostId: t.Optional(t.String()),
       }),
-    }
+    },
   );

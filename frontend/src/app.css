@@ -1,34 +1,15 @@
 @import "tailwindcss";
 @import "@hiai/ui/styles/tokens.css";
 
-/* ── Observe semantic token aliases ──
- * tokens.css defines the canonical shadcn palette (:root / .dark / .theme-observe).
- * Observe's components reference observe-flavored names (--color-surface-raised,
- * --color-text-muted, --color-accent-bg, etc.). We alias them to the canon so
- * there is one source of truth — no hex duplication. */
-.theme-observe {
-  --color-surface: var(--background);
-  --color-surface-raised: var(--card);
-  --color-surface-overlay: var(--accent);
-  --color-border: var(--border);
-  --color-text-primary: var(--foreground);
-  --color-text-secondary: var(--muted-foreground);
-  --color-text-muted: var(--muted-foreground);
-  --color-accent: var(--primary);
-  --color-accent-hover: var(--primary-hover);
-  --color-accent-bg: color-mix(in oklch, var(--primary) 12%, transparent);
-  --color-success: var(--success);
-  --color-success-bg: color-mix(in oklch, var(--success) 18%, transparent);
-  --color-warning: var(--warning);
-  --color-warning-bg: color-mix(in oklch, var(--warning) 18%, transparent);
-  --color-danger: var(--destructive);
-  --color-danger-bg: color-mix(in oklch, var(--destructive) 18%, transparent);
-  --color-info: var(--info);
-  --color-info-bg: color-mix(in oklch, var(--info) 18%, transparent);
-  --color-violet: var(--violet);
-  --color-violet-bg: color-mix(in oklch, var(--violet) 18%, transparent);
-}
+/* Tailwind v4 content scanner — shadcn-svelte's `cn(buttonVariants({...}))`
+ * runtime generates utility classes (bg-primary, text-foreground, etc.) from
+ * `@hiai/ui`. Vite's auto-discovery only scans the consumer project, not
+ * workspace packages, so this directive tells Tailwind to scan hiai-ui's
+ * source tree for class names. Path is relative to this file:
+ *   frontend/src/app.css → 4 levels up → /mnt/ai_data/packages/hiai-ui/src. */
+@source "../../../../packages/hiai-ui/src";
 
+/* Reduced-motion preference (not covered by tokens.css — observe-specific UX) */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -40,13 +21,15 @@
   }
 }
 
+/* Document base — uses canonical shadcn tokens (--background, --foreground)
+ * defined in @hiai/ui/styles/tokens.css under :root and .theme-observe. */
 body {
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* Scrollbar */
+/* Scrollbar — uses canonical --accent (overlay) and --muted-foreground (hover). */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -57,10 +40,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-surface-overlay);
+  background: var(--accent);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: var(--muted-foreground);
 }

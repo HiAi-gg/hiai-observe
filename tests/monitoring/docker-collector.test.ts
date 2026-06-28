@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getConfig, resetConfig } from "../../src/monitoring/config.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getMonitoringConfig, resetMonitoringConfig } from "../../src/lib/config.js";
 
 describe("collectDockerStats", () => {
   beforeEach(() => {
-    resetConfig();
+    resetMonitoringConfig();
   });
 
   it("returns correct ContainerStats structure", async () => {
@@ -86,7 +86,7 @@ describe("collectDockerStats", () => {
   it("handles missing Docker socket gracefully", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(() =>
-      Promise.reject(new Error("ENOENT: no such file or directory"))
+      Promise.reject(new Error("ENOENT: no such file or directory")),
     ) as typeof fetch;
 
     try {
@@ -98,7 +98,7 @@ describe("collectDockerStats", () => {
   });
 
   it("config reads from environment", () => {
-    const config = getConfig();
+    const config = getMonitoringConfig();
     expect(config).toHaveProperty("dockerSocket");
     expect(config).toHaveProperty("collectionIntervalMs");
     expect(config).toHaveProperty("containerFilter");

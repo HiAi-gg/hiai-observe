@@ -8,8 +8,9 @@
  * Gracefully disabled when HEALTH_PING_URL is not set.
  */
 
-import { getWorkerHealth } from "../workers/health.js";
+import { config } from "../lib/config.js";
 import { logger } from "../lib/logger.js";
+import { getWorkerHealth } from "../workers/health.js";
 
 const PING_INTERVAL_MS = 60_000; // 60 seconds
 
@@ -25,7 +26,7 @@ function getMemoryStats(): { rssMb: number; heapUsedMb: number; heapTotalMb: num
 }
 
 async function sendPing(): Promise<void> {
-  const url = process.env.HEALTH_PING_URL;
+  const url = config.HEALTH_PING_URL;
   if (!url) return;
 
   const workers = getWorkerHealth();
@@ -37,9 +38,7 @@ async function sendPing(): Promise<void> {
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     memory,
-    workers: Object.fromEntries(
-      Object.entries(workers).map(([name, w]) => [name, w.status])
-    ),
+    workers: Object.fromEntries(Object.entries(workers).map(([name, w]) => [name, w.status])),
   };
 
   try {
@@ -71,7 +70,7 @@ async function sendPing(): Promise<void> {
 }
 
 export function startHealthPinger(): void {
-  const url = process.env.HEALTH_PING_URL;
+  const url = config.HEALTH_PING_URL;
   if (!url) {
     logger.info("Health pinger: disabled (HEALTH_PING_URL not set)");
     return;
@@ -83,7 +82,9 @@ export function startHealthPinger(): void {
 
   // Initial ping after 5s
   setTimeout(() => {
-    sendPing().catch((err) => logger.error("Health ping: initial send failed", { error: String(err) }));
+    sendPing().catch((err) =>
+      logger.error("Health ping: initial send failed", { error: String(err) }),
+    );
   }, 5_000);
 
   intervalId = setInterval(() => {

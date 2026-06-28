@@ -2,7 +2,7 @@
  * Tests for Alert Rules Engine
  */
 
-import { describe, it, expect, vi, } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the database module
 vi.mock("../../src/store/db.js", () => ({
@@ -36,14 +36,19 @@ describe("AlertCondition comparison", () => {
   function compare(
     value: number,
     operator: "gt" | "lt" | "eq" | "gte" | "lte",
-    threshold: number
+    threshold: number,
   ): boolean {
     switch (operator) {
-      case "gt": return value > threshold;
-      case "lt": return value < threshold;
-      case "eq": return value === threshold;
-      case "gte": return value >= threshold;
-      case "lte": return value <= threshold;
+      case "gt":
+        return value > threshold;
+      case "lt":
+        return value < threshold;
+      case "eq":
+        return value === threshold;
+      case "gte":
+        return value >= threshold;
+      case "lte":
+        return value <= threshold;
     }
   }
 
@@ -144,11 +149,7 @@ describe("Consecutive failures (uptime_down)", () => {
 
 describe("Token usage aggregation", () => {
   it("sums total tokens from rows", () => {
-    const rows = [
-      { total: 1500 },
-      { total: 2300 },
-      { total: 800 },
-    ];
+    const rows = [{ total: 1500 }, { total: 2300 }, { total: 800 }];
     const sum = rows.reduce((acc, r) => acc + r.total, 0);
 
     expect(sum).toBe(4600);
@@ -168,25 +169,24 @@ describe("Resource threshold", () => {
     ["cpu", 75, "gt", 80, false],
     ["memory", 90, "gte", 90, true],
     ["disk", 50, "lte", 80, true],
-  ])(
-    "%s: value=%d %s %d → %s",
-    (_resource, value, operator, threshold, expected) => {
-      const compare = (
-        v: number,
-        op: string,
-        t: number
-      ): boolean => {
-        switch (op) {
-          case "gt": return v > t;
-          case "lt": return v < t;
-          case "eq": return v === t;
-          case "gte": return v >= t;
-          case "lte": return v <= t;
-          default: return false;
-        }
-      };
+  ])("%s: value=%d %s %d → %s", (_resource, value, operator, threshold, expected) => {
+    const compare = (v: number, op: string, t: number): boolean => {
+      switch (op) {
+        case "gt":
+          return v > t;
+        case "lt":
+          return v < t;
+        case "eq":
+          return v === t;
+        case "gte":
+          return v >= t;
+        case "lte":
+          return v <= t;
+        default:
+          return false;
+      }
+    };
 
-      expect(compare(value, operator, threshold)).toBe(expected);
-    }
-  );
+    expect(compare(value, operator, threshold)).toBe(expected);
+  });
 });

@@ -39,25 +39,30 @@ export function stripAnsi(str: string): string {
 export function isJson(str: string): boolean {
   if (!str || typeof str !== "string") return false;
   const trimmed = str.trim();
-  return (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  return (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  );
 }
 
 // Syntax-highlight a JSON value for HTML display
 export function highlightJson(value: unknown, indent = 2): string {
   const json = JSON.stringify(value, null, indent);
   if (!json) return "";
-  return json
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    // Keys
-    .replace(/"([^"]+)":/g, '<span class="text-[var(--color-accent)]">"$1"</span>:')
-    // String values
-    .replace(/: "([^"]*)"(,?)/g, ': <span class="text-[var(--color-success)]">"$1"</span>$2')
-    // Numbers
-    .replace(/: (\d+\.?\d*)(,?)/g, ': <span class="text-[var(--color-warning)]">$1</span>$2')
-    // Booleans/null
-    .replace(/: (true|false|null)(,?)/g, ': <span class="text-[var(--color-violet)]">$1</span>$2');
+  return (
+    json
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // Keys
+      .replace(/"([^"]+)":/g, '<span class="text-[var(--primary)]">"$1"</span>:')
+      // String values
+      .replace(/: "([^"]*)"(,?)/g, ': <span class="text-[var(--success)]">"$1"</span>$2')
+      // Numbers
+      .replace(/: (\d+\.?\d*)(,?)/g, ': <span class="text-[var(--warning)]">$1</span>$2')
+      // Booleans/null
+      .replace(/: (true|false|null)(,?)/g, ': <span class="text-[var(--violet)]">$1</span>$2')
+  );
 }
 
 // Detect stack trace lines
@@ -65,11 +70,11 @@ export function isStackTrace(message: string): boolean {
   const lines = message.split("\n");
   if (lines.length < 2) return false;
   const stackPatterns = [
-    /^\s+at\s+/,              // Node/Bun: "at functionName (file:line:col)"
+    /^\s+at\s+/, // Node/Bun: "at functionName (file:line:col)"
     /^Traceback \(most recent/, // Python
-    /^File "/,                  // Python file lines
-    /^\s+File "/,               // Python nested file lines
-    /^\[ERROR\]/,               // Generic error prefix with stack
+    /^File "/, // Python file lines
+    /^\s+File "/, // Python nested file lines
+    /^\[ERROR\]/, // Generic error prefix with stack
   ];
   let matchCount = 0;
   for (const line of lines) {

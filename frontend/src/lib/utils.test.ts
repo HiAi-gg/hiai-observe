@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { debounce, formatBytes, formatDuration, timeAgo, stripAnsi, isJson, highlightJson, isStackTrace } from "./utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  debounce,
+  formatBytes,
+  formatDuration,
+  highlightJson,
+  isJson,
+  isStackTrace,
+  stripAnsi,
+  timeAgo,
+} from "./utils";
 
 describe("utils", () => {
   // --- timeAgo ---
@@ -210,25 +219,25 @@ describe("utils", () => {
 
     it("highlights keys", () => {
       const result = highlightJson({ name: "test" });
-      expect(result).toContain("text-[var(--color-accent)]");
+      expect(result).toContain("text-[var(--primary)]");
       expect(result).toContain('"name"');
     });
 
     it("highlights string values", () => {
       const result = highlightJson({ name: "test" });
-      expect(result).toContain("text-[var(--color-success)]");
+      expect(result).toContain("text-[var(--success)]");
       expect(result).toContain('"test"');
     });
 
     it("highlights numbers", () => {
       const result = highlightJson({ count: 42 });
-      expect(result).toContain("text-[var(--color-warning)]");
+      expect(result).toContain("text-[var(--warning)]");
       expect(result).toContain("42");
     });
 
     it("highlights booleans and null", () => {
       const result = highlightJson({ active: true, deleted: false, extra: null });
-      expect(result).toContain("text-[var(--color-violet)]");
+      expect(result).toContain("text-[var(--violet)]");
       expect(result).toContain("true");
       expect(result).toContain("false");
       expect(result).toContain("null");

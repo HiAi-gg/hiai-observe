@@ -43,7 +43,7 @@ function getStatusColor(status: SlackAlert["status"]): string {
 export async function sendSlackAlert(
   webhookUrl: string,
   alert: SlackAlert,
-  _config?: Record<string, string>
+  _config?: Record<string, string>,
 ): Promise<{ ok: boolean; error?: string }> {
   const emoji = getStatusEmoji(alert.status);
   const color = getStatusColor(alert.status);

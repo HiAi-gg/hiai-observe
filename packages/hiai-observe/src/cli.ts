@@ -88,7 +88,10 @@ function pad(s: string | number, w: number): string {
   return str.length >= w ? str.slice(0, w) : str + " ".repeat(w - str.length);
 }
 
-function table(rows: Array<Record<string, string | number>>, columns: Array<{ key: string; header: string; width: number }>) {
+function table(
+  rows: Array<Record<string, string | number>>,
+  columns: Array<{ key: string; header: string; width: number }>,
+) {
   if (rows.length === 0) {
     console.log("(no data)");
     return;
@@ -109,7 +112,12 @@ function truncate(s: string, max: number): string {
 function fmtDate(iso: string): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return iso;
   }
@@ -117,7 +125,10 @@ function fmtDate(iso: string): string {
 
 async function cmdDashboard() {
   const data = (await call("/api/dashboard")) as Record<string, unknown>;
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║        HiAi Observe Dashboard            ║");
@@ -127,8 +138,10 @@ async function cmdDashboard() {
   const kv: Array<[string, string]> = [];
   if (typeof data.errorCount24h === "number") kv.push(["Errors (24h)", String(data.errorCount24h)]);
   if (typeof data.traceCount24h === "number") kv.push(["Traces (24h)", String(data.traceCount24h)]);
-  if (typeof data.uptimePercentage === "number") kv.push(["Uptime %", `${data.uptimePercentage.toFixed(2)}%`]);
-  if (typeof data.activeContainers === "number") kv.push(["Active Containers", String(data.activeContainers)]);
+  if (typeof data.uptimePercentage === "number")
+    kv.push(["Uptime %", `${data.uptimePercentage.toFixed(2)}%`]);
+  if (typeof data.activeContainers === "number")
+    kv.push(["Active Containers", String(data.activeContainers)]);
   if (typeof data.activeAlerts === "number") kv.push(["Active Alerts", String(data.activeAlerts)]);
 
   for (const [k, v] of kv) {
@@ -180,8 +193,13 @@ async function cmdIssues(args: string[]) {
   const search = extractFlag(args, "--search");
   const limit = parseInt(extractFlag(args, "--limit") ?? "20", 10);
 
-  const data = (await call("/api/issues", { status, level, search, limit })) as { issues?: Issue[] };
-  if (IS_JSON) { out(data); return; }
+  const data = (await call("/api/issues", { status, level, search, limit })) as {
+    issues?: Issue[];
+  };
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   const issues = data.issues ?? [];
   console.log(`Issues (${issues.length} shown):`);
@@ -212,7 +230,10 @@ async function cmdIssue(args: string[]) {
     process.exit(1);
   }
   const data = await call(`/api/issues/${id}`);
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   const issue = data as Record<string, unknown>;
   console.log("╔══════════════════════════════════════════╗");
@@ -252,12 +273,17 @@ async function cmdAiCost(args: string[]) {
   const projectId = await resolveProjectId(extractFlag(args, "--project"));
 
   const data = await call("/api/traces/stats", { projectId, groupBy, from, to });
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   console.log(`AI Cost (grouped by ${groupBy}):`);
   console.log();
 
-  const stats = (data as Record<string, unknown>).tokenUsage as Array<Record<string, unknown>> | undefined;
+  const stats = (data as Record<string, unknown>).tokenUsage as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (!stats || stats.length === 0) {
     console.log("(no token usage in range)");
     return;
@@ -285,8 +311,13 @@ async function cmdTraces(args: string[]) {
   const status = extractFlag(args, "--status");
   const limit = parseInt(extractFlag(args, "--limit") ?? "20", 10);
 
-  const data = (await call("/api/traces", { workflowName, agentName, status, limit })) as { traces?: Trace[] };
-  if (IS_JSON) { out(data); return; }
+  const data = (await call("/api/traces", { workflowName, agentName, status, limit })) as {
+    traces?: Trace[];
+  };
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   const traces = data.traces ?? [];
   console.log(`Traces (${traces.length} shown):`);
@@ -312,7 +343,10 @@ async function cmdTraces(args: string[]) {
 
 async function cmdUptime() {
   const data = (await call("/api/monitors")) as { monitors?: Monitor[] };
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   const monitors = data.monitors ?? [];
   console.log(`Uptime Monitors (${monitors.length}):`);
@@ -340,15 +374,29 @@ async function cmdLogs(args: string[]) {
   const container = extractFlag(args, "--container");
   const limit = parseInt(extractFlag(args, "--limit") ?? "50", 10);
 
-  const data = (await call("/api/logs", { search, level, container, limit })) as { logs?: LogEntry[] };
-  if (IS_JSON) { out(data); return; }
+  const data = (await call("/api/logs", { search, level, container, limit })) as {
+    logs?: LogEntry[];
+  };
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   const logs = data.logs ?? [];
   console.log(`Logs (${logs.length} shown):`);
   for (const log of logs) {
-    const levelColor = log.level === "error" ? "\x1b[31m" : log.level === "warn" ? "\x1b[33m" : log.level === "info" ? "\x1b[32m" : "\x1b[36m";
+    const levelColor =
+      log.level === "error"
+        ? "\x1b[31m"
+        : log.level === "warn"
+          ? "\x1b[33m"
+          : log.level === "info"
+            ? "\x1b[32m"
+            : "\x1b[36m";
     const reset = "\x1b[0m";
-    console.log(`${levelColor}[${log.level.padEnd(5)}]${reset} ${fmtDate(log.timestamp)} ${pad(log.container, 15)} ${truncate(log.message, 80)}`);
+    console.log(
+      `${levelColor}[${log.level.padEnd(5)}]${reset} ${fmtDate(log.timestamp)} ${pad(log.container, 15)} ${truncate(log.message, 80)}`,
+    );
   }
 }
 
@@ -360,14 +408,19 @@ async function cmdInfra() {
   ]);
 
   const data = { hosts, containers, gpu };
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║        Infrastructure Status             ║");
   console.log("╚══════════════════════════════════════════╝");
   console.log();
 
-  const hostList = (hosts as Record<string, unknown>).hosts as Array<Record<string, unknown>> | undefined;
+  const hostList = (hosts as Record<string, unknown>).hosts as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (hostList && hostList.length > 0) {
     console.log("Hosts:");
     table(
@@ -389,7 +442,9 @@ async function cmdInfra() {
     console.log();
   }
 
-  const containerList = (containers as Record<string, unknown>).containers as Array<Record<string, unknown>> | undefined;
+  const containerList = (containers as Record<string, unknown>).containers as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (containerList && containerList.length > 0) {
     console.log("Containers:");
     table(
@@ -409,7 +464,9 @@ async function cmdInfra() {
     console.log();
   }
 
-  const gpuList = (gpu as Record<string, unknown>).gpus as Array<Record<string, unknown>> | undefined;
+  const gpuList = (gpu as Record<string, unknown>).gpus as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (gpuList && gpuList.length > 0) {
     console.log("GPUs:");
     table(
@@ -438,14 +495,19 @@ async function cmdAlerts(args: string[]) {
   ]);
 
   const data = { rules, history };
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║           Alerts Status                  ║");
   console.log("╚══════════════════════════════════════════╝");
   console.log();
 
-  const ruleList = (rules as Record<string, unknown>).alerts as Array<Record<string, unknown>> | undefined;
+  const ruleList = (rules as Record<string, unknown>).alerts as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (ruleList && ruleList.length > 0) {
     console.log("Alert Rules:");
     table(
@@ -467,7 +529,9 @@ async function cmdAlerts(args: string[]) {
     console.log();
   }
 
-  const histList = (history as Record<string, unknown>).history as Array<Record<string, unknown>> | undefined;
+  const histList = (history as Record<string, unknown>).history as
+    | Array<Record<string, unknown>>
+    | undefined;
   if (histList && histList.length > 0) {
     console.log("Recent History:");
     table(
@@ -489,7 +553,10 @@ async function cmdAlerts(args: string[]) {
 
 async function cmdHealth() {
   const data = await call("/health");
-  if (IS_JSON) { out(data); return; }
+  if (IS_JSON) {
+    out(data);
+    return;
+  }
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║           Health Check                   ║");
@@ -625,7 +692,9 @@ async function main() {
     }
   } catch (err) {
     if (IS_JSON) {
-      console.log(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+      console.log(
+        JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2),
+      );
     } else {
       console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : String(err)}`);
     }

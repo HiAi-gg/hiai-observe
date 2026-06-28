@@ -73,13 +73,18 @@ function tool(
     } catch (err) {
       return {
         isError: true,
-        content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }],
+        content: [
+          { type: "text" as const, text: err instanceof Error ? err.message : String(err) },
+        ],
       };
     }
   });
 }
 
-const projectId = z.string().describe("Project id (optional; defaults to the key's project)").optional();
+const projectId = z
+  .string()
+  .describe("Project id (optional; defaults to the key's project)")
+  .optional();
 
 tool(
   "observe_dashboard",
@@ -97,7 +102,13 @@ tool(
     search: z.string().optional(),
     limit: z.number().int().min(1).max(100).default(20),
   },
-  (a) => call("/api/issues", { status: a.status as string, level: a.level as string, search: a.search as string, limit: a.limit as number }),
+  (a) =>
+    call("/api/issues", {
+      status: a.status as string,
+      level: a.level as string,
+      search: a.search as string,
+      limit: a.limit as number,
+    }),
 );
 
 tool(
@@ -116,7 +127,13 @@ tool(
     from: z.string().describe("ISO start time (optional)").optional(),
     to: z.string().describe("ISO end time (optional)").optional(),
   },
-  async (a) => call("/api/traces/stats", { projectId: await resolveProjectId(a.projectId as string), groupBy: a.groupBy as string, from: a.from as string, to: a.to as string }),
+  async (a) =>
+    call("/api/traces/stats", {
+      projectId: await resolveProjectId(a.projectId as string),
+      groupBy: a.groupBy as string,
+      from: a.from as string,
+      to: a.to as string,
+    }),
 );
 
 tool(
@@ -128,7 +145,13 @@ tool(
     status: z.string().optional(),
     limit: z.number().int().min(1).max(100).default(20),
   },
-  (a) => call("/api/traces", { workflowName: a.workflowName as string, agentName: a.agentName as string, status: a.status as string, limit: a.limit as number }),
+  (a) =>
+    call("/api/traces", {
+      workflowName: a.workflowName as string,
+      agentName: a.agentName as string,
+      status: a.status as string,
+      limit: a.limit as number,
+    }),
 );
 
 tool(
@@ -147,7 +170,13 @@ tool(
     container: z.string().optional(),
     limit: z.number().int().min(1).max(200).default(50),
   },
-  (a) => call("/api/logs", { search: a.search as string, level: a.level as string, container: a.container as string, limit: a.limit as number }),
+  (a) =>
+    call("/api/logs", {
+      search: a.search as string,
+      level: a.level as string,
+      container: a.container as string,
+      limit: a.limit as number,
+    }),
 );
 
 tool(
@@ -171,10 +200,146 @@ tool(
   async (a) => {
     const [rules, history] = await Promise.all([
       call("/api/alerts"),
-      call("/api/alerts/history", { limit: a.limit as number }).catch((e) => ({ error: String(e) })),
+      call("/api/alerts/history", { limit: a.limit as number }).catch((e) => ({
+        error: String(e),
+      })),
     ]);
     return { rules, history };
   },
+);
+
+tool(
+  "observe_search",
+  "Full-text search across issues, traces, events, and logs. Cross-entity type filter.",
+  {
+    q: z.string().describe("Search query (required)"),
+    type: z.enum(["issues", "traces", "events", "logs"]).optional(),
+    projectId,
+  },
+  async (a) =>
+    call("/api/search", {
+      q: a.q as string,
+      type: a.type as string,
+      projectId: await resolveProjectId(a.projectId as string),
+    }),
+);
+
+tool(
+  "observe_list_releases",
+  "List releases with deployment health and status, newest first.",
+  {
+    projectId,
+    limit: z.number().int().min(1).max(100).default(20),
+  },
+  async (a) =>
+    call("/api/releases", {
+      projectId: await resolveProjectId(a.projectId as string),
+      limit: a.limit as number,
+    }),
+);
+
+tool("observe_list_team", "List team members for a project.", { projectId }, async (a) =>
+  call("/api/team", { projectId: await resolveProjectId(a.projectId as string) }),
+);
+
+tool(
+  "observe_list_incidents",
+  "List incidents, newest first. Filter by status (investigating/identified/monitoring/resolved).",
+  {
+    status: z.enum(["investigating", "identified", "monitoring", "resolved"]).optional(),
+    limit: z.number().int().min(1).max(100).default(20),
+  },
+  (a) =>
+    call("/api/incidents", {
+      status: a.status as string,
+      limit: a.limit as number,
+    }),
+);
+
+tool(
+  "observe_get_notifications",
+  "Get notification channel configuration for a project (Telegram, Discord, SMTP, webhooks).",
+  { projectId },
+  async (a) =>
+    call("/api/notifications", {
+      projectId: await resolveProjectId(a.projectId as string),
+    }),
+);
+
+tool(
+  "observe_list_events",
+  "List error events for a specific issue, newest first.",
+  {
+    issueId: z.string().describe("Issue id (required)"),
+    limit: z.number().int().min(1).max(100).default(20),
+  },
+  (a) =>
+    call("/api/events", {
+      issueId: a.issueId as string,
+      limit: a.limit as number,
+    }),
+);
+
+tool(
+  "observe_log_stats",
+  "Aggregated log statistics (counts by level, container, time bucket).",
+  { projectId },
+  async (a) =>
+    call("/api/logs/stats", {
+      projectId: await resolveProjectId(a.projectId as string),
+    }),
+);
+
+tool(
+  "observe_get_badge",
+  "Generate a status badge URL (uptime or incidents) in SVG or PNG format.",
+  {
+    type: z.enum(["uptime", "incidents"]).describe("Badge type"),
+    slug: z.string().describe("Project or monitor slug"),
+    id: z.string().describe("Target id (monitor or project)"),
+    format: z.enum(["svg", "png"]).default("svg"),
+  },
+  (a) =>
+    call(`/api/badges/${a.type}/${a.slug}/${a.id}`, {
+      format: a.format as string,
+    }),
+);
+
+tool(
+  "observe_list_saved_searches",
+  "List saved search queries for a project.",
+  { projectId },
+  async (a) =>
+    call("/api/saved-searches", {
+      projectId: await resolveProjectId(a.projectId as string),
+    }),
+);
+
+tool(
+  "observe_get_maintenance",
+  "List scheduled maintenance windows for a project.",
+  { projectId },
+  async (a) =>
+    call("/api/maintenance", {
+      projectId: await resolveProjectId(a.projectId as string),
+    }),
+);
+
+tool(
+  "observe_export",
+  "Export issues/traces/logs data for offline analysis (CSV or JSON).",
+  {
+    type: z.enum(["issues", "traces", "logs"]).describe("Data type to export"),
+    format: z.enum(["csv", "json"]).default("json"),
+    from: z.string().describe("ISO start time (optional)").optional(),
+    to: z.string().describe("ISO end time (optional)").optional(),
+  },
+  (a) =>
+    call(`/api/export/${a.type}`, {
+      format: a.format as string,
+      from: a.from as string,
+      to: a.to as string,
+    }),
 );
 
 await server.connect(new StdioServerTransport());

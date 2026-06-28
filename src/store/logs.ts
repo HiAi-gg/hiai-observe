@@ -1,7 +1,7 @@
+import { and, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { db } from "./db.js";
-import { logs } from "./schema.js";
-import { eq, and, gte, lte, ilike, sql, desc } from "drizzle-orm";
 import type { NewLogEntry } from "./schema.js";
+import { logs } from "./schema.js";
 
 interface SearchLogsParams {
   container?: string;
@@ -13,15 +13,22 @@ interface SearchLogsParams {
   offset?: number;
 }
 
-export async function insertLogs(entries: Array<{
-  containerId: string;
-  containerName: string;
-  stream: string;
-  message: string;
-  timestamp: Date;
-  level?: string;
-  raw?: unknown;
-}>): Promise<void> {
+export async function insertLogs(
+  entries: Array<{
+    containerId: string;
+    containerName: string;
+    stream: string;
+    message: string;
+    timestamp: Date;
+    level?: string;
+    /**
+     * Optional raw payload. Stored as JSONB in `logs.raw`. Callers may omit
+     * it — the schema column is nullable and we coerce undefined → null here
+     * so downstream consumers can rely on `raw` always being `unknown | null`.
+     */
+    raw?: unknown;
+  }>,
+): Promise<void> {
   if (entries.length === 0) return;
 
   const rows: NewLogEntry[] = entries.map((e) => ({
@@ -31,6 +38,10 @@ export async function insertLogs(entries: Array<{
     message: e.message,
     timestamp: e.timestamp,
     level: e.level ?? null,
+    // Coerce undefined → null so the JSONB column always receives a value.
+    // The schema column is `jsonb("raw")` (nullable), and a literal `null`
+    // is semantically clearer than `undefined` slipping through the ORMs
+    // type check.
     raw: e.raw ?? null,
   }));
 
@@ -75,7 +86,10 @@ export async function getLogContainers() {
 
 export async function clearLogs(before?: Date): Promise<number> {
   if (before) {
-    const result = await db.delete(logs).where(lte(logs.timestamp, before)).returning({ id: logs.id });
+    const result = await db
+      .delete(logs)
+      .where(lte(logs.timestamp, before))
+      .returning({ id: logs.id });
     return result.length;
   }
   const result = await db.delete(logs).returning({ id: logs.id });
@@ -98,7 +112,9 @@ export async function searchLogsRegex(params: SearchLogsRegexParams) {
   if (pattern.length > 300) {
     return { logs: [], total: 0, limit, offset };
   }
-  try { new RegExp(pattern); } catch {
+  try {
+    new RegExp(pattern);
+  } catch {
     return { logs: [], total: 0, limit, offset };
   }
   if (/\([^)]+\)[+*?][+*?]/.test(pattern)) {
@@ -148,7 +164,13 @@ export async function searchLogsFuzzy(params: SearchLogsFuzzyParams) {
   const where = and(...conditions);
 
   const [rows, countResult] = await Promise.all([
-    db.select().from(logs).where(where).orderBy(sql`similarity(${logs.message}, ${term}) desc`).limit(limit).offset(offset),
+    db
+      .select()
+      .from(logs)
+      .where(where)
+      .orderBy(sql`similarity(${logs.message}, ${term}) desc`)
+      .limit(limit)
+      .offset(offset),
     db.select({ count: sql<number>`count(*)` }).from(logs).where(where),
   ]);
 
@@ -167,8 +189,13 @@ export async function getLogVolume(params: LogVolumeParams) {
 
   // Map shorthand to PostgreSQL interval for date_trunc
   const truncUnit: Record<string, string> = {
-    "5m": "minute", "15m": "minute", "30m": "minute",
-    "1h": "hour", "6h": "hour", "12h": "hour", "1d": "day",
+    "5m": "minute",
+    "15m": "minute",
+    "30m": "minute",
+    "1h": "hour",
+    "6h": "hour",
+    "12h": "hour",
+    "1d": "day",
   };
   const unit = truncUnit[interval] ?? "hour";
 
@@ -194,5 +221,5 @@ export async function getLogVolume(params: LogVolumeParams) {
     .groupBy(truncExpr)
     .orderBy(truncExpr);
 
-  return rows.map(r => ({ time: r.bucket, count: r.count }));
+  return rows.map((r) => ({ time: r.bucket, count: r.count }));
 }

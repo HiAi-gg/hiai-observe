@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  parseMastraTrace,
   buildSpanTree,
   extractTokenUsageFromSpans,
   type ParsedSpan,
+  parseMastraTrace,
 } from "../../src/mastra/trace-parser.js";
 
 function makeSpan(overrides: Partial<ParsedSpan> = {}): ParsedSpan {
@@ -14,7 +14,7 @@ function makeSpan(overrides: Partial<ParsedSpan> = {}): ParsedSpan {
     name: "test-span",
     kind: "INTERNAL",
     startTimeUnixNano: "1000000000", // 1s from epoch = 1000ms
-    endTimeUnixNano: "2000000000",   // 2s from epoch = 1000ms duration
+    endTimeUnixNano: "2000000000", // 2s from epoch = 1000ms duration
     attributes: {},
     status: "STATUS_CODE_OK",
     statusMessage: null,
@@ -36,16 +36,16 @@ describe("parseMastraTrace", () => {
         spanId: "step1",
         parentSpanId: "wf1",
         name: "extract-params",
-        startTimeUnixNano: "1100000000",  // 1100ms
-        endTimeUnixNano: "1200000000",    // 1200ms = 100ms duration
+        startTimeUnixNano: "1100000000", // 1100ms
+        endTimeUnixNano: "1200000000", // 1200ms = 100ms duration
         status: "STATUS_CODE_OK",
       }),
       makeSpan({
         spanId: "step2",
         parentSpanId: "wf1",
         name: "generate-content",
-        startTimeUnixNano: "1200000000",  // 1200ms
-        endTimeUnixNano: "1800000000",    // 1800ms = 600ms duration
+        startTimeUnixNano: "1200000000", // 1200ms
+        endTimeUnixNano: "1800000000", // 1800ms = 600ms duration
         status: "STATUS_CODE_OK",
       }),
     ];
@@ -243,7 +243,7 @@ describe("extractTokenUsageFromSpans", () => {
       makeSpan({
         spanId: "span2",
         attributes: {
-          "model": "claude-3.5-sonnet",
+          model: "claude-3.5-sonnet",
           "gen_ai.usage.prompt_tokens": "2000",
           "gen_ai.usage.completion_tokens": "800",
           "gen_ai.usage.total_tokens": "2800",
@@ -261,12 +261,342 @@ describe("extractTokenUsageFromSpans", () => {
   });
 
   it("ignores spans without token usage", () => {
-    const spans: ParsedSpan[] = [
-      makeSpan({ attributes: { "http.method": "GET" } }),
-    ];
+    const spans: ParsedSpan[] = [makeSpan({ attributes: { "http.method": "GET" } })];
 
     const result = extractTokenUsageFromSpans(spans);
 
     expect(result).toHaveLength(0);
+  });
+
+  it("reads input_tokens / output_tokens (current OTel GenAI semconv names)", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        attributes: {
+          "gen_ai.provider.name": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": "750",
+          "gen_ai.usage.output_tokens": "250",
+        },
+      }),
+    ];
+
+    const result = extractTokenUsageFromSpans(spans);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].model).toBe("gpt-4o");
+    expect(result[0].promptTokens).toBe(750);
+    expect(result[0].completionTokens).toBe(250);
+    // No total_tokens attribute — total is computed as prompt + completion.
+    expect(result[0].totalTokens).toBe(1000);
+  });
+
+  it("prefers total_tokens when both total and split values are present", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "100",
+          "gen_ai.usage.completion_tokens": "50",
+          "gen_ai.usage.total_tokens": "175", // includes reasoning_tokens
+        },
+      }),
+    ];
+
+    const result = extractTokenUsageFromSpans(spans);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].totalTokens).toBe(175);
+  });
+});
+
+describe("parseMastraTrace — generic OpenTelemetry GenAI spans", () => {
+  it("extracts a span with stable pre-stable gen_ai.* attributes", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "otel1",
+        name: "openai.chat",
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "1200",
+          "gen_ai.usage.completion_tokens": "600",
+          "gen_ai.usage.total_tokens": "1800",
+          "gen_ai.response.finish_reason": "stop",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.workflowRuns).toHaveLength(0);
+    expect(result.toolCalls).toHaveLength(0);
+    expect(result.agentInteractions).toHaveLength(0);
+    expect(result.genericAiInteractions).toHaveLength(1);
+    const g = result.genericAiInteractions[0];
+    expect(g.spanId).toBe("otel1");
+    expect(g.system).toBe("openai");
+    expect(g.model).toBe("gpt-4o");
+    expect(g.promptTokens).toBe(1200);
+    expect(g.completionTokens).toBe(600);
+    expect(g.totalTokens).toBe(1800);
+    expect(g.finishReason).toBe("stop");
+    expect(g.durationMs).toBe(1000);
+  });
+
+  it("extracts a span with current OTel GenAI semconv attribute names", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "otel2",
+        name: "anthropic.messages",
+        attributes: {
+          "gen_ai.provider.name": "anthropic",
+          "gen_ai.operation.name": "chat",
+          "gen_ai.request.model": "claude-3-opus",
+          "gen_ai.request.max_tokens": "1024",
+          "gen_ai.usage.input_tokens": "800",
+          "gen_ai.usage.output_tokens": "300",
+          "gen_ai.response.finish_reasons": '["stop"]',
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions).toHaveLength(1);
+    const g = result.genericAiInteractions[0];
+    expect(g.system).toBe("anthropic");
+    expect(g.operation).toBe("chat");
+    expect(g.model).toBe("claude-3-opus");
+    expect(g.maxTokens).toBe(1024);
+    expect(g.promptTokens).toBe(800);
+    expect(g.completionTokens).toBe(300);
+    expect(g.totalTokens).toBe(1100); // computed, no total_tokens attribute
+    expect(g.finishReason).toBe("stop");
+  });
+
+  it("parses multi-element finish_reasons arrays (JSON + comma-separated)", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "otel3",
+        attributes: {
+          "gen_ai.provider.name": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": "100",
+          "gen_ai.usage.output_tokens": "50",
+          "gen_ai.response.finish_reasons": "stop,length",
+        },
+      }),
+      makeSpan({
+        spanId: "otel4",
+        attributes: {
+          "gen_ai.provider.name": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": "10",
+          "gen_ai.usage.output_tokens": "5",
+          "gen_ai.response.finish_reasons": '["tool_calls", "stop"]',
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions).toHaveLength(2);
+    expect(result.genericAiInteractions[0].finishReason).toBe("stop");
+    expect(result.genericAiInteractions[1].finishReason).toBe("tool_calls");
+  });
+
+  it("infers framework from otel.scope.name", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "lc1",
+        name: "ChatOpenAI",
+        attributes: {
+          "otel.scope.name": "langchain.llm",
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "100",
+          "gen_ai.usage.completion_tokens": "50",
+          "gen_ai.usage.total_tokens": "150",
+        },
+      }),
+      makeSpan({
+        spanId: "li1",
+        name: "OpenAIEmbedding",
+        attributes: {
+          "otel.scope.name": "llama_index.embedding",
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "text-embedding-3-small",
+          "gen_ai.usage.prompt_tokens": "20",
+          "gen_ai.usage.total_tokens": "20",
+        },
+      }),
+      makeSpan({
+        spanId: "oi1",
+        name: "ChatCompletion",
+        attributes: {
+          "otel.scope.name": "openinference.instrumentation.openai",
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": "300",
+          "gen_ai.usage.output_tokens": "200",
+        },
+      }),
+      makeSpan({
+        spanId: "raw1",
+        name: "manual",
+        attributes: {
+          // No scope name; system still recoverable.
+          "gen_ai.provider.name": "google",
+          "gen_ai.request.model": "gemini-1.5-pro",
+          "gen_ai.usage.input_tokens": "5",
+          "gen_ai.usage.output_tokens": "5",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions.map((g) => g.framework)).toEqual([
+      "langchain",
+      "llama_index",
+      "openinference",
+      "google",
+    ]);
+  });
+
+  it("computes total_tokens when only prompt/completion are reported", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "otel5",
+        attributes: {
+          "gen_ai.system": "anthropic",
+          "gen_ai.request.model": "claude-3-haiku",
+          "gen_ai.usage.input_tokens": "12",
+          "gen_ai.usage.output_tokens": "34",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions[0].totalTokens).toBe(46);
+  });
+
+  it("does not duplicate spans that already have mastra.agent", () => {
+    // A Mastra agent span carries both `mastra.agent` and GenAI attrs.
+    // It should land in agentInteractions, NOT in genericAiInteractions.
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "mastra-agent",
+        attributes: {
+          "mastra.agent": "content-writer",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "100",
+          "gen_ai.usage.completion_tokens": "50",
+          "gen_ai.usage.total_tokens": "150",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.agentInteractions).toHaveLength(1);
+    expect(result.genericAiInteractions).toHaveLength(0);
+  });
+
+  it("ignores non-GenAI spans (http, db, custom instrumentation)", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "http1",
+        name: "GET /api/users",
+        attributes: { "http.method": "GET", "http.status_code": "200" },
+      }),
+      makeSpan({
+        spanId: "db1",
+        name: "pg.query",
+        attributes: { "db.system": "postgresql", "db.statement": "SELECT 1" },
+      }),
+      makeSpan({
+        spanId: "otel6",
+        name: "openai.chat",
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "5",
+          "gen_ai.usage.completion_tokens": "5",
+          "gen_ai.usage.total_tokens": "10",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions).toHaveLength(1);
+    expect(result.genericAiInteractions[0].spanId).toBe("otel6");
+  });
+
+  it("handles malformed / missing token values gracefully", () => {
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "bad1",
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "not-a-number",
+          "gen_ai.usage.completion_tokens": "",
+          "gen_ai.usage.total_tokens": "0",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.genericAiInteractions).toHaveLength(1);
+    const g = result.genericAiInteractions[0];
+    expect(g.promptTokens).toBe(0);
+    expect(g.completionTokens).toBe(0);
+    expect(g.totalTokens).toBe(0);
+    expect(g.maxTokens).toBeNull();
+    expect(g.finishReason).toBeNull();
+  });
+
+  it("coexists with Mastra workflow spans in a single trace", () => {
+    // LangChain span nested under a Mastra workflow → only one
+    // `genericAiInteraction`, the workflow and Mastra agent are still
+    // classified into their own buckets.
+    const spans: ParsedSpan[] = [
+      makeSpan({
+        spanId: "wf1",
+        attributes: { "mastra.workflow": "rag-pipeline" },
+      }),
+      makeSpan({
+        spanId: "step1",
+        parentSpanId: "wf1",
+        attributes: { "mastra.tool": "vector-search" },
+      }),
+      makeSpan({
+        spanId: "step2",
+        parentSpanId: "wf1",
+        name: "openai.chat",
+        attributes: {
+          "otel.scope.name": "langchain.llm",
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.prompt_tokens": "200",
+          "gen_ai.usage.completion_tokens": "100",
+          "gen_ai.usage.total_tokens": "300",
+        },
+      }),
+    ];
+
+    const result = parseMastraTrace(spans);
+
+    expect(result.workflowRuns).toHaveLength(1);
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.agentInteractions).toHaveLength(0);
+    expect(result.genericAiInteractions).toHaveLength(1);
+    expect(result.genericAiInteractions[0].framework).toBe("langchain");
+    expect(result.genericAiInteractions[0].parentSpanId).toBe("wf1");
   });
 });

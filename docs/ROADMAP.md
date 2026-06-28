@@ -54,7 +54,7 @@ living document — open an issue to propose or reprioritize items.
 | ID | Task | Est. |
 |---|---|---|
 | **QW-CI** | CI bump `actions/checkout` v4→v5 | ~~15min~~ ✅ done in v0.1.6 |
-| **QW-OTLP-PROTO** | OTLP protobuf support (content-type detection + protobuf decode + tests) | 4h |
+| **QW-OTLP-PROTO** | OTLP protobuf support (content-type detection + protobuf decode + tests) | ~~4h~~ ✅ done |
 | **QW-ZOD** | Config validation with Zod (validate all env vars at startup, log warnings) | 1h |
 | **QW-CI-E2E** | Dedicated CI job that boots the server and runs the e2e/integration suite (`INTEGRATION=1`) | 2d |
 | **QW-DRIZZLE-REGEN** | Regenerate the Drizzle migration journal/snapshots so `drizzle-kit generate` works again | 1h |
@@ -165,12 +165,12 @@ living document — open an issue to propose or reprioritize items.
 **Works today:**
 - `POST /v1/traces` (OTLP JSON traces)
 - `POST /v1/metrics` (OTLP JSON metrics)
+- `POST /v1/traces` + `/v1/metrics` accept OTLP protobuf (`application/x-protobuf`) — decoded via `src/ingestion/otlp-proto.ts`
 - `src/ingestion/otlp-parser.ts` parses both
 - `src/mastra/trace-parser.ts` classifies Mastra spans by `mastra.*` attributes
 - Mastra exporter sends OTLP with `mastra.*` attributes
 
 **Missing:**
-- Protobuf support (binary OTLP frames) — `QW-OTLP-PROTO`
 - Generic OTLP docs (only Mastra integration is documented)
 - Zod validation on input — `QW-ZOD`
 

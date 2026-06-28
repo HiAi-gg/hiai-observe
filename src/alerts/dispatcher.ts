@@ -5,36 +5,41 @@
  * Loads channel config from DB first, falls back to .env.
  */
 
+import { and, eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
 import { db } from "../store/db.js";
 import { alertHistory, notificationConfig } from "../store/schema.js";
-import { eq, and } from "drizzle-orm";
-import { sendTelegramAlert } from "./notifiers/telegram.js";
 import { sendDiscordAlert } from "./notifiers/discord.js";
 import { sendEmailAlert } from "./notifiers/email.js";
-import { sendSlackAlert } from "./notifiers/slack.js";
-import { sendWebhookAlert } from "./notifiers/webhook.js";
-import { sendPagerdutyAlert } from "./notifiers/pagerduty.js";
-import { sendTeamsAlert } from "./notifiers/teams.js";
-import { sendNtfyAlert } from "./notifiers/ntfy.js";
 import { sendGotifyAlert } from "./notifiers/gotify.js";
+import { sendNtfyAlert } from "./notifiers/ntfy.js";
+import { sendPagerdutyAlert } from "./notifiers/pagerduty.js";
 import { sendPushoverAlert } from "./notifiers/pushover.js";
-
-import type { AlertRule, AlertChannel, AlertEvaluationResult } from "./rules-engine.js";
-import { logger } from "../lib/logger.js";
+import { sendSlackAlert } from "./notifiers/slack.js";
+import { sendTeamsAlert } from "./notifiers/teams.js";
+import { sendTelegramAlert } from "./notifiers/telegram.js";
+import { sendWebhookAlert } from "./notifiers/webhook.js";
+import type { AlertChannel, AlertEvaluationResult, AlertRule } from "./rules-engine.js";
 
 export interface DispatchResult {
   alertId: string;
   channels: Array<{ type: string; target: string; ok: boolean; error?: string }>;
 }
 
-async function getChannelConfig(projectId: string, channel: string): Promise<Record<string, string> | null> {
-  const [row] = await db.select()
+async function getChannelConfig(
+  projectId: string,
+  channel: string,
+): Promise<Record<string, string> | null> {
+  const [row] = await db
+    .select()
     .from(notificationConfig)
-    .where(and(
-      eq(notificationConfig.projectId, projectId),
-      eq(notificationConfig.channel, channel),
-      eq(notificationConfig.enabled, true),
-    ))
+    .where(
+      and(
+        eq(notificationConfig.projectId, projectId),
+        eq(notificationConfig.channel, channel),
+        eq(notificationConfig.enabled, true),
+      ),
+    )
     .limit(1);
 
   return row?.config ?? null;
@@ -42,8 +47,8 @@ async function getChannelConfig(projectId: string, channel: string): Promise<Rec
 
 const SEVERITY_EMOJI: Record<string, string> = {
   critical: "\u{1F534}", // red circle
-  warning: "\u{1F7E1}",  // yellow circle
-  info: "\u{1F535}",     // blue circle
+  warning: "\u{1F7E1}", // yellow circle
+  info: "\u{1F535}", // blue circle
   recovered: "\u{1F7E2}", // green circle
 };
 
@@ -63,14 +68,17 @@ export async function dispatchAlert(
   // Use per-alert channels if configured, otherwise fall back to project-level
   let channelsToUse = rule.channels;
   if (channelsToUse.length === 0) {
-    const projectConfigs = await db.select()
+    const projectConfigs = await db
+      .select()
       .from(notificationConfig)
-      .where(and(
-        eq(notificationConfig.projectId, rule.projectId),
-        eq(notificationConfig.enabled, true),
-      ));
+      .where(
+        and(eq(notificationConfig.projectId, rule.projectId), eq(notificationConfig.enabled, true)),
+      );
     channelsToUse = projectConfigs
-      .map((c) => ({ type: c.channel as AlertChannel["type"], target: extractTarget(c.channel, c.config) }))
+      .map((c) => ({
+        type: c.channel as AlertChannel["type"],
+        target: extractTarget(c.channel, c.config),
+      }))
       .filter((c) => c.target.length > 0);
   }
 
@@ -79,15 +87,19 @@ export async function dispatchAlert(
 
     const emoji = SEVERITY_EMOJI[status] ?? SEVERITY_EMOJI.warning;
 
-    const delivery = await deliverToChannel(channel, {
-      title: `${emoji} ${rule.name}`,
-      status,
-      details: result.message,
-      currentValue: result.currentValue,
-      threshold: result.threshold,
-      ruleName: rule.name,
-      timestamp,
-    }, dbConfig);
+    const delivery = await deliverToChannel(
+      channel,
+      {
+        title: `${emoji} ${rule.name}`,
+        status,
+        details: result.message,
+        currentValue: result.currentValue,
+        threshold: result.threshold,
+        ruleName: rule.name,
+        timestamp,
+      },
+      dbConfig,
+    );
 
     channelResults.push({
       type: channel.type,
@@ -110,7 +122,10 @@ export async function dispatchAlert(
     },
   });
 
-  logger.info("[Alert Dispatcher] dispatched", { rule: rule.name, channels: channelResults.length });
+  logger.info("[Alert Dispatcher] dispatched", {
+    rule: rule.name,
+    channels: channelResults.length,
+  });
 
   return {
     alertId: rule.id,
@@ -131,15 +146,19 @@ interface DeliveryPayload {
 async function deliverToChannel(
   channel: AlertChannel,
   payload: DeliveryPayload,
-  dbConfig: Record<string, string> | null
+  dbConfig: Record<string, string> | null,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     switch (channel.type) {
       case "telegram":
-        return sendTelegramAlert(channel.target, {
-          chatId: channel.target,
-          ...payload,
-        }, { botToken: dbConfig?.botToken });
+        return sendTelegramAlert(
+          channel.target,
+          {
+            chatId: channel.target,
+            ...payload,
+          },
+          { botToken: dbConfig?.botToken },
+        );
 
       case "discord":
         return sendDiscordAlert(channel.target, payload, dbConfig ?? undefined);
@@ -183,23 +202,32 @@ async function deliverToChannel(
 function extractTarget(channel: string, config: Record<string, string> | null): string {
   if (!config) return "";
   switch (channel) {
-    case "telegram": return config.chatId ?? "";
-    case "discord": return config.webhookUrl ?? "";
-    case "email": return config.to ?? "";
-    case "slack": return config.webhookUrl ?? "";
-    case "webhook": return config.url ?? "";
-    case "pagerduty": return config.routingKey ?? "";
-    case "teams": return config.webhookUrl ?? "";
-    case "ntfy": return config.topic ?? "";
-    case "gotify": return config.server ?? "";
-    case "pushover": return config.userKey ?? "";
-    default: return "";
+    case "telegram":
+      return config.chatId ?? "";
+    case "discord":
+      return config.webhookUrl ?? "";
+    case "email":
+      return config.to ?? "";
+    case "slack":
+      return config.webhookUrl ?? "";
+    case "webhook":
+      return config.url ?? "";
+    case "pagerduty":
+      return config.routingKey ?? "";
+    case "teams":
+      return config.webhookUrl ?? "";
+    case "ntfy":
+      return config.topic ?? "";
+    case "gotify":
+      return config.server ?? "";
+    case "pushover":
+      return config.userKey ?? "";
+    default:
+      return "";
   }
 }
 
-export async function testAlert(
-  rule: AlertRule
-): Promise<DispatchResult> {
+export async function testAlert(rule: AlertRule): Promise<DispatchResult> {
   const result: AlertEvaluationResult = {
     triggered: true,
     currentValue: 0,

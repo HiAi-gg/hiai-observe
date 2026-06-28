@@ -5,12 +5,7 @@
  * via the OTLP HTTP JSON protocol.
  */
 
-import type {
-  HiaiObserveExporterConfig,
-  MastraSpan,
-  OTLPSpan,
-  OTLPTracePayload,
-} from "./types.js";
+import type { HiaiObserveExporterConfig, MastraSpan, OTLPSpan, OTLPTracePayload } from "./types.js";
 
 export type { HiaiObserveExporterConfig, MastraSpan } from "./types.js";
 
@@ -125,12 +120,10 @@ export class HiaiObserveExporter {
   }
 
   private convertSpan(span: MastraSpan): OTLPSpan {
-    const attributes = Object.entries(span.attributes ?? {}).map(
-      ([key, value]) => ({
-        key,
-        value: { stringValue: value },
-      })
-    );
+    const attributes = Object.entries(span.attributes ?? {}).map(([key, value]) => ({
+      key,
+      value: { stringValue: value },
+    }));
 
     const events = (span.events ?? []).map((e) => ({
       timeUnixNano: e.timeUnixNano,
@@ -161,10 +154,7 @@ export class HiaiObserveExporter {
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          this.config.timeout
-        );
+        const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
         const response = await fetch(`${this.config.endpoint}/v1/traces`, {
           method: "POST",
@@ -182,14 +172,10 @@ export class HiaiObserveExporter {
 
         // Non-retryable errors
         if (response.status === 401 || response.status === 403) {
-          throw new Error(
-            `Authentication failed (${response.status}): ${await response.text()}`
-          );
+          throw new Error(`Authentication failed (${response.status}): ${await response.text()}`);
         }
 
-        lastError = new Error(
-          `HTTP ${response.status}: ${await response.text()}`
-        );
+        lastError = new Error(`HTTP ${response.status}: ${await response.text()}`);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
 

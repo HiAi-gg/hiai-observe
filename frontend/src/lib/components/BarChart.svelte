@@ -1,33 +1,36 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-  let { data = [], title = "" }: {
-    data: Array<{ label: string; value: number; color: string }>;
-    title?: string;
-  } = $props();
+let {
+  data = [],
+  title = "",
+}: {
+  data: Array<{ label: string; value: number; color: string }>;
+  title?: string;
+} = $props();
 
-  let mounted = $state(false);
-  let prefersReduced = $state(false);
+let mounted = $state(false);
+let prefersReduced = $state(false);
 
-  onMount(() => {
-    mounted = true;
-    prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  });
+onMount(() => {
+  mounted = true;
+  prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+});
 
-  const max = $derived(Math.max(...data.map((d) => d.value), 1));
-  const barHeight = 28;
-  const gap = 8;
-  const labelWidth = 100;
-  const chartWidth = 400;
-  const totalHeight = $derived(data.length * (barHeight + gap));
+const max = $derived(Math.max(...data.map((d) => d.value), 1));
+const barHeight = 28;
+const gap = 8;
+const labelWidth = 100;
+const chartWidth = 400;
+const totalHeight = $derived(data.length * (barHeight + gap));
 </script>
 
 {#if title}
-  <h3 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
+  <h3 class="mb-3 text-sm font-semibold text-[var(--foreground)]">{title}</h3>
 {/if}
 
 {#if data.length === 0}
-  <p class="py-4 text-center text-sm text-[var(--color-text-muted)]">No data</p>
+  <p class="py-4 text-center text-sm text-[var(--muted-foreground)]">No data</p>
 {:else}
   <svg
     width="100%"
@@ -44,7 +47,7 @@
         y={y + barHeight / 2 + 4}
         text-anchor="end"
         class="text-xs"
-        fill="var(--color-text-secondary)"
+        fill="var(--muted-foreground)"
       >{item.label}</text>
 
       <rect
@@ -62,7 +65,7 @@
         x={labelWidth + barWidth + 8}
         y={y + barHeight / 2 + 4}
         class="text-xs font-medium"
-        fill="var(--color-text-primary)"
+        fill="var(--foreground)"
       >{item.value.toLocaleString()}</text>
     {/each}
   </svg>

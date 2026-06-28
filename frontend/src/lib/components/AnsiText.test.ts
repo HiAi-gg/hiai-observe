@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { parseAnsi, color256, ANSI_16, ANSI_16_BRIGHT } from "../ansi";
+import { describe, expect, it } from "vitest";
+import { ANSI_16, ANSI_16_BRIGHT, color256, parseAnsi } from "../ansi";
 
 describe("AnsiText (parseAnsi + color256)", () => {
   // --- Plain text ---
@@ -26,23 +26,17 @@ describe("AnsiText (parseAnsi + color256)", () => {
   describe("basic foreground colors", () => {
     it("applies red foreground (31)", () => {
       const spans = parseAnsi("\x1b[31mred\x1b[0m");
-      expect(spans).toEqual([
-        { style: "color:#cc0000", content: "red" },
-      ]);
+      expect(spans).toEqual([{ style: "color:var(--destructive)", content: "red" }]);
     });
 
     it("applies green foreground (32)", () => {
       const spans = parseAnsi("\x1b[32mgreen\x1b[0m");
-      expect(spans).toEqual([
-        { style: "color:#4e9a06", content: "green" },
-      ]);
+      expect(spans).toEqual([{ style: "color:var(--success)", content: "green" }]);
     });
 
     it("applies blue foreground (34)", () => {
       const spans = parseAnsi("\x1b[34mblue\x1b[0m");
-      expect(spans).toEqual([
-        { style: "color:#3465a4", content: "blue" },
-      ]);
+      expect(spans).toEqual([{ style: "color:var(--info)", content: "blue" }]);
     });
   });
 
@@ -51,16 +45,12 @@ describe("AnsiText (parseAnsi + color256)", () => {
   describe("basic background colors", () => {
     it("applies red background (41)", () => {
       const spans = parseAnsi("\x1b[41mred bg\x1b[0m");
-      expect(spans).toEqual([
-        { style: "background-color:#cc0000", content: "red bg" },
-      ]);
+      expect(spans).toEqual([{ style: "background-color:var(--destructive)", content: "red bg" }]);
     });
 
     it("applies blue background (44)", () => {
       const spans = parseAnsi("\x1b[44mblue bg\x1b[0m");
-      expect(spans).toEqual([
-        { style: "background-color:#3465a4", content: "blue bg" },
-      ]);
+      expect(spans).toEqual([{ style: "background-color:var(--info)", content: "blue bg" }]);
     });
   });
 
@@ -72,8 +62,8 @@ describe("AnsiText (parseAnsi + color256)", () => {
       expect(spans.length).toBe(1);
       expect(spans[0]!.content).toBe("color1");
       expect(spans[0]!.style).toContain("color:");
-      // color256(1) = ANSI_16[1] = #cc0000
-      expect(spans[0]!.style).toBe("color:#cc0000");
+      // color256(1) = ANSI_16[1] = var(--destructive)
+      expect(spans[0]!.style).toBe("color:var(--destructive)");
     });
 
     it("applies 256-color from color cube (16-231)", () => {
@@ -103,16 +93,12 @@ describe("AnsiText (parseAnsi + color256)", () => {
   describe("RGB color", () => {
     it("applies RGB foreground (38;2;r;g;b)", () => {
       const spans = parseAnsi("\x1b[38;2;255;128;0morange\x1b[0m");
-      expect(spans).toEqual([
-        { style: "color:rgb(255,128,0)", content: "orange" },
-      ]);
+      expect(spans).toEqual([{ style: "color:rgb(255,128,0)", content: "orange" }]);
     });
 
     it("applies RGB background (48;2;r;g;b)", () => {
       const spans = parseAnsi("\x1b[48;2;0;100;200mblue bg\x1b[0m");
-      expect(spans).toEqual([
-        { style: "background-color:rgb(0,100,200)", content: "blue bg" },
-      ]);
+      expect(spans).toEqual([{ style: "background-color:rgb(0,100,200)", content: "blue bg" }]);
     });
   });
 
@@ -121,23 +107,17 @@ describe("AnsiText (parseAnsi + color256)", () => {
   describe("text decorations", () => {
     it("applies bold (code 1)", () => {
       const spans = parseAnsi("\x1b[1mbold\x1b[0m");
-      expect(spans).toEqual([
-        { style: "font-weight:bold", content: "bold" },
-      ]);
+      expect(spans).toEqual([{ style: "font-weight:bold", content: "bold" }]);
     });
 
     it("applies italic (code 3)", () => {
       const spans = parseAnsi("\x1b[3mitalic\x1b[0m");
-      expect(spans).toEqual([
-        { style: "font-style:italic", content: "italic" },
-      ]);
+      expect(spans).toEqual([{ style: "font-style:italic", content: "italic" }]);
     });
 
     it("applies underline (code 4)", () => {
       const spans = parseAnsi("\x1b[4munderlined\x1b[0m");
-      expect(spans).toEqual([
-        { style: "text-decoration:underline", content: "underlined" },
-      ]);
+      expect(spans).toEqual([{ style: "text-decoration:underline", content: "underlined" }]);
     });
 
     it("applies bold + italic + underline combined", () => {
@@ -155,14 +135,17 @@ describe("AnsiText (parseAnsi + color256)", () => {
     it("resets all formatting with \\x1b[0m", () => {
       const spans = parseAnsi("\x1b[31mred\x1b[0mnormal");
       expect(spans.length).toBe(2);
-      expect(spans[0]).toEqual({ style: "color:#cc0000", content: "red" });
+      expect(spans[0]).toEqual({
+        style: "color:var(--destructive)",
+        content: "red",
+      });
       expect(spans[1]).toEqual({ style: "", content: "normal" });
     });
 
     it("resets foreground with code 39", () => {
       const spans = parseAnsi("\x1b[31mred\x1b[39mplain");
       expect(spans.length).toBe(2);
-      expect(spans[0]!.style).toBe("color:#cc0000");
+      expect(spans[0]!.style).toBe("color:var(--destructive)");
       expect(spans[1]!.style).toBe("");
       expect(spans[1]!.content).toBe("plain");
     });
@@ -191,7 +174,7 @@ describe("AnsiText (parseAnsi + color256)", () => {
     it("resets background with code 49", () => {
       const spans = parseAnsi("\x1b[41mred bg\x1b[49mplain");
       expect(spans.length).toBe(2);
-      expect(spans[0]!.style).toBe("background-color:#cc0000");
+      expect(spans[0]!.style).toBe("background-color:var(--destructive)");
       expect(spans[1]!.style).toBe("");
     });
   });
@@ -202,11 +185,17 @@ describe("AnsiText (parseAnsi + color256)", () => {
     it("handles multiple colored segments", () => {
       const spans = parseAnsi("\x1b[31mred\x1b[0m \x1b[32mgreen\x1b[0m \x1b[34mblue\x1b[0m");
       expect(spans.length).toBe(5);
-      expect(spans[0]).toEqual({ style: "color:#cc0000", content: "red" });
+      expect(spans[0]).toEqual({
+        style: "color:var(--destructive)",
+        content: "red",
+      });
       expect(spans[1]).toEqual({ style: "", content: " " });
-      expect(spans[2]).toEqual({ style: "color:#4e9a06", content: "green" });
+      expect(spans[2]).toEqual({
+        style: "color:var(--success)",
+        content: "green",
+      });
       expect(spans[3]).toEqual({ style: "", content: " " });
-      expect(spans[4]).toEqual({ style: "color:#3465a4", content: "blue" });
+      expect(spans[4]).toEqual({ style: "color:var(--info)", content: "blue" });
     });
 
     it("handles bold then color change", () => {
@@ -220,7 +209,7 @@ describe("AnsiText (parseAnsi + color256)", () => {
       const spans = parseAnsi("\x1b[31mred\x1b[1mred bold\x1b[0m");
       expect(spans.length).toBe(2);
       // First: just red (no bold)
-      expect(spans[0]!.style).toBe("color:#cc0000");
+      expect(spans[0]!.style).toBe("color:var(--destructive)");
       expect(spans[0]!.content).toBe("red");
       // Second: red + bold (bold activates, so bright variant used)
       expect(spans[1]!.style).toContain("font-weight:bold");
@@ -243,13 +232,13 @@ describe("AnsiText (parseAnsi + color256)", () => {
     it("applies bright red (91)", () => {
       const spans = parseAnsi("\x1b[91mbright red\x1b[0m");
       expect(spans.length).toBe(1);
-      // ANSI_16_BRIGHT[1] = #ef2929
-      expect(spans[0]!.style).toBe("color:#ef2929");
+      // ANSI_16_BRIGHT[1] = var(--destructive)
+      expect(spans[0]!.style).toBe("color:var(--destructive)");
     });
 
     it("applies bright green (92)", () => {
       const spans = parseAnsi("\x1b[92mbright green\x1b[0m");
-      expect(spans[0]!.style).toBe("color:#8ae234");
+      expect(spans[0]!.style).toBe("color:var(--success)");
     });
   });
 
@@ -259,15 +248,15 @@ describe("AnsiText (parseAnsi + color256)", () => {
     it("uses bright color variant when bold is active for basic 30-37", () => {
       const spans = parseAnsi("\x1b[1;31mbold red\x1b[0m");
       expect(spans.length).toBe(1);
-      // Bold + red (31): ANSI_16_BRIGHT[1] = #ef2929
-      expect(spans[0]!.style).toContain("color:#ef2929");
+      // Bold + red (31): ANSI_16_BRIGHT[1] = var(--destructive)
+      expect(spans[0]!.style).toContain("color:var(--destructive)");
     });
 
     it("uses normal color when bold is not active", () => {
       const spans = parseAnsi("\x1b[31mnormal red\x1b[0m");
       expect(spans.length).toBe(1);
-      // Normal red (31): ANSI_16[1] = #cc0000
-      expect(spans[0]!.style).toBe("color:#cc0000");
+      // Normal red (31): ANSI_16[1] = var(--destructive)
+      expect(spans[0]!.style).toBe("color:var(--destructive)");
     });
   });
 
@@ -276,7 +265,7 @@ describe("AnsiText (parseAnsi + color256)", () => {
   describe("color256", () => {
     it("returns hex for basic palette (0-15)", () => {
       expect(color256(0)).toBe("#000000");
-      expect(color256(1)).toBe("#cc0000");
+      expect(color256(1)).toBe("var(--destructive)");
       expect(color256(15)).toBe("#eeeeec");
     });
 

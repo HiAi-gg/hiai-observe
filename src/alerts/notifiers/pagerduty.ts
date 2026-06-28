@@ -5,6 +5,8 @@
  * Supports trigger and resolve event actions.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 const PAGERDUTY_EVENTS_API = "https://events.pagerduty.com/v2/enqueue";
 
 interface PagerdutyAlert {
@@ -34,9 +36,9 @@ function mapSeverity(status: PagerdutyAlert["status"]): string {
 export async function sendPagerdutyAlert(
   routingKey: string,
   alert: PagerdutyAlert,
-  config?: { routingKey?: string }
+  config?: { routingKey?: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const key = config?.routingKey || routingKey || process.env.PAGERDUTY_ROUTING_KEY;
+  const key = config?.routingKey || routingKey || appConfig.PAGERDUTY_ROUTING_KEY;
   if (!key) {
     return { ok: false, error: "PagerDuty routing key not configured" };
   }

@@ -64,8 +64,8 @@ Data enters HiAi Observe through three paths:
   - Events grouped by `grouper.ts` (fingerprint-based)
 
 - **OpenTelemetry** → `POST /v1/traces` or `/v1/metrics`
-  - OTLP JSON format (protobuf not supported in MVP)
-  - Parsed by `otlp-parser.ts`
+  - OTLP JSON or protobuf (`application/x-protobuf`)
+  - Parsed by `otlp-parser.ts` (JSON) / `otlp-proto.ts` (binary)
   - Spans stored directly in `traces` table
 
 - **Mastra** → via OpenTelemetry with Mastra-specific attributes
@@ -100,6 +100,14 @@ After ingestion, data goes through processing:
 | `alerts` | Alert rule definitions with severity | Permanent |
 | `alert_history` | Alert trigger log | Configurable (default 30d) |
 | `logs` | Container log entries | Configurable (default 30d) |
+| `team_members` | Team member management | Permanent |
+| `releases` | Release tracking with deployment health | Permanent |
+| `issue_comments` | Issue comments and collaboration | Configurable (default 30d) |
+| `fingerprint_rules` | Custom fingerprinting rules | Permanent |
+| `saved_searches` | Saved search queries | Configurable (default 30d) |
+| `status_subscribers` | Status page subscribers | Permanent |
+| `gpu_stats` | GPU utilization, VRAM, temperature | Configurable (default 30d) |
+| `host_info` | Host information and metadata | Permanent |
 | `notification_config` | Per-project notification channel config | Permanent |
 | `retention_config` | Per-table retention policy overrides | Permanent |
 | `maintenance_windows` | Scheduled downtime windows | Permanent |
@@ -114,22 +122,42 @@ After ingestion, data goes through processing:
 
 ### 4. API
 
-The Elysia API layer exposes 35+ endpoints organized into 12 plugins:
+The Elysia API layer exposes 50+ endpoints organized into 32 plugins:
 
 | Plugin | Prefix | Endpoints |
 |---|---|---|
-| `healthPlugin` | `/` | Health check |
+| `healthPlugin` | `/api/health`, `/health` | Health check (canonical + legacy alias) |
 | `sentryIngestPlugin` | `/api` | Sentry SDK ingestion |
-| `issuesPlugin` | `/api` | Issue CRUD |
-| `eventsPlugin` | `/api` | Event queries |
-| `monitorsPlugin` | `/api/monitors` | Uptime monitor CRUD |
+| `agentIngestPlugin` | `/api/agent` | Agent-specific ingestion |
+| `issuesPlugin` | `/api/issues` | Issue CRUD |
+| `eventsPlugin` | `/api/events` | Event queries |
+| `monitorsPlugin` | `/api/monitors` | Uptime monitor CRUD (HTTP, TCP, DNS, ping, gRPC, cert) |
 | `statusPagePlugin` | `/api/status` | Public status pages |
-| `infrastructureRoutes` | `/api/infrastructure` | Docker + host metrics |
-| `logsPlugin` | `/api/logs` | Log search |
+| `infrastructureRoutes` | `/api/infrastructure` | Docker + host + GPU metrics |
+| `logsPlugin` | `/api/logs` | Log search + download |
 | `logsWsPlugin` | `/ws/logs` | Real-time log WebSocket |
-| `otlpRoutes` | `/v1` | OTLP trace/metrics ingestion |
-| `tracesRoutes` | `/api/traces` | Trace queries + stats |
-| `alertsRoutes` | `/api/alerts` | Alert rule CRUD + history |
+| `otlpRoutes` | `/v1` | OTLP trace/metrics/logs (JSON + protobuf) |
+| `tracesRoutes` | `/api/traces` | Trace queries + stats + workflows |
+| `alertsRoutes` | `/api/alerts` | Alert rule CRUD + history + test |
+| `maintenanceRoutes` | `/api/maintenance` | Maintenance windows CRUD |
+| `incidentsRoutes` | `/api/incidents` | Incident lifecycle CRUD |
+| `dashboardRoutes` | `/api/dashboard` | Unified dashboard aggregates |
+| `projectsRoutes` | `/api/projects` | Project CRUD + key rotation |
+| `notificationsRoutes` | `/api/notifications/:channel` | Notification channel config |
+| `sourcemapsRoutes` | `/api/sourcemaps` | Source map upload |
+| `releasesRoutes` | `/api/releases` | Release tracking |
+| `teamRoutes` | `/api/team` | Team member management |
+| `searchRoutes` | `/api/search` | Cross-resource search |
+| `savedSearchesPlugin` | `/api/saved-searches` | Saved search CRUD |
+| `commentsRoutes` | `/api/issues/:id/comments` | Issue comments |
+| `badgesRoutes` | `/api/badges` | Public status badges |
+| `subscribersRoutes` | `/api/status-subscribers` | Status page email subscribers |
+| `fingerprintRulesPlugin` | `/api/fingerprint-rules` | Custom fingerprinting rules |
+| `exportRoutes` | `/api/export` | Bulk export (issues, traces, logs) |
+| `adminBridgeRoutes` | `/api/admin-bridge` | Cross-tenant admin operations |
+| `embedRoutes` | `/api/embed` | Embeddable views for dashboard integration |
+| `tenantHealthRoutes` | `/api/tenant/:tenantId/health` | Cross-project health aggregate |
+| `releaseRoutes` | `/api/releases` | Release tracking + health |
 
 ### 5. Frontend
 
@@ -141,10 +169,11 @@ SvelteKit frontend with 9 pages:
 | Issues | `/issues` | Error list with filters and search |
 | Issue Detail | `/issues/[id]` | Stack trace, breadcrumbs, resolve/ignore |
 | Uptime | `/uptime` | Monitor cards with status and uptime % |
-| Infrastructure | `/infrastructure` | Container stats, host CPU/memory/disk |
+| Infrastructure | `/infrastructure` | Container stats, host CPU/memory/disk, GPU metrics |
 | Logs | `/logs` | Real-time stream, search, container filter |
 | Traces | `/traces` | Workflow list with filters |
 | Trace Detail | `/traces/[id]` | Waterfall timeline, token breakdown |
+| Team | `/team` | Team member management |
 | Settings | `/settings` | API keys, alerts, notification channels |
 
 ### 6. Background Workers
@@ -201,6 +230,7 @@ alerts          (1) ──► (N) alert_history
 - `slug` TEXT UNIQUE — URL-safe identifier for status pages
 - `api_key` TEXT UNIQUE — authentication key
 - `created_at` TIMESTAMPTZ
+- `updated_at` TIMESTAMPTZ
 
 **events**
 - `id` UUID PK
@@ -309,6 +339,7 @@ alerts          (1) ──► (N) alert_history
 - `cooldown_seconds` INTEGER (default 300)
 - `last_triggered` TIMESTAMPTZ
 - `created_at` TIMESTAMPTZ
+- `updated_at` TIMESTAMPTZ
 
 **alert_history**
 - `id` UUID PK
@@ -327,7 +358,8 @@ alerts          (1) ──► (N) alert_history
 - `level` VARCHAR(16) — nullable
 - `timestamp` TIMESTAMPTZ
 - `raw` JSONB — original log entry
-- Indexes: container_id, timestamp, (container_id, timestamp)
+- `project_id` UUID FK → projects
+- Indexes: container_id, timestamp, (container_id, timestamp), project_id
 
 **notification_config**
 - `id` UUID PK
@@ -425,6 +457,69 @@ Every HTTP request gets a UUID (`X-Request-ID` header) via `src/middleware/reque
 - Generated fresh or reused from incoming `X-Request-ID` header
 - Set on the response header for client-side correlation
 - Available via Elysia's `requestId` derive for use in log entries
+
+---
+
+## Configuration (Wave 2 OBS0.2)
+
+All environment-variable access is centralized in `src/lib/config.ts` and validated at module load by Zod:
+
+- **0 `process.env` calls** anywhere else in `src/`. Modules import `import { config } from "@/lib/config"`.
+- **Zod schema** (`ConfigSchema`) — types, defaults, and constraints enforced at boot
+- **Startup banner** — `summarizeConfig()` partitions vars into *set* / *defaulted* / *missing optional*; `formatConfigSummary()` emits a single info-level line at boot, plus a warn-level line listing unconfigured notifier channels (TELEGRAM, DISCORD, SMTP, SLACK, WEBHOOK, PAGERDUTY, TEAMS, NTFY, GOTIFY, PUSHOVER)
+- **Schema coverage tests** — `tests/lib/config.test.ts` covers happy path, defaults, coercion (`PORT=8001` → number), enums, frozen-config immutability, all four failure modes, and the banner partitioning
+
+---
+
+## Rate Limiting (Wave 5 W5.13)
+
+Per-project rate limiting uses **3-bucket defense-in-depth**:
+
+1. **IP bucket** — per remote IP per path per window
+2. **API-key bucket** — per project API key per path per window
+3. **Project bucket** — per project per path per window (LRU-cached project lookups, invalidated on `PUT`)
+
+Effective limit is the tightest of the three. Redis key format: `rl:proj:{projectId}:{ip}:{path}:{windowMs}`. Fail-open on DB errors. Drizzle migration `0001_per_project_rate_limit.sql` adds the supporting columns; middleware lives in `src/middleware/tenant-scope.ts`.
+
+> **Note:** Elysia 1.4 `onBeforeHandle` hooks **without** `as: "global"` are local-scoped and silently no-op on parent routes. The rate limiter hook must be registered with `as: "global"` to fire across all routes.
+
+---
+
+## OpenTelemetry Logs (Wave 5 W5.8)
+
+`POST /v1/logs` accepts the same wire format as `/v1/traces` and `/v1/metrics` (JSON or `application/x-protobuf`):
+
+- **Field mapping** — `body` → `message` (stringified when not a string), `severityText` → `level` (fallback via `severityNumber` → text map 1–24 → TRACE/DEBUG/INFO/WARN/ERROR/FATAL), `timeUnixNano` → `timestamp` (ns ÷ 1 000 000), full envelope → `raw` jsonb
+- **Stream** — set to `"otel"` to distinguish from Docker worker rows (`"stdout"` / `"stderr"`)
+- **Resource attrs** — `service.instance.id` → `containerId` (fallback `service.namespace` → `otlp`), `service.name` → `containerName` (fallback `otlp`)
+- **Visible alongside Docker logs** at `/api/logs`; filter by `stream=otel` or `containerName=<service.name>`
+
+---
+
+## AI Enrichment (Wave 5 W5.9)
+
+Mastra / generic OTel GenAI spans are enriched at parse time with dual naming (pre-stable + current semconv):
+
+- **Pre-stable:** `gen_ai.system`, `prompt_tokens`, `completion_tokens`, `finish_reason`
+- **Current semconv:** `gen_ai.provider.name`, `gen_ai.operation.name`, `input_tokens`, `output_tokens`, `finish_reasons` (array)
+- **Framework label** — inferred from `otel.scope.name`
+- **Per-model pricing** — see `QW-MODEL-PRICING`; `MODEL_PRICING` env override for deployment-specific prices
+
+---
+
+## Execution Status (2026-06-20)
+
+| Wave | Status |
+|---|---|
+| Wave 0 (P0 fixes) | ✅ Complete |
+| Wave 1 (Docs + QW-OTLP-PROTO) | ✅ Complete |
+| Wave 2 (OBS0) | ✅ Complete |
+| Wave 3 (OBS1) | ✅ Complete |
+| Wave 4 (OBS2) | ✅ Complete |
+| Wave 5 (Platform Maturation) | 🟡 11/14 — remaining: CI-E2E, PM-INF-1, PM-RBAC, PM-AUDIT |
+| Wave 6 (Strategic Initiatives) | ⏸ Not started |
+
+**Quality gates:** `tsc --noEmit` 0 errors · vitest 500 passed / 35 skipped · coverage 27.25% (threshold 25%) · build 2.15 MB / 630 modules.
 
 ---
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const UUID1 = "550e8400-e29b-41d4-a716-446655440000";
 const UUID2 = "660e8400-e29b-41d4-a716-446655440001";
@@ -31,8 +31,17 @@ const mockEvent = {
 function createChain(result: any) {
   const chain: any = {};
   const methods = [
-    "from", "where", "orderBy", "limit", "offset",
-    "returning", "set", "values", "for", "delete", "groupBy",
+    "from",
+    "where",
+    "orderBy",
+    "limit",
+    "offset",
+    "returning",
+    "set",
+    "values",
+    "for",
+    "delete",
+    "groupBy",
   ];
   for (const m of methods) {
     chain[m] = vi.fn().mockReturnValue(chain);
@@ -57,8 +66,12 @@ vi.mock("../../src/store/db.js", () => {
 // ── Mock schema ───────────────────────────────────────────────────────
 vi.mock("../../src/store/schema.js", () => ({
   issues: {
-    id: "id", projectId: "project_id", title: "title",
-    status: "status", lastSeen: "last_seen", fingerprint: "fingerprint",
+    id: "id",
+    projectId: "project_id",
+    title: "title",
+    status: "status",
+    lastSeen: "last_seen",
+    fingerprint: "fingerprint",
     count: "count",
   },
   events: { id: "id", issueId: "issue_id", createdAt: "created_at" },
@@ -109,9 +122,7 @@ describe("issues API", () => {
     it("returns paginated data", async () => {
       mockSelectSequence([[mockIssue], [{ value: 1 }]]);
 
-      const res = await issuesPlugin.handle(
-        new Request("http://localhost/api/issues"),
-      );
+      const res = await issuesPlugin.handle(new Request("http://localhost/api/issues"));
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -140,9 +151,7 @@ describe("issues API", () => {
     it("returns empty data when no issues", async () => {
       mockSelectSequence([[], [{ value: 0 }]]);
 
-      const res = await issuesPlugin.handle(
-        new Request("http://localhost/api/issues"),
-      );
+      const res = await issuesPlugin.handle(new Request("http://localhost/api/issues"));
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -155,9 +164,7 @@ describe("issues API", () => {
     it("returns issue with events", async () => {
       mockSelectSequence([[mockIssue], [mockEvent]]);
 
-      const res = await issuesPlugin.handle(
-        new Request(`http://localhost/api/issues/${UUID1}`),
-      );
+      const res = await issuesPlugin.handle(new Request(`http://localhost/api/issues/${UUID1}`));
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -170,9 +177,7 @@ describe("issues API", () => {
     it("returns 404 for non-existent issue", async () => {
       mockSelectSequence([[]]);
 
-      const res = await issuesPlugin.handle(
-        new Request(`http://localhost/api/issues/${UUID2}`),
-      );
+      const res = await issuesPlugin.handle(new Request(`http://localhost/api/issues/${UUID2}`));
 
       expect(res.status).toBe(404);
       const body = await res.json();
@@ -232,9 +237,9 @@ describe("issues API", () => {
     it("merges source issues into target", async () => {
       // select calls: 1=target exists, 2=source exists, 3=event count
       mockSelectSequence([
-        [{ id: UUID1 }],     // target exists
-        [{ id: UUID2 }],     // source exists
-        [{ value: 10 }],     // event count
+        [{ id: UUID1 }], // target exists
+        [{ id: UUID2 }], // source exists
+        [{ value: 10 }], // event count
       ]);
       mockUpdate([]);
       mockDelete();

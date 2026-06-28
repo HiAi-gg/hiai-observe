@@ -4,6 +4,9 @@
  * Sends alert notifications via SMTP with HTML formatting.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+import { logger } from "../../lib/logger.js";
+
 interface EmailAlert {
   to: string;
   title: string;
@@ -91,16 +94,16 @@ function escapeHtml(text: string): string {
  */
 export async function sendEmailAlert(
   alert: EmailAlert,
-  config?: Record<string, string>
+  config?: Record<string, string>,
 ): Promise<{ ok: boolean; error?: string }> {
-  const host = config?.host || process.env.SMTP_HOST;
-  const port = Number(config?.port || process.env.SMTP_PORT || 587);
-  const user = config?.user || process.env.SMTP_USER;
-  const pass = config?.pass || process.env.SMTP_PASS;
-  const from = config?.from || process.env.SMTP_FROM || user;
+  const host = config?.host || appConfig.SMTP_HOST;
+  const port = Number(config?.port || appConfig.SMTP_PORT || 587);
+  const user = config?.user || appConfig.SMTP_USER;
+  const pass = config?.pass || appConfig.SMTP_PASS;
+  const from = config?.from || appConfig.SMTP_FROM || user;
 
   if (!host || !user || !pass) {
-    console.warn("[email-notifier] SMTP not configured — skipping email alert");
+    logger.warn("[email-notifier] SMTP not configured — skipping email alert");
     return {
       ok: false,
       error: "SMTP not configured",
@@ -140,7 +143,10 @@ export async function sendEmailAlert(
   try {
     // Response queue for async SMTP reads
     const responseQueue: string[] = [];
-    const waiters: Array<{ resolve: (v: string) => void; reject: (e: Error) => void }> = [];
+    const waiters: Array<{
+      resolve: (v: string) => void;
+      reject: (e: Error) => void;
+    }> = [];
 
     function pushResponse(data: string) {
       const waiter = waiters.shift();
@@ -161,8 +167,14 @@ export async function sendEmailAlert(
           reject(new Error("SMTP read timeout"));
         }, 10_000);
         waiters.push({
-          resolve: (v: string) => { clearTimeout(timeout); resolve(v); },
-          reject: (e: Error) => { clearTimeout(timeout); reject(e); },
+          resolve: (v: string) => {
+            clearTimeout(timeout);
+            resolve(v);
+          },
+          reject: (e: Error) => {
+            clearTimeout(timeout);
+            reject(e);
+          },
         });
       });
     }
@@ -213,7 +225,10 @@ export async function sendEmailAlert(
     const authResp = await smtpSend("AUTH LOGIN");
     if (!authResp.startsWith("334")) {
       socket.end();
-      return { ok: false, error: `SMTP AUTH LOGIN rejected: ${authResp.trim()}` };
+      return {
+        ok: false,
+        error: `SMTP AUTH LOGIN rejected: ${authResp.trim()}`,
+      };
     }
 
     // Send username (base64)
@@ -234,7 +249,10 @@ export async function sendEmailAlert(
     const fromResp = await smtpSend(`MAIL FROM:<${from}>`);
     if (!fromResp.includes("250")) {
       socket.end();
-      return { ok: false, error: `SMTP MAIL FROM rejected: ${fromResp.trim()}` };
+      return {
+        ok: false,
+        error: `SMTP MAIL FROM rejected: ${fromResp.trim()}`,
+      };
     }
 
     // RCPT TO
@@ -264,8 +282,7 @@ export async function sendEmailAlert(
     socket.end();
     return { ok: true };
   } catch (err) {
-    const errorMessage =
-      err instanceof Error ? err.message : "Unknown error";
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return { ok: false, error: `Email send failed: ${errorMessage}` };
   }
 }

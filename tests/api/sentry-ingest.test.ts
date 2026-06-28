@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const UUID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -97,7 +97,10 @@ describe("sentry ingest endpoint", () => {
     // Restore default behavior
     vi.mocked(authModule.resolveApiKey).mockReturnValue({ apiKey: "test-api-key" });
     vi.mocked(authModule.lookupProject).mockResolvedValue({ projectId: UUID });
-    vi.mocked(grouperModule.groupEvent).mockResolvedValue({ issueId: "existing-issue-id", isNew: false });
+    vi.mocked(grouperModule.groupEvent).mockResolvedValue({
+      issueId: "existing-issue-id",
+      isNew: false,
+    });
     vi.mocked(parserModule.parseSentryEvent).mockReturnValue({
       eventId: "abc123",
       message: "Test error",
@@ -183,9 +186,11 @@ describe("sentry ingest endpoint", () => {
       }),
     );
 
-    expect(res.status).toBe(200);
+    // URL projectId (UUID) does not match the API key's project (api-key-project-id).
+    // For security we reject with 403 rather than silently using the API key's project.
+    expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.id).toBe("abc123");
+    expect(body.error).toBe("Project mismatch");
   });
 
   it("body too large returns 413", async () => {

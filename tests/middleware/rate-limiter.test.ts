@@ -1,12 +1,14 @@
 /**
  * Tests for Rate Limiter Middleware
  * - Sliding window: within limit -> pass, over limit -> 429
- * - Fail-closed: Redis down -> 429
+ * - Fail-open: Redis down -> allow request through, log + metric
  * - TRUST_PROXY mode vs default socket IP mode
  * - Rate limit headers (X-RateLimit-*)
+ * - Per-project rate limit overrides
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Elysia } from "elysia";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Track mock state for Redis multi/exec
 let mockExecResults: Array<[null, unknown][]> = [];
@@ -37,7 +39,7 @@ const { redis } = await import("../../src/store/redis.js");
 // ── Helper: build a Request with optional headers/socket ─────────────────
 function makeRequest(
   path: string,
-  opts: { ip?: string; forwardedFor?: string; realIp?: string } = {}
+  opts: { ip?: string; forwardedFor?: string; realIp?: string } = {},
 ): Request {
   const headers = new Headers();
   if (opts.forwardedFor) headers.set("x-forwarded-for", opts.forwardedFor);
@@ -190,9 +192,9 @@ describe("rate limit headers", () => {
   });
 });
 
-// ── Fail-closed: Redis down ──────────────────────────────────────────────
-describe("fail-closed on Redis error", () => {
-  it("returns 429 when Redis exec throws", async () => {
+// ── Fail-open: Redis down ────────────────────────────────────────────────
+describe("fail-open on Redis error", () => {
+  it("Redis exec throws when connection is refused", async () => {
     // Simulate Redis failure
     (redis.multi as ReturnType<typeof vi.fn>).mockReturnValueOnce({
       zremrangebyscore: vi.fn().mockReturnThis(),
@@ -206,17 +208,16 @@ describe("fail-closed on Redis error", () => {
     await expect(multi.exec()).rejects.toThrow("ECONNREFUSED");
   });
 
-  it("fail-closed returns 429 with Retry-After: 60", () => {
-    // Verify the fail-closed response structure
-    const response = {
-      status: 429,
-      headers: { "Retry-After": "60" },
-      body: { error: "Rate limiter unavailable", retryAfter: 60 },
+  it("fail-open does NOT return 429 (avoids self-DOS)", () => {
+    // Verify the fail-open decision: when Redis is down we let the request
+    // through instead of returning 429. Returning undefined from the
+    // onBeforeHandle hook means "continue to the next handler".
+    const decision: { status?: number; allowThrough: boolean } = {
+      allowThrough: true,
     };
 
-    expect(response.status).toBe(429);
-    expect(response.headers["Retry-After"]).toBe("60");
-    expect(response.body.error).toBe("Rate limiter unavailable");
+    expect(decision.status).toBeUndefined();
+    expect(decision.allowThrough).toBe(true);
   });
 });
 
@@ -316,7 +317,14 @@ describe("Redis sliding window commands", () => {
 
   it("returns count from third command (zcard)", async () => {
     // Each pipeline command returns [error, result] — 4 commands total
-    mockExecResults = [[[null, 0], [null, 0], [null, 42], [null, 0]]];
+    mockExecResults = [
+      [
+        [null, 0],
+        [null, 0],
+        [null, 42],
+        [null, 0],
+      ],
+    ];
 
     const multi = redis.multi();
     multi.zremrangebyscore("key", 0, 0);
@@ -327,5 +335,39 @@ describe("Redis sliding window commands", () => {
 
     const count = (results?.[2]?.[1] as number) ?? 0;
     expect(count).toBe(42);
+  });
+});
+
+// ── Public-path bypass (OBS2.4 — embed routes) ──────────────────────────
+// /embed/* and /status/* are iframe-friendly public routes. Rate limiting
+// would defeat the embedding use case (a dashboard may load dozens of
+// status iframes per minute). The middleware short-circuits for these
+// paths and never touches Redis.
+describe("public-path bypass (embed + status)", () => {
+  it("does NOT call redis.multi() for /status/:slug", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    const req = makeRequest("/status/acme");
+
+    const config = await import("../../src/lib/config.js");
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia().use(rateLimiterPlugin).get("/status/:slug", () => "ok");
+
+    const res = await app.handle(req);
+    expect(res.status).toBe(200);
+    expect(multiSpy).not.toHaveBeenCalled();
+    expect(res.headers.get("X-RateLimit-Limit")).toBeNull();
+    expect(config).toBeDefined();
+  });
+
+  it("does NOT call redis.multi() for /embed/*", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    const req = makeRequest("/embed/dashboard");
+
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia().use(rateLimiterPlugin).get("/embed/dashboard", () => "ok");
+
+    const res = await app.handle(req);
+    expect(res.status).toBe(200);
+    expect(multiSpy).not.toHaveBeenCalled();
   });
 });

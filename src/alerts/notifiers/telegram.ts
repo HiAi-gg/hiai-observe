@@ -5,6 +5,8 @@
  * inline keyboard buttons, and rate limit handling.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 const TELEGRAM_API = "https://api.telegram.org";
 const MAX_MESSAGE_LENGTH = 4096;
 
@@ -60,9 +62,9 @@ function formatMessage(msg: TelegramMessage): string {
 export async function sendTelegramAlert(
   chatId: string,
   message: TelegramMessage,
-  config?: { botToken?: string }
+  config?: { botToken?: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const botToken = config?.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  const botToken = config?.botToken || appConfig.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     return { ok: false, error: "TELEGRAM_BOT_TOKEN not configured" };
   }

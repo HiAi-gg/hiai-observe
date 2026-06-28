@@ -1,19 +1,19 @@
 <script lang="ts">
-  let { connected = false }: { connected: boolean } = $props();
+let { connected = false }: { connected: boolean } = $props();
 </script>
 
 <span class="inline-flex items-center gap-1.5">
   <span class="relative inline-block h-2 w-2">
     <span
       class="absolute inset-0 rounded-full"
-      class:bg-[var(--color-success)]={connected}
-      class:bg-[var(--color-danger)]={!connected}
+      class:bg-[var(--success)]={connected}
+      class:bg-[var(--destructive)]={!connected}
     ></span>
     {#if connected}
-      <span class="live-ping absolute inset-0 rounded-full bg-[var(--color-success)] opacity-75"></span>
+      <span class="live-ping absolute inset-0 rounded-full bg-[var(--success)] opacity-75"></span>
     {/if}
   </span>
-  <span class="text-xs" class:text-[var(--color-success)]={connected} class:text-[var(--color-danger)]={!connected}>
+  <span class="text-xs" class:text-[var(--success)]={connected} class:text-[var(--destructive)]={!connected}>
     {connected ? "Live" : "Offline"}
   </span>
 </span>

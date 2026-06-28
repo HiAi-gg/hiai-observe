@@ -6,7 +6,7 @@
  * - getRemainingCooldown()
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Track cooldown keys in mock Redis
 const cooldownKeys = new Map<string, number>();
@@ -60,39 +60,21 @@ describe("shouldFireAlert", () => {
     const { redis } = await import("../../src/store/redis.js");
     await shouldFireAlert("alert-003", 600);
 
-    expect(redis.set).toHaveBeenCalledWith(
-      "alert:cooldown:alert-003",
-      "1",
-      "EX",
-      600,
-      "NX"
-    );
+    expect(redis.set).toHaveBeenCalledWith("alert:cooldown:alert-003", "1", "EX", 600, "NX");
   });
 
   it("uses default 300s cooldown when not specified", async () => {
     const { redis } = await import("../../src/store/redis.js");
     await shouldFireAlert("alert-004");
 
-    expect(redis.set).toHaveBeenCalledWith(
-      "alert:cooldown:alert-004",
-      "1",
-      "EX",
-      300,
-      "NX"
-    );
+    expect(redis.set).toHaveBeenCalledWith("alert:cooldown:alert-004", "1", "EX", 300, "NX");
   });
 
   it("respects custom cooldown value", async () => {
     const { redis } = await import("../../src/store/redis.js");
     await shouldFireAlert("alert-005", 60);
 
-    expect(redis.set).toHaveBeenCalledWith(
-      "alert:cooldown:alert-005",
-      "1",
-      "EX",
-      60,
-      "NX"
-    );
+    expect(redis.set).toHaveBeenCalledWith("alert:cooldown:alert-005", "1", "EX", 60, "NX");
   });
 
   it("isolates different alert IDs", async () => {

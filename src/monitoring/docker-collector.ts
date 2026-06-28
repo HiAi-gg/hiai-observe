@@ -3,7 +3,7 @@
  * Connects to Docker Engine API via unix socket.
  */
 
-import { getConfig } from "./config.js";
+import { getMonitoringConfig } from "../lib/config.js";
 
 export interface ContainerStats {
   id: string;
@@ -59,7 +59,7 @@ interface DockerStats {
 }
 
 function dockerFetch(path: string): Promise<Response> {
-  const cfg = getConfig();
+  const cfg = getMonitoringConfig();
   // Prepend the configured API version (empty = versionless, daemon's current).
   const p = `${cfg.dockerApiPrefix}${path}`;
   // TCP mode: connect via Docker socket proxy
@@ -73,12 +73,8 @@ function dockerFetch(path: string): Promise<Response> {
 }
 
 function calculateCpuPercent(stats: DockerStats): number {
-  const cpuDelta =
-    stats.cpu_stats.cpu_usage.total_usage -
-    stats.precpu_stats.cpu_usage.total_usage;
-  const systemDelta =
-    stats.cpu_stats.system_cpu_usage -
-    stats.precpu_stats.system_cpu_usage;
+  const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+  const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
   const cpuCount = stats.cpu_stats.online_cpus || 1;
   if (systemDelta === 0) return 0;
   return Math.round((cpuDelta / systemDelta) * cpuCount * 10000) / 100;
@@ -120,7 +116,7 @@ function parseUptime(startedAt: string): number {
 }
 
 function matchesFilter(name: string): boolean {
-  const cfg = getConfig();
+  const cfg = getMonitoringConfig();
   const { include, exclude } = cfg.containerFilter;
   if (exclude.length > 0 && exclude.some((p) => name.includes(p))) return false;
   if (include.length > 0 && !include.some((p) => name.includes(p))) return false;
@@ -143,9 +139,7 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
     filtered.map(async (container): Promise<ContainerStats | null> => {
       const name = (container.Names[0] || "").replace(/^\//, "");
       try {
-        const statsRes = await dockerFetch(
-          `/containers/${container.Id}/stats?stream=false`
-        );
+        const statsRes = await dockerFetch(`/containers/${container.Id}/stats?stream=false`);
         if (!statsRes.ok) return null;
         const stats = (await statsRes.json()) as DockerStats;
 
@@ -165,8 +159,8 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
         if (prev) {
           const timeDelta = (now - prev.time) / 1000; // seconds
           if (timeDelta > 0) {
-            rxRate = Math.round(Math.max(0, (net.rx - prev.rx)) / timeDelta);
-            txRate = Math.round(Math.max(0, (net.tx - prev.tx)) / timeDelta);
+            rxRate = Math.round(Math.max(0, net.rx - prev.rx) / timeDelta);
+            txRate = Math.round(Math.max(0, net.tx - prev.tx) / timeDelta);
           }
         }
         prevNetStats.set(containerId, { rx: net.rx, tx: net.tx, time: now });
@@ -193,7 +187,7 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
       } catch {
         return null;
       }
-    })
+    }),
   );
 
   return results.filter((r): r is ContainerStats => r !== null);

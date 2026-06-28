@@ -366,7 +366,14 @@ export interface DashboardData {
   uptimePercent: number;
   activeContainers: number;
   traceCount24h: number;
-  recentIssues: Array<{ id: string; title: string; type: string; count: number; status: string; lastSeen: string }>;
+  recentIssues: Array<{
+    id: string;
+    title: string;
+    type: string;
+    count: number;
+    status: string;
+    lastSeen: string;
+  }>;
   monitorStatuses: Array<{ id: string; name: string; url: string; active: boolean; isUp: boolean }>;
   alertCount: number;
   errorBuckets: Array<{ hour: string; count: number }>;
@@ -462,7 +469,15 @@ class IssuesResource {
     limit?: number;
     offset?: number;
   }): Promise<PaginatedResponse<Issue>> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/issues", undefined, params as Record<string, string | number | undefined>);
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/issues",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get issue detail with recent events */
@@ -481,18 +496,39 @@ class IssuesResource {
   }
 
   /** Merge source issues into a target */
-  merge(targetIssueId: string, sourceIssueIds: string[]): Promise<{ merged: number; targetIssueId: string; totalEvents: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "POST", "/api/issues/merge", { targetIssueId, sourceIssueIds });
+  merge(
+    targetIssueId: string,
+    sourceIssueIds: string[],
+  ): Promise<{ merged: number; targetIssueId: string; totalEvents: number }> {
+    return request(this.fetch, this.baseUrl, this.apiKey, "POST", "/api/issues/merge", {
+      targetIssueId,
+      sourceIssueIds,
+    });
   }
 
   /** List comments for an issue */
   listComments(issueId: string, params?: PaginationParams): Promise<PaginatedResponse<Comment>> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", `/api/issues/${issueId}/comments`, undefined, params as Record<string, string | number | undefined>);
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      `/api/issues/${issueId}/comments`,
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Add comment to an issue */
   addComment(issueId: string, data: CommentCreateInput): Promise<Comment> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "POST", `/api/issues/${issueId}/comments`, data);
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "POST",
+      `/api/issues/${issueId}/comments`,
+      data,
+    );
   }
 }
 
@@ -504,8 +540,21 @@ class EventsResource {
   ) {}
 
   /** List events */
-  list(params?: { issueId?: string; projectId?: string; limit?: number; offset?: number }): Promise<PaginatedResponse<Event>> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/events", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    issueId?: string;
+    projectId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PaginatedResponse<Event>> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/events",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get single event */
@@ -522,8 +571,20 @@ class MonitorsResource {
   ) {}
 
   /** List monitors with uptime */
-  list(params?: { project_id?: string; group?: string; hours?: number }): Promise<{ monitors: Monitor[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/monitors", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    project_id?: string;
+    group?: string;
+    hours?: number;
+  }): Promise<{ monitors: Monitor[] }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/monitors",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get monitor detail */
@@ -548,12 +609,31 @@ class MonitorsResource {
 
   /** Get monitor groups */
   groups(projectId?: string): Promise<{ groups: string[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/monitors/groups", undefined, { project_id: projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/monitors/groups",
+      undefined,
+      { project_id: projectId },
+    );
   }
 
   /** Get check history for a monitor */
-  checks(id: string, params?: { limit?: number; offset?: number; from?: string; to?: string }): Promise<{ data: unknown[]; total: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", `/api/monitors/${id}/checks`, undefined, params as Record<string, string | number | undefined>);
+  checks(
+    id: string,
+    params?: { limit?: number; offset?: number; from?: string; to?: string },
+  ): Promise<{ data: unknown[]; total: number }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      `/api/monitors/${id}/checks`,
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 }
 
@@ -565,8 +645,21 @@ class AlertsResource {
   ) {}
 
   /** List alert rules */
-  list(params?: { projectId?: string; search?: string; limit?: number; offset?: number }): Promise<{ items: Alert[]; total: number; limit: number; offset: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/alerts", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    projectId?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: Alert[]; total: number; limit: number; offset: number }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/alerts",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get alert detail with history */
@@ -600,8 +693,20 @@ class AlertsResource {
   }
 
   /** List alert trigger history */
-  history(params?: { alertId?: string; limit?: number; offset?: number }): Promise<{ items: AlertHistoryEntry[]; total: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/alerts/history", undefined, params as Record<string, string | number | undefined>);
+  history(params?: {
+    alertId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: AlertHistoryEntry[]; total: number }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/alerts/history",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** List available notification channels */
@@ -629,7 +734,15 @@ class TracesResource {
     limit?: number;
     offset?: number;
   }): Promise<{ data: Trace[]; total: number; limit: number; offset: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/traces", undefined, params as Record<string, string | number | undefined>);
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/traces",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get trace detail with span tree */
@@ -638,13 +751,33 @@ class TracesResource {
   }
 
   /** Aggregated stats (token usage + latency) */
-  stats(projectId: string, params?: { from?: string; to?: string; groupBy?: string }): Promise<{ tokenUsage: unknown; latency: unknown }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/traces/stats", undefined, { projectId, ...params } as Record<string, string | number | undefined>);
+  stats(
+    projectId: string,
+    params?: { from?: string; to?: string; groupBy?: string },
+  ): Promise<{ tokenUsage: unknown; latency: unknown }> {
+    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/traces/stats", undefined, {
+      projectId,
+      ...params,
+    } as Record<string, string | number | undefined>);
   }
 
   /** List workflow runs */
-  workflows(params?: { projectId?: string; workflowName?: string; status?: string; limit?: number; offset?: number }): Promise<unknown> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/traces/workflows", undefined, params as Record<string, string | number | undefined>);
+  workflows(params?: {
+    projectId?: string;
+    workflowName?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<unknown> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/traces/workflows",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get workflow run detail */
@@ -672,17 +805,43 @@ class LogsResource {
     limit?: number;
     offset?: number;
   }): Promise<{ data: { logs: LogEntry[]; total: number; limit: number; offset: number } }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/logs", undefined, params as Record<string, string | number | undefined>);
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/logs",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Log statistics (24h) */
-  stats(): Promise<{ total24h: number; byLevel: Record<string, number>; byContainer: Array<{ name: string; count: number }>; byHour: Array<{ hour: string; count: number }> }> {
+  stats(): Promise<{
+    total24h: number;
+    byLevel: Record<string, number>;
+    byContainer: Array<{ name: string; count: number }>;
+    byHour: Array<{ hour: string; count: number }>;
+  }> {
     return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/logs/stats");
   }
 
   /** Log volume over time */
-  volume(params?: { interval?: string; containerId?: string; from?: string; to?: string }): Promise<{ data: unknown[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/logs/volume", undefined, params as Record<string, string | number | undefined>);
+  volume(params?: {
+    interval?: string;
+    containerId?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ data: unknown[] }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/logs/volume",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** List log containers */
@@ -692,7 +851,9 @@ class LogsResource {
 
   /** Clear logs before a timestamp */
   clear(before?: string): Promise<{ deleted: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "DELETE", "/api/logs", undefined, { before });
+    return request(this.fetch, this.baseUrl, this.apiKey, "DELETE", "/api/logs", undefined, {
+      before,
+    });
   }
 }
 
@@ -704,8 +865,21 @@ class ReleasesResource {
   ) {}
 
   /** List releases */
-  list(params?: { projectId?: string; environment?: string; limit?: number; offset?: number }): Promise<PaginatedResponse<Release>> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/releases", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    projectId?: string;
+    environment?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PaginatedResponse<Release>> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/releases",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get release detail */
@@ -719,7 +893,10 @@ class ReleasesResource {
   }
 
   /** Update a release */
-  update(id: string, data: { version?: string; environment?: string; deployedAt?: string }): Promise<Release> {
+  update(
+    id: string,
+    data: { version?: string; environment?: string; deployedAt?: string },
+  ): Promise<Release> {
     return request(this.fetch, this.baseUrl, this.apiKey, "PUT", `/api/releases/${id}`, data);
   }
 
@@ -742,8 +919,20 @@ class TeamResource {
   ) {}
 
   /** List team members */
-  list(params?: { projectId?: string; limit?: number; offset?: number }): Promise<PaginatedResponse<TeamMember>> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/team", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    projectId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PaginatedResponse<TeamMember>> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/team",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Add team member */
@@ -783,13 +972,34 @@ class MaintenanceResource {
   ) {}
 
   /** List maintenance windows */
-  list(params?: { projectId?: string; status?: string; limit?: number; offset?: number }): Promise<{ items: MaintenanceWindow[]; total: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/maintenance", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    projectId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: MaintenanceWindow[]; total: number }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/maintenance",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get currently active maintenance windows */
   activeNow(projectId?: string): Promise<{ items: MaintenanceWindow[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/maintenance/active/now", undefined, { projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/maintenance/active/now",
+      undefined,
+      { projectId },
+    );
   }
 
   /** Get maintenance window */
@@ -821,13 +1031,34 @@ class IncidentsResource {
   ) {}
 
   /** List incidents */
-  list(params?: { projectId?: string; status?: string; limit?: number; offset?: number }): Promise<{ items: Incident[]; total: number }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/incidents", undefined, params as Record<string, string | number | undefined>);
+  list(params?: {
+    projectId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: Incident[]; total: number }> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/incidents",
+      undefined,
+      params as Record<string, string | number | undefined>,
+    );
   }
 
   /** Get active (non-resolved) incidents */
   active(projectId?: string): Promise<{ items: Incident[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/incidents/active", undefined, { projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      "/api/incidents/active",
+      undefined,
+      { projectId },
+    );
   }
 
   /** Get incident */
@@ -860,27 +1091,63 @@ class NotificationsResource {
 
   /** List notification configs */
   list(projectId?: string): Promise<{ notifications: NotificationConfig[] }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/notifications", undefined, { projectId });
+    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/notifications", undefined, {
+      projectId,
+    });
   }
 
   /** Get notification channel config */
   get(channel: string, projectId?: string): Promise<unknown> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", `/api/notifications/${channel}`, undefined, { projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "GET",
+      `/api/notifications/${channel}`,
+      undefined,
+      { projectId },
+    );
   }
 
   /** Upsert notification channel config */
-  upsert(channel: string, data: { projectId: string; config: Record<string, string>; enabled?: boolean }): Promise<unknown> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "PUT", `/api/notifications/${channel}`, data);
+  upsert(
+    channel: string,
+    data: { projectId: string; config: Record<string, string>; enabled?: boolean },
+  ): Promise<unknown> {
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "PUT",
+      `/api/notifications/${channel}`,
+      data,
+    );
   }
 
   /** Delete notification channel config */
   delete(channel: string, projectId?: string): Promise<{ deleted: boolean }> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "DELETE", `/api/notifications/${channel}`, undefined, { projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "DELETE",
+      `/api/notifications/${channel}`,
+      undefined,
+      { projectId },
+    );
   }
 
   /** Test a notification channel */
   test(channel: string, projectId?: string): Promise<unknown> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "POST", `/api/notifications/${channel}/test`, undefined, { projectId });
+    return request(
+      this.fetch,
+      this.baseUrl,
+      this.apiKey,
+      "POST",
+      `/api/notifications/${channel}/test`,
+      undefined,
+      { projectId },
+    );
   }
 }
 
@@ -893,7 +1160,10 @@ class SearchResource {
 
   /** Cross-project search across issues, events, and traces */
   search(q: string, params?: { projectId?: string; limit?: number }): Promise<SearchResults> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/search", undefined, { q, ...params } as Record<string, string | number | undefined>);
+    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/search", undefined, {
+      q,
+      ...params,
+    } as Record<string, string | number | undefined>);
   }
 }
 
@@ -934,7 +1204,9 @@ class DashboardResource {
 
   /** Get aggregated dashboard data */
   get(projectId?: string): Promise<DashboardData> {
-    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/dashboard", undefined, { projectId });
+    return request(this.fetch, this.baseUrl, this.apiKey, "GET", "/api/dashboard", undefined, {
+      projectId,
+    });
   }
 }
 

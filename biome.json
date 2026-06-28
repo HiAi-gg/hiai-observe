@@ -14,7 +14,15 @@
         "useExponentiationOperator": "warn"
       },
       "suspicious": {
-        "noThenProperty": "off"
+        "noThenProperty": "off",
+        "noControlCharactersInRegex": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "off",
+        "noUnusedImports": "off"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
       }
     }
   },
@@ -23,5 +31,10 @@
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 100
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   }
 }

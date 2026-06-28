@@ -44,13 +44,17 @@ function getStatusEmoji(status: DiscordAlert["status"]): string {
 export async function sendDiscordAlert(
   webhookUrl: string,
   alert: DiscordAlert,
-  _config?: Record<string, string>
+  _config?: Record<string, string>,
 ): Promise<{ ok: boolean; error?: string }> {
   const color = getStatusColor(alert.status);
   const emoji = getStatusEmoji(alert.status);
 
   const fields = [
-    { name: "Status", value: `${emoji} **${alert.status.toUpperCase()}**`, inline: true },
+    {
+      name: "Status",
+      value: `${emoji} **${alert.status.toUpperCase()}**`,
+      inline: true,
+    },
     { name: "Rule", value: alert.ruleName, inline: true },
     { name: "\u200B", value: "\u200B", inline: true }, // spacer
     { name: "Current Value", value: `\`${alert.currentValue}\``, inline: true },

@@ -4,6 +4,8 @@
  * Sends alert notifications via ntfy.sh push notification service.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 const NTFY_DEFAULT_SERVER = "https://ntfy.sh";
 
 interface NtfyAlert {
@@ -44,14 +46,14 @@ function getTags(status: NtfyAlert["status"]): string[] {
 export async function sendNtfyAlert(
   topic: string,
   alert: NtfyAlert,
-  config?: { topic?: string; server?: string }
+  config?: { topic?: string; server?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   const targetTopic = config?.topic || topic;
   if (!targetTopic) {
     return { ok: false, error: "ntfy topic not configured" };
   }
 
-  const server = config?.server || process.env.NTFY_SERVER || NTFY_DEFAULT_SERVER;
+  const server = config?.server || appConfig.NTFY_SERVER || NTFY_DEFAULT_SERVER;
   const url = `${server.replace(/\/$/, "")}/${targetTopic}`;
 
   const timeStr = alert.timestamp.toISOString().replace("T", " ").slice(0, 19);
@@ -73,9 +75,9 @@ export async function sendNtfyAlert(
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Title": alert.title,
-        "Priority": getPriority(alert.status),
-        "Tags": getTags(alert.status).join(","),
+        Title: alert.title,
+        Priority: getPriority(alert.status),
+        Tags: getTags(alert.status).join(","),
         "Content-Type": "text/plain",
       },
       body,

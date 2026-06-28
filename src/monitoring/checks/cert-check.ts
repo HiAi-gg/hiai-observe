@@ -19,10 +19,7 @@ export interface CertInfo {
  * Uses `tls.connect()` with `rejectUnauthorized: false` to inspect
  * certificates even if they are expired or self-signed.
  */
-export async function checkCert(
-  host: string,
-  port: number = 443
-): Promise<CertInfo> {
+export async function checkCert(host: string, port: number = 443): Promise<CertInfo> {
   return new Promise((resolve, reject) => {
     let settled = false;
 
@@ -59,7 +56,7 @@ export async function checkCert(
           const validTo = new Date(cert.valid_to);
           const now = new Date();
           const daysRemaining = Math.floor(
-            (validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+            (validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Build issuer string from issuer object
@@ -76,7 +73,7 @@ export async function checkCert(
           socket.destroy();
           safeReject(err instanceof Error ? err : new Error(String(err)));
         }
-      }
+      },
     );
 
     socket.on("error", (err) => {

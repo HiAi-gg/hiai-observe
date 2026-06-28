@@ -4,6 +4,8 @@
  * Sends alert notifications via Teams incoming webhook using Adaptive Card format.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 interface TeamsAlert {
   title: string;
   status: "critical" | "warning" | "recovered";
@@ -42,9 +44,9 @@ function getStatusEmoji(status: TeamsAlert["status"]): string {
 export async function sendTeamsAlert(
   webhookUrl: string,
   alert: TeamsAlert,
-  config?: { webhookUrl?: string }
+  config?: { webhookUrl?: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const url = config?.webhookUrl || webhookUrl || process.env.TEAMS_WEBHOOK_URL;
+  const url = config?.webhookUrl || webhookUrl || appConfig.TEAMS_WEBHOOK_URL;
   if (!url) {
     return { ok: false, error: "Teams webhook URL not configured" };
   }

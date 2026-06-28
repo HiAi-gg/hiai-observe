@@ -5,12 +5,12 @@
  * whether alerts should fire based on thresholds and time windows.
  */
 
-import { db } from "../store/db.js";
-import { events, traces, maintenanceWindows } from "../store/schema.js";
-import { eq, and, gte, lte, sql, count } from "drizzle-orm";
-import { castDbRows } from "../lib/db-types.js";
+import { and, count, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
+import { castDbRows } from "../lib/db-types.js";
 import { logger } from "../lib/logger.js";
+import { db } from "../store/db.js";
+import { events, maintenanceWindows, traces } from "../store/schema.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,15 @@ export type ComparisonOperator = "gt" | "lt" | "eq" | "gte" | "lte";
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
 export const AlertConditionSchema = z.object({
-  type: z.enum(["error_rate", "uptime_down", "resource_threshold", "trace_error", "token_usage", "recovery", "cert_expiry"]),
+  type: z.enum([
+    "error_rate",
+    "uptime_down",
+    "resource_threshold",
+    "trace_error",
+    "token_usage",
+    "recovery",
+    "cert_expiry",
+  ]),
   threshold: z.number(),
   duration: z.number().optional(),
   operator: z.enum(["gt", "lt", "eq", "gte", "lte"]),
@@ -40,7 +48,18 @@ export const AlertConditionSchema = z.object({
 });
 
 export const AlertChannelSchema = z.object({
-  type: z.enum(["telegram", "discord", "email", "slack", "webhook", "pagerduty", "teams", "ntfy", "gotify", "pushover"]),
+  type: z.enum([
+    "telegram",
+    "discord",
+    "email",
+    "slack",
+    "webhook",
+    "pagerduty",
+    "teams",
+    "ntfy",
+    "gotify",
+    "pushover",
+  ]),
   target: z.string(),
 });
 
@@ -72,11 +91,7 @@ export interface AlertEvaluationResult {
 
 // ─── Comparison Helpers ────────────────────────────────────────────────────────
 
-function compare(
-  value: number,
-  operator: ComparisonOperator,
-  threshold: number
-): boolean {
+function compare(value: number, operator: ComparisonOperator, threshold: number): boolean {
   switch (operator) {
     case "gt":
       return value > threshold;
@@ -95,21 +110,14 @@ function compare(
 
 async function evaluateErrorRate(
   condition: AlertCondition,
-  projectId: string
+  projectId: string,
 ): Promise<AlertEvaluationResult> {
-  const windowStart = new Date(
-    Date.now() - (condition.duration ?? 300) * 1000
-  );
+  const windowStart = new Date(Date.now() - (condition.duration ?? 300) * 1000);
 
   const [row] = await db
     .select({ cnt: count() })
     .from(events)
-    .where(
-      and(
-        eq(events.projectId, projectId),
-        gte(events.createdAt, windowStart)
-      )
-    );
+    .where(and(eq(events.projectId, projectId), gte(events.createdAt, windowStart)));
 
   const errorCount = row?.cnt ?? 0;
   const durationMinutes = (condition.duration ?? 300) / 60;
@@ -126,7 +134,7 @@ async function evaluateErrorRate(
 
 async function evaluateUptimeDown(
   condition: AlertCondition,
-  projectId: string
+  projectId: string,
 ): Promise<AlertEvaluationResult> {
   const consecutiveFailures = condition.consecutiveFailures ?? 3;
 
@@ -138,12 +146,16 @@ async function evaluateUptimeDown(
         JOIN uptime_monitors um ON uc.monitor_id = um.id
         WHERE um.project_id = ${projectId}
         ORDER BY uc.checked_at DESC
-        LIMIT ${consecutiveFailures * 10}`
+        LIMIT ${consecutiveFailures * 10}`,
   );
 
   // Group by monitor and count consecutive failures
   const monitorChecks = new Map<string, Array<{ status_code: number | null; success: boolean }>>();
-  const checkRows = castDbRows<{ monitor_id: string; status_code: number | null; success: boolean }>(recentChecks);
+  const checkRows = castDbRows<{
+    monitor_id: string;
+    status_code: number | null;
+    success: boolean;
+  }>(recentChecks);
   for (const check of checkRows) {
     const checks = monitorChecks.get(check.monitor_id) ?? [];
     checks.push({ status_code: check.status_code, success: check.success });
@@ -167,11 +179,7 @@ async function evaluateUptimeDown(
     }
   }
 
-  const triggered = compare(
-    worstConsecutive,
-    condition.operator,
-    consecutiveFailures
-  );
+  const triggered = compare(worstConsecutive, condition.operator, consecutiveFailures);
 
   return {
     triggered,
@@ -184,7 +192,7 @@ async function evaluateUptimeDown(
 async function evaluateResourceThreshold(
   condition: AlertCondition,
   _projectId: string,
-  resourceValues?: { cpu?: number; memory?: number; disk?: number }
+  resourceValues?: { cpu?: number; memory?: number; disk?: number },
 ): Promise<AlertEvaluationResult> {
   const resource = condition.resource ?? "cpu";
   const value = resourceValues?.[resource] ?? 0;
@@ -200,11 +208,9 @@ async function evaluateResourceThreshold(
 
 async function evaluateTraceError(
   condition: AlertCondition,
-  projectId: string
+  projectId: string,
 ): Promise<AlertEvaluationResult> {
-  const windowStart = new Date(
-    Date.now() - (condition.duration ?? 300) * 1000
-  );
+  const windowStart = new Date(Date.now() - (condition.duration ?? 300) * 1000);
 
   const [row] = await db
     .select({ cnt: count() })
@@ -213,16 +219,12 @@ async function evaluateTraceError(
       and(
         eq(traces.projectId, projectId),
         eq(traces.status, "ERROR"),
-        gte(traces.startTime, windowStart)
-      )
+        gte(traces.startTime, windowStart),
+      ),
     );
 
   const errorCount = row?.cnt ?? 0;
-  const triggered = compare(
-    errorCount,
-    condition.operator,
-    condition.threshold
-  );
+  const triggered = compare(errorCount, condition.operator, condition.threshold);
 
   return {
     triggered,
@@ -234,11 +236,9 @@ async function evaluateTraceError(
 
 async function evaluateTokenUsage(
   condition: AlertCondition,
-  projectId: string
+  projectId: string,
 ): Promise<AlertEvaluationResult> {
-  const windowStart = new Date(
-    Date.now() - (condition.duration ?? 3600) * 1000
-  );
+  const windowStart = new Date(Date.now() - (condition.duration ?? 3600) * 1000);
 
   // Sum token usage from trace attributes
   const result = await db.execute(
@@ -246,16 +246,12 @@ async function evaluateTokenUsage(
         FROM traces
         WHERE project_id = ${projectId}
           AND start_time >= ${windowStart.toISOString()}
-          AND attributes ? 'usage.total_tokens'`
+          AND attributes ? 'usage.total_tokens'`,
   );
 
   const resultRows = castDbRows<{ total: number }>(result);
   const totalTokens = Number(resultRows[0]?.total ?? 0);
-  const triggered = compare(
-    totalTokens,
-    condition.operator,
-    condition.threshold
-  );
+  const triggered = compare(totalTokens, condition.operator, condition.threshold);
 
   return {
     triggered,
@@ -267,7 +263,7 @@ async function evaluateTokenUsage(
 
 async function evaluateCertExpiry(
   condition: AlertCondition,
-  _projectId: string
+  _projectId: string,
 ): Promise<AlertEvaluationResult> {
   const host = condition.host;
   if (!host) {
@@ -310,7 +306,7 @@ async function evaluateCertExpiry(
  */
 export async function isInMaintenanceWindow(
   projectId: string,
-  monitorIds?: string[]
+  monitorIds?: string[],
 ): Promise<boolean> {
   const now = new Date();
 
@@ -321,15 +317,15 @@ export async function isInMaintenanceWindow(
       and(
         eq(maintenanceWindows.projectId, projectId),
         lte(maintenanceWindows.startsAt, now),
-        gte(maintenanceWindows.endsAt, now)
-      )
+        gte(maintenanceWindows.endsAt, now),
+      ),
     );
 
   if (activeWindows.length === 0) return false;
 
   // If any window has empty monitorIds, it covers all monitors
   const coversAll = activeWindows.some(
-    (w) => !w.monitorIds || (w.monitorIds as string[]).length === 0
+    (w) => !w.monitorIds || (w.monitorIds as string[]).length === 0,
   );
   if (coversAll) return true;
 
@@ -356,7 +352,7 @@ export async function isInMaintenanceWindow(
  */
 export async function checkCondition(
   rule: AlertRule,
-  resourceValues?: { cpu?: number; memory?: number; disk?: number }
+  resourceValues?: { cpu?: number; memory?: number; disk?: number },
 ): Promise<AlertEvaluationResult> {
   const { condition, projectId } = rule;
 
@@ -372,11 +368,15 @@ export async function checkCondition(
     case "token_usage":
       return evaluateTokenUsage(condition, projectId);
     case "recovery":
+      // Recovery is dispatched manually from the uptime worker
+      // (src/monitoring/uptime-worker.ts) when a monitor transitions from
+      // down → up. It must never trigger from a periodic evaluation cycle,
+      // so return a non-triggered result here as a safety net.
       return {
-        triggered: true,
-        currentValue: 1,
+        triggered: false,
+        currentValue: 0,
         threshold: 0,
-        message: "Service recovered — back online",
+        message: "Recovery is dispatched manually from the uptime worker",
       };
     case "cert_expiry":
       return evaluateCertExpiry(condition, projectId);
@@ -396,7 +396,7 @@ export async function checkCondition(
  */
 export async function evaluateRules(
   projectId: string,
-  resourceValues?: { cpu?: number; memory?: number; disk?: number }
+  resourceValues?: { cpu?: number; memory?: number; disk?: number },
 ): Promise<Array<{ rule: AlertRule; result: AlertEvaluationResult }>> {
   // Skip evaluation if project is in an active maintenance window
   const inMaintenance = await isInMaintenanceWindow(projectId);
@@ -405,8 +405,7 @@ export async function evaluateRules(
   }
 
   const rules = await db.query.alerts.findMany({
-    where: (alerts, { and, eq }) =>
-      and(eq(alerts.projectId, projectId), eq(alerts.isActive, true)),
+    where: (alerts, { and, eq }) => and(eq(alerts.projectId, projectId), eq(alerts.isActive, true)),
   });
 
   const triggered: Array<{
@@ -420,13 +419,19 @@ export async function evaluateRules(
 
     const conditionResult = AlertConditionSchema.safeParse(rule.condition);
     if (!conditionResult.success) {
-      logger.warn("[rules-engine] Invalid condition, skipping rule", { ruleId: rule.id, errors: conditionResult.error.flatten() });
+      logger.warn("[rules-engine] Invalid condition, skipping rule", {
+        ruleId: rule.id,
+        errors: conditionResult.error.flatten(),
+      });
       continue;
     }
 
     const channelsResult = z.array(AlertChannelSchema).safeParse(rule.channels);
     if (!channelsResult.success) {
-      logger.warn("[rules-engine] Invalid channels, skipping rule", { ruleId: rule.id, errors: channelsResult.error.flatten() });
+      logger.warn("[rules-engine] Invalid channels, skipping rule", {
+        ruleId: rule.id,
+        errors: channelsResult.error.flatten(),
+      });
       continue;
     }
 
@@ -443,18 +448,11 @@ export async function evaluateRules(
     };
 
     // Inject resource values if available
-    if (
-      alertRule.condition.type === "resource_threshold" &&
-      resourceValues
-    ) {
+    if (alertRule.condition.type === "resource_threshold" && resourceValues) {
       const resource = alertRule.condition.resource ?? "cpu";
       const value = resourceValues[resource] ?? 0;
       const result: AlertEvaluationResult = {
-        triggered: compare(
-          value,
-          alertRule.condition.operator,
-          alertRule.condition.threshold
-        ),
+        triggered: compare(value, alertRule.condition.operator, alertRule.condition.threshold),
         currentValue: value,
         threshold: alertRule.condition.threshold,
         message: `Resource ${resource}: ${value}% (threshold: ${alertRule.condition.operator} ${alertRule.condition.threshold}%)`,

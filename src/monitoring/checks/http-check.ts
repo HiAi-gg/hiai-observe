@@ -22,7 +22,7 @@ export interface HttpCheckResult {
 
 export async function runHttpCheck(
   url: string,
-  config: HttpCheckConfig = {}
+  config: HttpCheckConfig = {},
 ): Promise<HttpCheckResult> {
   const start = Date.now();
   const timeoutMs = config.timeoutMs ?? 30_000;
@@ -82,6 +82,12 @@ export async function runHttpCheck(
   } catch (err: unknown) {
     clearTimeout(timeout);
     const message = err instanceof Error ? err.message : "Unknown error";
-    return { statusCode: null, responseTimeMs: Date.now() - start, error: message, success: false, certExpiry };
+    return {
+      statusCode: null,
+      responseTimeMs: Date.now() - start,
+      error: message,
+      success: false,
+      certExpiry,
+    };
   }
 }

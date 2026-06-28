@@ -1,8 +1,7 @@
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../store/db.js";
-import { uptimeMonitors, uptimeChecks, projects } from "../store/schema.js";
-import { eq, desc, and, gte } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { projects, uptimeChecks, uptimeMonitors } from "../store/schema.js";
 
 const _BADGE_WIDTH = 120;
 const BADGE_HEIGHT = 22;
@@ -16,12 +15,7 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function svgBadge(
-  label: string,
-  value: string,
-  color: string,
-  valueColor?: string,
-): string {
+function svgBadge(label: string, value: string, color: string, valueColor?: string): string {
   const labelWidth = label.length * 7 + 12;
   const valueWidth = value.length * 7 + 12;
   const totalWidth = labelWidth + valueWidth;
@@ -50,21 +44,29 @@ function svgBadge(
 
 function statusColor(status: string): string {
   switch (status) {
-    case "operational": return "#4c1";
-    case "up": return "#4c1";
-    case "degraded": return "#dbab09";
-    case "down": return "#e05d44";
-    default: return "#9f9f9f";
+    case "operational":
+      return "#4c1";
+    case "up":
+      return "#4c1";
+    case "degraded":
+      return "#dbab09";
+    case "down":
+      return "#e05d44";
+    default:
+      return "#9f9f9f";
   }
 }
 
-async function getMonitorStatus(slug: string): Promise<{ name: string; status: string; uptime: number | null }> {
+async function getMonitorStatus(
+  slug: string,
+): Promise<{ name: string; status: string; uptime: number | null }> {
   // Look up project by slug
   const [project] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
   if (!project) return { name: slug, status: "unknown", uptime: null };
 
   // Get first active monitor for this project
-  const [monitor] = await db.select()
+  const [monitor] = await db
+    .select()
     .from(uptimeMonitors)
     .where(and(eq(uptimeMonitors.projectId, project.id), eq(uptimeMonitors.active, true)))
     .limit(1);
@@ -72,7 +74,8 @@ async function getMonitorStatus(slug: string): Promise<{ name: string; status: s
   if (!monitor) return { name: project.name, status: "unknown", uptime: null };
 
   // Get last check
-  const [lastCheck] = await db.select()
+  const [lastCheck] = await db
+    .select()
     .from(uptimeChecks)
     .where(eq(uptimeChecks.monitorId, monitor.id))
     .orderBy(desc(uptimeChecks.checkedAt))
@@ -82,10 +85,11 @@ async function getMonitorStatus(slug: string): Promise<{ name: string; status: s
 
   // Calculate 24h uptime
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const checks = await db.select({
-    total: sql<number>`count(*)`,
-    successCount: sql<number>`count(*) filter (where ${uptimeChecks.success} = true)`,
-  })
+  const checks = await db
+    .select({
+      total: sql<number>`count(*)`,
+      successCount: sql<number>`count(*) filter (where ${uptimeChecks.success} = true)`,
+    })
     .from(uptimeChecks)
     .where(and(eq(uptimeChecks.monitorId, monitor.id), gte(uptimeChecks.checkedAt, since24h)));
 
@@ -111,7 +115,7 @@ export const badgesRoutes = new Elysia({ prefix: "/api/badges" })
     },
     {
       params: t.Object({ slug: t.String() }),
-    }
+    },
   )
   .get(
     "/:slug/uptime",
@@ -119,9 +123,16 @@ export const badgesRoutes = new Elysia({ prefix: "/api/badges" })
       const { name, uptime } = await getMonitorStatus(params.slug);
       const label = name.length > 20 ? `${name.slice(0, 18)}..` : name;
       const value = uptime !== null ? `${uptime}%` : "N/A";
-      const color = uptime !== null
-        ? uptime >= 99.9 ? "#4c1" : uptime >= 99 ? "#97CA00" : uptime >= 95 ? "#dbab09" : "#e05d44"
-        : "#9f9f9f";
+      const color =
+        uptime !== null
+          ? uptime >= 99.9
+            ? "#4c1"
+            : uptime >= 99
+              ? "#97CA00"
+              : uptime >= 95
+                ? "#dbab09"
+                : "#e05d44"
+          : "#9f9f9f";
 
       set.headers["Content-Type"] = "image/svg+xml";
       set.headers["Cache-Control"] = "public, max-age=60";
@@ -129,5 +140,5 @@ export const badgesRoutes = new Elysia({ prefix: "/api/badges" })
     },
     {
       params: t.Object({ slug: t.String() }),
-    }
+    },
   );

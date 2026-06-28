@@ -5,10 +5,10 @@
  * end-to-end workflow latency, and identifies slow steps.
  */
 
-import { db } from "../store/db.js";
-import { traces } from "../store/schema.js";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { castDbRows } from "../lib/db-types.js";
+import { db } from "../store/db.js";
+import { traces } from "../store/schema.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -78,9 +78,7 @@ function calcPercentiles(values: number[]): Percentiles {
 
 // ── Latency stats ───────────────────────────────────────────────────────
 
-export async function getLatencyStats(
-  params: LatencyParams,
-): Promise<LatencyStats[]> {
+export async function getLatencyStats(params: LatencyParams): Promise<LatencyStats[]> {
   const { projectId, workflowName, from, to } = params;
 
   // Get all workflow spans grouped by workflow name and trace
@@ -117,39 +115,61 @@ export async function getLatencyStats(
     byWorkflow.set(name, list);
   }
 
-  const results: LatencyStats[] = [];
+  // Collect all trace IDs across all workflows and fetch step spans in ONE query
+  // (avoids N+1: M workflows × 1 step-spans query each)
+  const allTraceIds = new Set<string>();
+  for (const rows of byWorkflow.values()) {
+    for (const r of rows) {
+      allTraceIds.add(String(r.trace_id));
+    }
+  }
 
-  for (const [wfName, rows] of byWorkflow) {
-    const e2eDurations = rows.map((r) => Number(r.duration_ms ?? 0));
-
-    // Get child spans (steps) for these traces
-    const traceIds = rows.map((r) => String(r.trace_id));
-
-    if (traceIds.length === 0) continue;
-
+  const stepsByTraceId = new Map<string, Array<{ stepName: string; durationMs: number }>>();
+  if (allTraceIds.size > 0) {
     const stepSpans = await db
       .select({
+        trace_id: traces.traceId,
         step_name: traces.name,
         duration_ms: traces.durationMs,
       })
       .from(traces)
       .where(
         and(
-          inArray(traces.traceId, traceIds),
+          inArray(traces.traceId, Array.from(allTraceIds)),
           sql`${traces.parentSpanId} IS NOT NULL`,
           sql`${traces.parentSpanId} != ''`,
         ),
       )
       .orderBy(traces.name, traces.startTime);
 
-    // Group step durations by step name
-    const stepDurations = new Map<string, number[]>();
     for (const row of castDbRows<Record<string, unknown>>(stepSpans)) {
-      const stepName = String(row.step_name ?? "unknown");
-      const dur = Number(row.duration_ms ?? 0);
-      const list = stepDurations.get(stepName) ?? [];
-      list.push(dur);
-      stepDurations.set(stepName, list);
+      const traceId = String(row.trace_id);
+      const entry = {
+        stepName: String(row.step_name ?? "unknown"),
+        durationMs: Number(row.duration_ms ?? 0),
+      };
+      const list = stepsByTraceId.get(traceId) ?? [];
+      list.push(entry);
+      stepsByTraceId.set(traceId, list);
+    }
+  }
+
+  const results: LatencyStats[] = [];
+
+  for (const [wfName, rows] of byWorkflow) {
+    const e2eDurations = rows.map((r) => Number(r.duration_ms ?? 0));
+
+    // Group step durations by step name (looked up from the pre-fetched Map)
+    const stepDurations = new Map<string, number[]>();
+    for (const r of rows) {
+      const traceId = String(r.trace_id);
+      const spans = stepsByTraceId.get(traceId);
+      if (!spans) continue;
+      for (const span of spans) {
+        const list = stepDurations.get(span.stepName) ?? [];
+        list.push(span.durationMs);
+        stepDurations.set(span.stepName, list);
+      }
     }
 
     // Build step latencies

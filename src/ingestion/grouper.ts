@@ -1,6 +1,6 @@
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../store/db.js";
 import { issues } from "../store/schema.js";
-import { eq, and, sql } from "drizzle-orm";
 import type { ParsedEvent } from "./sentry-parser.js";
 
 /**
@@ -27,9 +27,10 @@ export function buildFingerprint(event: ParsedEvent): string {
 
 function buildTitle(event: ParsedEvent): string {
   if (event.exception) {
-    const value = event.exception.value.length > 120
-      ? `${event.exception.value.slice(0, 120)}…`
-      : event.exception.value;
+    const value =
+      event.exception.value.length > 120
+        ? `${event.exception.value.slice(0, 120)}…`
+        : event.exception.value;
     return `${event.exception.type}: ${value}`;
   }
   const msg = event.message ?? "Unknown error";

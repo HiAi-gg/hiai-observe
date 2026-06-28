@@ -1,8 +1,9 @@
-import { Elysia } from "elysia";
+import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
+import { Elysia } from "elysia";
+import { logger } from "../lib/logger.js";
 import { db } from "../store/db.js";
 import { redis } from "../store/redis.js";
-import { readFileSync } from "node:fs";
 import { getWorkerHealth } from "../workers/health.js";
 
 const startTime = Date.now();
@@ -11,7 +12,12 @@ let version = "0.1.0";
 try {
   const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8"));
   version = pkg.version ?? "0.1.0";
-} catch { /* use default */ }
+} catch (err) {
+  // Falling back to the default version is acceptable at runtime, but we
+  // still want to know in dev/logs if package.json was unreadable (e.g. we
+  // were launched from an unusual CWD or with a stripped image).
+  logger.debug("Could not read package.json for version, using default", { error: String(err) });
+}
 
 let lastError: { message: string; timestamp: number } | null = null;
 
@@ -56,57 +62,68 @@ function checkDisk(): { status: "ok" | "degraded"; freeBytes: number } {
     const output = result.stdout.toString();
     const lines = output.trim().split("\n");
     if (lines.length >= 2) {
-      const parts = lines[1]!.split(/\s+/);
-      // df output: Filesystem 1B-blocks Used Available Use% Mounted
-      const available = Number(parts[3]);
-      if (!Number.isNaN(available)) {
-        const ONE_GB = 1_073_741_824;
-        return { status: available < ONE_GB ? "degraded" : "ok", freeBytes: available };
+      const dataLine = lines[1];
+      if (dataLine) {
+        const parts = dataLine.split(/\s+/);
+        // df output: Filesystem 1B-blocks Used Available Use% Mounted
+        const available = Number(parts[3]);
+        if (!Number.isNaN(available)) {
+          const ONE_GB = 1_073_741_824;
+          return { status: available < ONE_GB ? "degraded" : "ok", freeBytes: available };
+        }
       }
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    // df can fail on non-Linux platforms or restricted containers; we
+    // fall back to "ok / unknown free bytes" but log so operators see it.
+    logger.debug("Disk check failed, reporting ok with unknown free bytes", { error: String(err) });
+  }
   return { status: "ok", freeBytes: -1 };
 }
 
+async function getHealth({ set }: { set: { status?: number | string } }) {
+  const [postgres, redisStatus] = await Promise.all([checkPostgres(), checkRedis()]);
+
+  const disk = checkDisk();
+
+  const allOk = postgres === "ok" && redisStatus === "ok" && disk.status === "ok";
+  const anyOk = postgres === "ok" || redisStatus === "ok";
+
+  const status = allOk ? "ok" : anyOk ? "degraded" : "error";
+  if (!anyOk) set.status = 503;
+
+  const mem = process.memoryUsage();
+  const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+
+  return {
+    status,
+    version,
+    uptime: formatUptime(uptimeSeconds),
+    uptimeSeconds,
+    memory: {
+      rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+      heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
+      external: `${Math.round(mem.external / 1024 / 1024)}MB`,
+    },
+    diskFreeBytes: disk.freeBytes,
+    dependencies: {
+      postgres,
+      redis: redisStatus,
+      disk: disk.status,
+    },
+    workers: getWorkerHealth(),
+    lastError: lastError
+      ? {
+          message: lastError.message,
+          ago: formatUptime(Math.floor((Date.now() - lastError.timestamp) / 1000)),
+        }
+      : null,
+  };
+}
+
 export const healthPlugin = new Elysia()
-  .get("/health", async ({ set }) => {
-    const [postgres, redisStatus] = await Promise.all([
-      checkPostgres(),
-      checkRedis(),
-    ]);
-
-    const disk = checkDisk();
-
-    const allOk = postgres === "ok" && redisStatus === "ok" && disk.status === "ok";
-    const anyOk = postgres === "ok" || redisStatus === "ok";
-
-    const status = allOk ? "ok" : anyOk ? "degraded" : "error";
-    if (!anyOk) set.status = 503;
-
-    const mem = process.memoryUsage();
-    const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-
-    return {
-      status,
-      version,
-      uptime: formatUptime(uptimeSeconds),
-      uptimeSeconds,
-      memory: {
-        rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
-        heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
-        heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
-        external: `${Math.round(mem.external / 1024 / 1024)}MB`,
-      },
-      diskFreeBytes: disk.freeBytes,
-      dependencies: {
-        postgres,
-        redis: redisStatus,
-        disk: disk.status,
-      },
-      workers: getWorkerHealth(),
-      lastError: lastError ? {
-        message: lastError.message,
-        ago: formatUptime(Math.floor((Date.now() - lastError.timestamp) / 1000)),
-      } : null,
-    };
-  });
+  // Canonical HiAi ecosystem health endpoint.
+  .get("/api/health", getHealth)
+  // Legacy alias for backwards compatibility with existing monitors/DSN/docker healthcheck.
+  .get("/health", getHealth);

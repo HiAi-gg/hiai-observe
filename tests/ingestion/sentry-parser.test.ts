@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseSentryEvent, parseSentryEnvelope } from "../../src/ingestion/sentry-parser.js";
 import type { SentryEvent } from "../../src/ingestion/sentry-parser.js";
+import { parseSentryEnvelope, parseSentryEvent } from "../../src/ingestion/sentry-parser.js";
 
 describe("parseSentryEvent", () => {
   it("parses a standard exception event", () => {
@@ -127,7 +127,11 @@ describe("parseSentryEvent", () => {
 describe("parseSentryEnvelope", () => {
   it("parses an envelope with one event item", () => {
     const envelopeHeader = JSON.stringify({ event_id: "env123", dsn: "http://key@localhost/1" });
-    const itemHeader = JSON.stringify({ type: "event", content_type: "application/json", length: 100 });
+    const itemHeader = JSON.stringify({
+      type: "event",
+      content_type: "application/json",
+      length: 100,
+    });
     const eventPayload = JSON.stringify({
       event_id: "env123",
       message: "Envelope error",

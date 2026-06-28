@@ -14,11 +14,11 @@ const heartbeats = new Map<string, number>();
 
 /** Interval thresholds per worker (ms). A worker is "stale" if overdue by 2x. */
 const INTERVALS: Record<string, number> = {
-  uptime:    10_000,   // TICK_INTERVAL_MS in uptime-worker
-  alert:     60_000,   // EVALUATION_INTERVAL_MS in alerts/worker
-  infra:     30_000,   // default COLLECTION_INTERVAL_MS
-  log:       15_000,   // streamer flush cadence (approximate)
-  retention:  86_400_000, // 24h
+  uptime: 10_000, // TICK_INTERVAL_MS in uptime-worker
+  alert: 60_000, // EVALUATION_INTERVAL_MS in alerts/worker
+  infra: 30_000, // default COLLECTION_INTERVAL_MS
+  log: 15_000, // streamer flush cadence (approximate)
+  retention: 86_400_000, // 24h
   maintenance: 691_200_000, // 8 days (7-day cycle + 1 day grace)
 };
 

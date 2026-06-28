@@ -1,6 +1,6 @@
+import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "./db.js";
-import { uptimeMonitors, uptimeChecks } from "./schema.js";
-import { eq, and, gte, count, sql, inArray } from "drizzle-orm";
+import { uptimeChecks, uptimeMonitors } from "./schema.js";
 
 export async function getMonitors(projectId?: string, group?: string) {
   const conditions = [];
@@ -8,11 +8,7 @@ export async function getMonitors(projectId?: string, group?: string) {
   if (group) conditions.push(eq(uptimeMonitors.monitorGroup, group));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  return db
-    .select()
-    .from(uptimeMonitors)
-    .where(where)
-    .orderBy(uptimeMonitors.createdAt);
+  return db.select().from(uptimeMonitors).where(where).orderBy(uptimeMonitors.createdAt);
 }
 
 export async function getMonitor(id: string) {
@@ -95,7 +91,7 @@ export async function getMonitorGroups(projectId?: string) {
     .groupBy(uptimeMonitors.monitorGroup)
     .orderBy(uptimeMonitors.monitorGroup);
 
-  return rows.filter(r => r.group !== null);
+  return rows.filter((r) => r.group !== null);
 }
 
 export async function updateMonitor(
@@ -117,7 +113,7 @@ export async function updateMonitor(
     dnsRecordType: string;
     dnsExpectedValue: string;
     dnsResolver: string;
-  }>
+  }>,
 ) {
   const [monitor] = await db
     .update(uptimeMonitors)
@@ -141,10 +137,7 @@ export async function insertCheck(data: {
   success: boolean;
   certExpiry?: Date | null;
 }) {
-  const [check] = await db
-    .insert(uptimeChecks)
-    .values(data)
-    .returning();
+  const [check] = await db.insert(uptimeChecks).values(data).returning();
 
   return check;
 }
@@ -156,7 +149,7 @@ export async function getChecks(
     offset?: number;
     from?: Date;
     to?: Date;
-  } = {}
+  } = {},
 ) {
   const { limit = 50, offset = 0, from, to } = opts;
 
@@ -174,10 +167,7 @@ export async function getChecks(
       .orderBy(sql`${uptimeChecks.checkedAt} DESC`)
       .limit(limit)
       .offset(offset),
-    db
-      .select({ total: count() })
-      .from(uptimeChecks)
-      .where(where),
+    db.select({ total: count() }).from(uptimeChecks).where(where),
   ]);
 
   return {
@@ -188,10 +178,7 @@ export async function getChecks(
   };
 }
 
-export async function getUptimePercentage(
-  monitorId: string,
-  hours: number
-): Promise<number> {
+export async function getUptimePercentage(monitorId: string, hours: number): Promise<number> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
   const result = await db
@@ -200,12 +187,7 @@ export async function getUptimePercentage(
       up: sql<number>`COUNT(*) FILTER (WHERE ${uptimeChecks.success} = true)`.mapWith(Number),
     })
     .from(uptimeChecks)
-    .where(
-      and(
-        eq(uptimeChecks.monitorId, monitorId),
-        gte(uptimeChecks.checkedAt, since)
-      )
-    );
+    .where(and(eq(uptimeChecks.monitorId, monitorId), gte(uptimeChecks.checkedAt, since)));
 
   const total = result[0]?.total ?? 0;
   const up = result[0]?.up ?? 0;
@@ -215,7 +197,7 @@ export async function getUptimePercentage(
 
 export async function getUptimePercentages(
   monitorIds: string[],
-  hours: number
+  hours: number,
 ): Promise<Map<string, number>> {
   if (monitorIds.length === 0) return new Map();
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);

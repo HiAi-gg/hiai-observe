@@ -1,11 +1,4 @@
-# HiAi Observe — Production Docker Compose
-# All configuration comes from .env file. Copy .env.example → .env first.
-#
-# Usage:
-#   cp .env.example .env    # configure
-#   docker compose up -d    # start
-#   docker compose logs -f  # watch logs
-
+# HiAi Observe — Docker Compose (quick start)
 services:
   postgres:
     image: pgvector/pgvector:pg18
@@ -15,12 +8,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-observe}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
       POSTGRES_DB: ${POSTGRES_DB:-hiai_observe}
-    # Ports removed for production — access only via internal network.
-    # For local development, uncomment:
-    # ports:
-    #   - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-observe} -d ${POSTGRES_DB:-hiai_observe}"]
       interval: 5s
@@ -32,10 +21,6 @@ services:
     restart: unless-stopped
     mem_limit: 256m
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-observe_local}"]
-    # Ports removed for production — access only via internal network.
-    # For local development, uncomment:
-    # ports:
-    #   - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -70,7 +55,6 @@ services:
       SESSION: 0
       SWARM: 0
       TASKS: 0
-      VOLUMES: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     read_only: true
@@ -83,9 +67,7 @@ services:
       retries: 5
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: vgalibov/hiai-observe:latest
     restart: unless-stopped
     mem_limit: 512m
     cpus: 1.0

@@ -5,9 +5,9 @@
  * in unit test runs. Use `bun test --integration` or set INTEGRATION=1 to enable.
  */
 
-import { db } from "../../src/store/db.js";
-import { projects, events, issues, traces } from "../../src/store/schema.js";
 import { eq } from "drizzle-orm";
+import { db } from "../../src/store/db.js";
+import { events, issues, projects, traces } from "../../src/store/schema.js";
 
 export const TEST_PROJECT_NAME = "integration-test-project";
 export const TEST_PROJECT_SLUG = "integration-test";
@@ -84,10 +84,7 @@ export async function waitForCondition<T>(
 /**
  * Make an authenticated fetch request to the HiAi Observe API.
  */
-export async function apiFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = `${TEST_BASE_URL}${path}`;
   const headers = {
     "Content-Type": "application/json",

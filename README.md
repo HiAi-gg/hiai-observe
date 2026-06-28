@@ -34,29 +34,37 @@ Built for indie developers, small teams, and AI agents who want answers to three
 - **Sentry SDK drop-in** — existing projects can switch by changing the DSN; no code rewrite
 - **Mastra-first AI tracing** — native support for Mastra workflows, tools, agents, and token usage, plus generic OTLP for anything else
 - **Built for small VPS** — runs comfortably on < 512 MB RAM, with a dedicated small-VPS env preset in `.env.example`
+- **Public status pages with email subscribers** — every uptime monitor ships a branded public status page (`GET /status/:slug`) plus a public email subscribe endpoint, so your users can self-serve incident notifications without a third-party tool
 - **AI-native, batteries included** — built-in MCP server, CLI, agent skill, and TypeScript SDK in one package, so any AI system (Claude Code / Cursor / Copilot / Mastra) can query, use, and integrate it out of the box
 
 ## Supported Protocols
 
 | Protocol | Status | Notes |
 |---|---|---|
-| **OpenTelemetry** (OTLP/HTTP) | ✅ | Traces + metrics over JSON; protobuf in `QW-OTLP-PROTO` |
+| **OpenTelemetry** (OTLP/HTTP) | ✅ | Traces + metrics + logs over JSON or protobuf |
 | **Sentry SDK** | ✅ | Drop-in replacement, full envelope support |
-| **OTLP Logs** | 🔜 | Ingestion endpoint planned (`PM-OTLP-LOGS`) |
+| **OTLP Logs** | ✅ | `POST /v1/logs` (JSON + protobuf), unified with Docker logs |
 | **Mastra** | ✅ | First-class, native exporters (`@hiai-gg/hiai-observe/mastra`) |
 | **Model Context Protocol (MCP)** | ✅ | 9 read tools for AI agents (`@hiai-gg/hiai-observe`) |
 | **OpenAPI** | ✅ | Spec at `GET /api/openapi.json` (no auth) |
 
-<!-- ============================================ -->
-<!-- 🖼️  SCREENSHOT #1: Hero / Splash              -->
-<!-- File:          docs/screenshots/hero.png       -->
-<!-- What to show: Main dashboard (light theme)    -->
-<!--              — error rate, uptime, containers  -->
-<!--              — AI cost panel, recent issues     -->
-<!-- Dimensions:   1200x675 (16:9)                 -->
-<!-- alt text:     "HiAi Observe unified dashboard showing error rate, uptime, container stats, and AI cost" -->
-<!-- Insert here:  <img src="docs/screenshots/hero.png" width="100%" alt="HiAi Observe unified dashboard" /> -->
-<!-- ============================================ -->
+## Execution Status (2026-06-20)
+
+| Wave | Scope | Status |
+|---|---|---|
+| **Wave 0** | P0 fixes (Drizzle regen, pre-commit hook, version bump → 0.1.9) | ✅ Complete |
+| **Wave 1** | Documentation sync + QW-OTLP-PROTO + 16 API endpoint docs | ✅ Complete |
+| **Wave 2** | OBS0 — Convention hygiene (Zod 3.25+, `src/lib/config.ts`, `/api/health` alias) | ✅ Complete |
+| **Wave 3** | OBS1 — UI unification via `@hiai/ui` | ✅ Complete |
+| **Wave 4** | OBS2 — Integration / embed (`EMBED.md`, plugin manifest, tenant filter, tenant-health) | ✅ Complete |
+| **Wave 5** | Platform Maturation (14 items) | 🟡 **11/14 done** — see below |
+| **Wave 6** | Strategic Initiatives (ClickHouse, cost engine, custom dashboard, anomaly detection) | ⏸ Not started |
+
+**Wave 5 progress:** QW-DRIZZLE-REGEN ✅ · QW-ZOD ✅ · QW-LOG-DOWNLOAD ✅ · QW-MODEL-PRICING ✅ · coverage threshold (25% lines) ✅ · OTLP logs endpoint ✅ · per-project rate limits ✅ · 99 API route tests ✅ · AI enrichment (gen_ai.* dual naming) ✅ · TCP port monitoring ✅ · startup config banner ✅ · ⏳ **CI-E2E**, **PM-INF-1** (mature multi-host), **PM-RBAC** (1–2 wks, critical path), **PM-AUDIT**.
+
+**Quality gates:** `tsc --noEmit` 0 errors · `vitest run` **500 passed / 35 skipped** (535 total) · coverage **27.25% lines** (threshold 25%) · `bun build` 2.15 MB / 630 modules.
+
+
 
 ## Quick Start
 
@@ -65,6 +73,10 @@ Built for indie developers, small teams, and AI agents who want answers to three
 git clone https://github.com/HiAi-gg/hiai-observe.git
 cd hiai-observe
 cp .env.example .env
+
+# Generate a secure API key
+echo "HIAI_OBSERVE_API_KEY=ho_$(openssl rand -hex 24)" >> .env
+
 docker compose up -d
 
 # Check health
@@ -146,11 +158,12 @@ HiAi Observe bundles 5 observability modules into a single container:
 |---|---|---|
 | **Error Tracking** | Sentry-compatible error ingestion, automatic issue grouping, stack traces, source maps | Bugsink, Sentry |
 | **Uptime Monitoring** | HTTP health checks, public status pages, response time history, SSL tracking | Uptime Kuma |
-| **Infrastructure** | Docker container stats, host CPU/memory/disk monitoring, auto-refresh dashboard | Beszel |
+| **Infrastructure** | Docker container stats, host CPU/memory/disk monitoring, GPU metrics, auto-refresh dashboard | Beszel |
 | **Log Viewer** | Real-time WebSocket log streaming, full-text search, container filtering | Dozzle |
 | **AI Agent Observability** | Mastra-native traces, workflow visualization, token usage, latency percentiles, cost estimation | Custom LLM tracing |
+| **Status Pages & Subscribers** | Branded public status pages, email subscriber signups (`POST /api/subscribers/public`), uptime/incident SVG badges, embeddable JSON API | Statuspage, BetterUptime |
 
-Plus: unified dashboard, alert rules engine, maintenance windows, incident management, and API key auth.
+Plus: agent telemetry ingest (`/api/agent/ingest`), team management, releases with deployment health, custom fingerprint rules, saved searches, embeddable status badges, per-tenant health rollup, unified dashboard, alert rules engine, maintenance windows, incident management, and API key auth.
 
 <img width="2539" height="1900" alt="Screenshot 2026-06-07 221755" src="https://github.com/user-attachments/assets/aa4f0596-f210-4688-8a56-0c6506374dfc" />
 
@@ -160,6 +173,7 @@ Plus: unified dashboard, alert rules engine, maintenance windows, incident manag
 
 <img width="2527" height="1916" alt="Screenshot 2026-06-07 221704" src="https://github.com/user-attachments/assets/2eb19a1a-fc14-46a9-ab60-54f4aa46da24" />
 
+Plus: individual error events with stack traces (Events), issue collaboration via comments (Comments), multi-project management (Projects), data export to CSV/JSON (Export), admin retention and cleanup tools (Admin), and iframe embed integration for external dashboards (Embed).
 
 ## Comparison
 
@@ -168,6 +182,7 @@ Plus: unified dashboard, alert rules engine, maintenance windows, incident manag
 | Error tracking (Sentry SDK) | Yes | Yes | — | — | — |
 | Uptime monitoring | Yes | — | Yes | — | — |
 | Status pages | Yes | — | Yes | — | — |
+| Status subscribers (email alerts) | Yes | — | Yes | — | — |
 | Docker container stats | Yes | — | — | Yes | — |
 | Host resource monitoring | Yes | — | — | Yes | — |
 | Real-time log streaming | Yes | — | — | — | Yes |
@@ -253,10 +268,10 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 
 | Category | Endpoints | Auth |
 |---|---|---|
-| Health | GET `/health`, GET `/metrics` | Public |
+| Health | GET `/api/health`, GET `/health` (legacy alias), GET `/metrics` | Public |
 | Sentry Ingestion | POST `/api/:projectId/store`, `/api/:projectId/envelope` | API Key |
 | Agent Ingestion | POST `/api/agent/ingest` | API Key |
-| OTLP | POST `/v1/traces`, POST `/v1/metrics` | API Key |
+| OTLP | POST `/v1/traces`, POST `/v1/metrics`, POST `/v1/logs` (JSON + protobuf) | API Key |
 | Issues | GET `/api/issues`, GET `/api/issues/:id`, PATCH `/api/issues/:id`, POST `/api/issues/:id/merge`, DELETE `/api/issues/:id` | API Key |
 | Events | GET `/api/events`, GET `/api/events/:id` | API Key |
 | Comments | GET `/api/issues/:id/comments`, POST `/api/issues/:id/comments`, DELETE `/api/comments/:id` | API Key |
@@ -264,7 +279,7 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 | Status Page | GET `/api/status/:slug` (JSON), GET `/status/:slug` (HTML), GET `/api/status/:slug/history` | Public |
 | Badges | GET `/api/badges/uptime/:slug/:id`, GET `/api/badges/incidents/:slug/:id` | Public |
 | Infrastructure | GET `/api/infrastructure/containers`, `/api/infrastructure/hosts`, `/api/infrastructure/gpu`, `/api/infrastructure/containers/:id` | API Key |
-| Logs | GET `/api/logs`, GET `/api/logs/stats`, GET `/api/logs/containers`, DELETE `/api/logs`, WS `/ws/logs` | API Key |
+| Logs | GET `/api/logs`, GET `/api/logs/stats`, GET `/api/logs/containers`, GET `/api/logs/download`, DELETE `/api/logs`, WS `/ws/logs` | API Key |
 | Traces | GET `/api/traces`, GET `/api/traces/stats`, GET `/api/traces/workflows`, GET `/api/traces/workflows/:id`, GET `/api/traces/:id` | API Key |
 | Alerts | CRUD `/api/alerts`, POST `/api/alerts/:id/test`, POST `/api/alerts/test-all`, GET `/api/alerts/history`, GET `/api/alerts/channels` | API Key |
 | Dashboard | GET `/api/dashboard` | API Key |
@@ -278,7 +293,10 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 | Search | GET `/api/search` | API Key |
 | Saved Searches | GET/POST/DELETE `/api/saved-searches` | API Key |
 | Export | GET `/api/export/issues`, `/api/export/traces`, `/api/export/logs` | API Key |
-| Admin | GET/PUT `/api/admin/retention`, POST `/api/admin/cleanup` | Admin Key |
+| Admin | GET/PUT `/api/admin/retention`, POST `/api/admin/cleanup`, `/api/admin-bridge/*` | Admin Key |
+| Embed | GET `/api/embed/*` (proxied views for dashboard integration) | Admin Key |
+| Tenant Health | GET `/api/tenant/:tenantId/health` (cross-project aggregate) | Admin Key |
+| Fingerprint Rules | CRUD `/api/fingerprint-rules` | API Key |
 
 ## Tech Stack
 
@@ -308,21 +326,23 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 │  └──────┬──────┘  └──────┬───────┘  └──────┬─────┘  │
 │         │                │                  │        │
 │  ┌──────┴────────────────┴──────────────────┴─────┐  │
-│  │              Elysia API (27 plugins)            │  │
+│  │              Elysia API (32 plugins)            │  │
 │  │  health│sentry│issues│events│monitors│status    │  │
-│  │  infra│logs│ws│otlp│traces│alerts│dashboard     │  │
-│  │  + auth + rate limiter + metrics + request-id   │  │
+│  │  infra│logs│ws│otlp│traces│alerts│dashboard│  │
+│  │  + auth + rate limiter + tenant-scope + metrics │  │
+│  │  + request-id + config-validation (Zod)        │  │
 │  └──────────────────┬─────────────────────────────┘  │
 │                     │                                │
 │  ┌──────────────────┴─────────────────────────────┐  │
 │  │           PostgreSQL 18 + Redis 8              │  │
-│  │  11 tables │ compound indexes │ FK relations   │  │
+│  │  23 tables │ compound indexes │ FK relations   │  │
 │  └────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────┘
            ▲                ▲
            │                │
-      Sentry SDK       OpenTelemetry
-      compatible          native
+       Sentry SDK       OpenTelemetry
+       compatible          native
+       (drop-in)       (traces/metrics/logs)
 ```
 
 ## Project Structure
@@ -330,24 +350,29 @@ SDK or the OpenAPI spec at `GET /api/openapi.json`.
 ```
 hiai-observe/
 ├── src/
-│   ├── index.ts                    # Elysia app entry (27 plugins + 4 middleware)
-│   ├── api/ (27 files)             # Route handlers
+│   ├── index.ts                    # Elysia app entry (32 plugins + 5 middleware)
+│   ├── api/ (32 files)             # Route handlers (incl. embed, admin-bridge, tenant-health, search, badges, fingerprint-rules)
 │   ├── alerts/ (5 files)           # Rules engine, dedup, 3 notifiers
 │   ├── ingestion/ (3 files)        # Sentry parser, OTLP parser, grouper
-│   ├── mastra/ (3 files)           # Trace parser, token aggregator, latency analyzer
-│   ├── middleware/ (4 files)        # Auth, metrics, rate limiter, request-id
-│   ├── monitoring/ (5 files)       # Docker/host collectors, uptime worker, log streamer
-│   ├── workers/ (2 files)          # Retention cleanup, maintenance scheduler
-│   └── store/ (8 files)            # Drizzle ORM schema, DB connection, data access
-├── frontend/
+│   ├── mastra/ (3 files)           # Trace parser, token aggregator, latency analyzer (gen_ai.* dual naming)
+│   ├── middleware/ (5 files)        # Auth, metrics, rate limiter, request-id, tenant-scope
+│   ├── monitoring/                 # Docker/host/GPU collectors, uptime worker, log streamer
+│   │   └── checks/ (6 files)        # http, tcp, dns, ping, grpc, cert
+│   ├── workers/                    # Retention cleanup, maintenance scheduler, alert worker
+│   ├── lib/                        # Auth helpers, RBAC, logger, config (Zod), errors
+│   └── store/ (8 files)            # Drizzle ORM schema, DB/Redis, uptime, traces, logs
+├── frontend/                       # Svelte 5 + SvelteKit 2.60+ (port 5174 in dev)
 │   └── src/
-│       ├── lib/ (4 files)          # API client, stores, utils, WebSocket manager
-│       ├── routes/ (12 pages)      # Dashboard, issues, uptime, infra, logs, traces, settings
-│       └── components/ (4 files)   # StatusBadge, MetricCard, DataTable, LiveIndicator
-├── tests/ (23 files, 216 tests)    # Unit + integration tests
-├── scripts/ (3 files)              # Seed, reset, API key generator
+│       ├── lib/                    # API client, stores, utils, WebSocket manager
+│       ├── routes/ (10 pages)      # Dashboard, issues, uptime, infra, logs, traces, settings
+│       └── components/             # StatusBadge, MetricCard, DataTable, LiveIndicator
+├── tests/ (41 files, 500 passed / 35 skipped)  # Unit + integration + e2e tests
+├── scripts/                        # Seed, reset, API key generator, backup
 ├── packages/hiai-observe/         # @hiai-gg/hiai-observe (SDK + CLI + MCP + agent + Mastra)
-├── docs/ (3 files)                 # API reference, integration guide, architecture
+├── drizzle/                        # Versioned SQL migrations
+│   ├── 0000_initial.sql
+│   └── 0001_per_project_rate_limit.sql
+├── docs/                           # API reference, integration guide, architecture, configuration, production, ROADMAP, EMBED, security policies
 ├── Dockerfile                      # Multi-stage production build
 ├── docker-compose.yml              # Development compose
 ├── docker-compose.prod.yml         # Production compose (with Caddy)
@@ -403,11 +428,11 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-Current: **v0.1.9** — first public release on all three channels:
+Current: **v0.1.9** — post-release, in active Wave 5 Platform Maturation:
 [`@hiai-gg/hiai-observe`](https://www.npmjs.com/package/@hiai-gg/hiai-observe) on
 npm (SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP server + `hiai-observe-agent`),
 multi-arch Docker images at [`vgalibov/hiai-observe`](https://hub.docker.com/r/vgalibov/hiai-observe),
-and tagged GitHub releases.
+and tagged GitHub releases. Initial public release was v0.1.8 on all three channels.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
 

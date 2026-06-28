@@ -1,57 +1,57 @@
 <script lang="ts">
-  let {
-    direction = "vertical",
-    initialRatio = 0.35,
-    minA = 80,
-    minB = 80,
-    collapsed = false,
-    onToggle,
-    children,
-  }: {
-    direction?: "vertical" | "horizontal";
-    initialRatio?: number;
-    minA?: number;
-    minB?: number;
-    collapsed?: boolean;
-    onToggle?: () => void;
-    children?: import("svelte").Snippet;
-  } = $props();
+let {
+  direction = "vertical",
+  initialRatio = 0.35,
+  minA = 80,
+  minB = 80,
+  collapsed = false,
+  onToggle,
+  children,
+}: {
+  direction?: "vertical" | "horizontal";
+  initialRatio?: number;
+  minA?: number;
+  minB?: number;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  children?: import("svelte").Snippet;
+} = $props();
 
-  let container = $state<HTMLDivElement | null>(null);
-  let ratio = $state(initialRatio);
-  let dragging = $state(false);
+let container = $state<HTMLDivElement | null>(null);
+let ratio = $state(initialRatio);
+let dragging = $state(false);
 
-  function onPointerDown(e: PointerEvent) {
-    e.preventDefault();
-    dragging = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+function onPointerDown(e: PointerEvent) {
+  e.preventDefault();
+  dragging = true;
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!dragging || !container) return;
+  const rect = container.getBoundingClientRect();
+  let pos: number;
+  let total: number;
+
+  if (direction === "vertical") {
+    pos = e.clientY - rect.top;
+    total = rect.height;
+  } else {
+    pos = e.clientX - rect.left;
+    total = rect.width;
   }
 
-  function onPointerMove(e: PointerEvent) {
-    if (!dragging || !container) return;
-    const rect = container.getBoundingClientRect();
-    let pos: number;
-    let total: number;
+  const clamped = Math.max(minA, Math.min(total - minB, pos));
+  ratio = clamped / total;
+}
 
-    if (direction === "vertical") {
-      pos = e.clientY - rect.top;
-      total = rect.height;
-    } else {
-      pos = e.clientX - rect.left;
-      total = rect.width;
-    }
+function onPointerUp() {
+  dragging = false;
+}
 
-    const clamped = Math.max(minA, Math.min(total - minB, pos));
-    ratio = clamped / total;
-  }
-
-  function onPointerUp() {
-    dragging = false;
-  }
-
-  function toggleCollapse() {
-    onToggle?.();
-  }
+function toggleCollapse() {
+  onToggle?.();
+}
 </script>
 
 <div
@@ -75,13 +75,13 @@
   {#if !collapsed}
     <button type="button"
       onpointerdown={onPointerDown}
-      class={`group relative z-10 shrink-0 bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]/50 ${
+      class={`group relative z-10 shrink-0 bg-[var(--border)] transition-colors hover:bg-[var(--primary)]/50 ${
         direction === "vertical" ? "h-1 w-full cursor-row-resize" : "w-1 h-full cursor-col-resize"
-      } ${dragging ? "bg-[var(--color-accent)]" : ""}`}
+      } ${dragging ? "bg-[var(--primary)]" : ""}`}
       aria-label="Resize panel"
     >
       <div
-        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-text-muted)]/30 transition-colors group-hover:bg-[var(--color-accent)]"
+        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--muted-foreground)]/30 transition-colors group-hover:bg-[var(--primary)]"
         class:w-8={direction === "vertical"}
         class:h-0.5={direction === "vertical"}
         class:h-8={direction === "horizontal"}
@@ -104,7 +104,7 @@
   {#if onToggle}
     <button type="button"
       onclick={toggleCollapse}
-      class="absolute right-2 top-2 z-20 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-1.5 py-0.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)]"
+      class="absolute right-2 top-2 z-20 rounded-md border border-[var(--border)] bg-[var(--card)] px-1.5 py-0.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--background)]"
       title={collapsed ? "Expand" : "Collapse"}
     >
       {#if collapsed}

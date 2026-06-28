@@ -1,3 +1,5 @@
+import { logger } from "../lib/logger.js";
+
 export interface StackFrame {
   filename: string;
   function: string;
@@ -48,6 +50,8 @@ export interface SentryEvent {
     ip_address?: string;
   };
   tags?: Record<string, string>;
+  extra?: Record<string, unknown>;
+  contexts?: Record<string, unknown>;
   sdk?: {
     name?: string;
     version?: string;
@@ -161,7 +165,7 @@ export function parseSentryEvent(raw: SentryEvent): ParsedEvent {
     type: raw.exception?.values ? "exception" : "message",
     exception: parseException(raw),
     exceptionChain: parseExceptionChain(raw),
-    fingerprint: (raw as Record<string, unknown>).fingerprint as string[] ?? null,
+    fingerprint: ((raw as Record<string, unknown>).fingerprint as string[]) ?? null,
     breadcrumbs: parseBreadcrumbs(raw),
     user: raw.user
       ? {
@@ -217,7 +221,14 @@ export function parseSentryEnvelope(body: string): ParsedEvent[] {
 function safeJson(line: string): Record<string, unknown> | null {
   try {
     return JSON.parse(line) as Record<string, unknown>;
-  } catch {
+  } catch (err) {
+    // Malformed envelope/header lines are common (clients sometimes send
+    // blank separators or partial frames); null is the right sentinel for
+    // the parser. Debug-log the failure so it's diagnosable in dev.
+    logger.debug("safeJson: ignoring malformed JSON line", {
+      preview: line.slice(0, 80),
+      error: String(err),
+    });
     return null;
   }
 }

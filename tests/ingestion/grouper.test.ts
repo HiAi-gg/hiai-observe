@@ -97,9 +97,7 @@ describe("buildFingerprint", () => {
       exception: {
         type: "TypeError",
         value: "different message",
-        stacktrace: [
-          { filename: "src/other.ts", function: "otherFn", lineno: 99, inApp: true },
-        ],
+        stacktrace: [{ filename: "src/other.ts", function: "otherFn", lineno: 99, inApp: true }],
       },
     });
 

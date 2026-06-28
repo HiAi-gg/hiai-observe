@@ -1,13 +1,16 @@
+import { and, desc, eq, ne } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { getMonitors, getChecks, getUptimePercentages } from "../store/uptime.js";
 import { db } from "../store/db.js";
-import { projects, incidents } from "../store/schema.js";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { incidents, projects } from "../store/schema.js";
+import { getChecks, getMonitors, getUptimePercentages } from "../store/uptime.js";
 
 export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
   .get("/:slug", async ({ params: { slug }, set }) => {
     const [project] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
-    if (!project) { set.status = 404; return { error: "Status page not found" }; }
+    if (!project) {
+      set.status = 404;
+      return { error: "Status page not found" };
+    }
 
     const monitors = await getMonitors(project.id);
 
@@ -26,7 +29,7 @@ export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
           uptime24h,
           lastCheck: checks[0] ?? null,
         };
-      })
+      }),
     );
 
     const statuses = monitorStatuses.filter((m) => m.active);
@@ -37,7 +40,9 @@ export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
     if (down.length > 0) overall = "down";
     else if (degraded.length > 0) overall = "degraded";
 
-    const activeIncidents = await db.select().from(incidents)
+    const activeIncidents = await db
+      .select()
+      .from(incidents)
       .where(and(eq(incidents.projectId, project.id), ne(incidents.status, "resolved")))
       .orderBy(desc(incidents.createdAt));
 
@@ -49,25 +54,32 @@ export const statusPagePlugin = new Elysia({ prefix: "/api/status" })
     };
   })
 
-  .get("/:slug/history", async ({ params: { slug }, query, set }) => {
-    const [project] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
-    if (!project) { set.status = 404; return { error: "Status page not found" }; }
+  .get(
+    "/:slug/history",
+    async ({ params: { slug }, query, set }) => {
+      const [project] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
+      if (!project) {
+        set.status = 404;
+        return { error: "Status page not found" };
+      }
 
-    const monitors = await getMonitors(project.id);
-    const days = query.days ?? 30;
+      const monitors = await getMonitors(project.id);
+      const days = query.days ?? 30;
 
-    const ids = monitors.map((m) => m.id);
-    const uptimeMap = await getUptimePercentages(ids, days * 24);
+      const ids = monitors.map((m) => m.id);
+      const uptimeMap = await getUptimePercentages(ids, days * 24);
 
-    const history = monitors.map((m) => ({
-      monitorId: m.id,
-      name: m.name,
-      uptimePercent: uptimeMap.get(m.id) ?? 100,
-    }));
+      const history = monitors.map((m) => ({
+        monitorId: m.id,
+        name: m.name,
+        uptimePercent: uptimeMap.get(m.id) ?? 100,
+      }));
 
-    return { history };
-  }, {
-    query: t.Object({
-      days: t.Optional(t.Number({ minimum: 1, maximum: 90 })),
-    }),
-  });
+      return { history };
+    },
+    {
+      query: t.Object({
+        days: t.Optional(t.Number({ minimum: 1, maximum: 90 })),
+      }),
+    },
+  );

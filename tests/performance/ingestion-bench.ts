@@ -119,7 +119,9 @@ async function main() {
   console.log(`    p95:  ${p95.toFixed(2)}ms`);
   console.log(`    p99:  ${p99.toFixed(2)}ms`);
   console.log(`    max:  ${max.toFixed(2)}ms`);
-  console.log(`\nTarget check: p95 = ${p95.toFixed(2)}ms ${p95 < 10 ? "PASS (< 10ms)" : "FAIL (>= 10ms)"}`);
+  console.log(
+    `\nTarget check: p95 = ${p95.toFixed(2)}ms ${p95 < 10 ? "PASS (< 10ms)" : "FAIL (>= 10ms)"}`,
+  );
 
   process.exit(p95 < 10 ? 0 : 1);
 }

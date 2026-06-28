@@ -1,8 +1,5 @@
-import { describe, it, expect } from "vitest";
-import {
-  parseDockerLogFrame,
-  parseRawLogLine,
-} from "../../src/monitoring/log-streamer.js";
+import { describe, expect, it } from "vitest";
+import { parseDockerLogFrame, parseRawLogLine } from "../../src/monitoring/log-streamer.js";
 
 describe("parseDockerLogFrame", () => {
   it("parses a stdout frame correctly", () => {

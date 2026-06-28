@@ -1,26 +1,51 @@
+import { gte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { searchLogs, getLogContainers, clearLogs, searchLogsRegex, searchLogsFuzzy, getLogVolume } from "../store/logs.js";
-import { db } from "../store/db.js";
-import { logs } from "../store/schema.js";
-import { sql, gte } from "drizzle-orm";
 import { lookupProject } from "../lib/auth.js";
-import { subscribeLogs, subscribeAllLogs } from "../store/log-pubsub.js";
+import { db } from "../store/db.js";
+import { subscribeAllLogs, subscribeLogs } from "../store/log-pubsub.js";
+import {
+  clearLogs,
+  getLogContainers,
+  getLogVolume,
+  searchLogs,
+  searchLogsFuzzy,
+  searchLogsRegex,
+} from "../store/logs.js";
+import { logs } from "../store/schema.js";
 
 export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   .get("/stats", async () => {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [totalResult, byLevel, byContainer, byHour] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)),
-      db.select({ level: logs.level, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(logs.level),
-      db.select({ container: logs.containerName, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(logs.containerName).orderBy(sql`count(*) desc`).limit(10),
-      db.select({ hour: sql<string>`date_trunc('hour', ${logs.timestamp})::text`, count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)).groupBy(sql`date_trunc('hour', ${logs.timestamp})`).orderBy(sql`date_trunc('hour', ${logs.timestamp})`),
+      db
+        .select({ level: logs.level, count: sql<number>`count(*)` })
+        .from(logs)
+        .where(gte(logs.timestamp, since24h))
+        .groupBy(logs.level),
+      db
+        .select({ container: logs.containerName, count: sql<number>`count(*)` })
+        .from(logs)
+        .where(gte(logs.timestamp, since24h))
+        .groupBy(logs.containerName)
+        .orderBy(sql`count(*) desc`)
+        .limit(10),
+      db
+        .select({
+          hour: sql<string>`date_trunc('hour', ${logs.timestamp})::text`,
+          count: sql<number>`count(*)`,
+        })
+        .from(logs)
+        .where(gte(logs.timestamp, since24h))
+        .groupBy(sql`date_trunc('hour', ${logs.timestamp})`)
+        .orderBy(sql`date_trunc('hour', ${logs.timestamp})`),
     ]);
 
     return {
       total24h: totalResult[0]?.count ?? 0,
-      byLevel: Object.fromEntries(byLevel.map(r => [r.level ?? "unknown", r.count])),
-      byContainer: byContainer.map(r => ({ name: r.container, count: r.count })),
-      byHour: byHour.map(r => ({ hour: r.hour, count: r.count })),
+      byLevel: Object.fromEntries(byLevel.map((r) => [r.level ?? "unknown", r.count])),
+      byContainer: byContainer.map((r) => ({ name: r.container, count: r.count })),
+      byHour: byHour.map((r) => ({ hour: r.hour, count: r.count })),
     };
   })
   .get(
@@ -42,7 +67,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
       }),
-    }
+    },
   )
   .get(
     "/",
@@ -63,7 +88,10 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
           });
           return { data: result };
         } catch {
-          return { data: { logs: [], total: 0, limit: 100, offset: 0 }, error: "Invalid regex pattern" };
+          return {
+            data: { logs: [], total: 0, limit: 100, offset: 0 },
+            error: "Invalid regex pattern",
+          };
         }
       }
 
@@ -119,7 +147,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         limit: t.Optional(t.Numeric()),
         offset: t.Optional(t.Numeric()),
       }),
-    }
+    },
   )
   .get(
     "/stream",
@@ -147,13 +175,16 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
       const stream = new ReadableStream({
         async start(controller) {
           const sendLog = (entry: any) => {
-            if (container && entry.container_id !== container && entry.container_name !== container) {
+            if (
+              container &&
+              entry.container_id !== container &&
+              entry.container_name !== container
+            ) {
               return;
             }
             try {
               controller.enqueue(`data: ${JSON.stringify(entry)}\n\n`);
-            } catch {
-            }
+            } catch {}
           };
 
           if (container) {
@@ -174,7 +205,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         cancel() {
           if (unsub) unsub();
           if (pingInterval) clearInterval(pingInterval);
-        }
+        },
       });
 
       return new Response(stream);
@@ -184,7 +215,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         key: t.Optional(t.String()),
         container: t.Optional(t.String()),
       }),
-    }
+    },
   )
   .get("/containers", async () => {
     const containers = await getLogContainers();
@@ -206,5 +237,5 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         before: t.Optional(t.String()),
         confirm: t.Optional(t.String()),
       }),
-    }
+    },
   );

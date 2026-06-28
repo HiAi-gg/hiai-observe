@@ -2,9 +2,9 @@
  * Traces data access layer.
  */
 
+import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { traces } from "./schema.js";
-import { eq, and, desc, asc, sql, count, gte, lte } from "drizzle-orm";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -98,14 +98,10 @@ export async function getTraces(filter: TraceFilter): Promise<TraceListResult> {
     conditions.push(eq(traces.traceId, filter.traceId));
   }
   if (filter.workflowName) {
-    conditions.push(
-      sql`attributes->>'mastra.workflow' = ${filter.workflowName}`,
-    );
+    conditions.push(sql`attributes->>'mastra.workflow' = ${filter.workflowName}`);
   }
   if (filter.agentName) {
-    conditions.push(
-      sql`attributes->>'mastra.agent' = ${filter.agentName}`,
-    );
+    conditions.push(sql`attributes->>'mastra.agent' = ${filter.agentName}`);
   }
   if (filter.status) {
     conditions.push(eq(traces.status, filter.status));
@@ -119,10 +115,7 @@ export async function getTraces(filter: TraceFilter): Promise<TraceListResult> {
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countResult] = await db
-    .select({ total: count() })
-    .from(traces)
-    .where(where);
+  const [countResult] = await db.select({ total: count() }).from(traces).where(where);
 
   const rows = await db
     .select()
@@ -173,17 +166,13 @@ export async function getWorkflowRuns(filter: {
   limit: number;
   offset: number;
 }) {
-  const conditions = [
-    sql`attributes->>'mastra.workflow' IS NOT NULL`,
-  ];
+  const conditions = [sql`attributes->>'mastra.workflow' IS NOT NULL`];
 
   if (filter.projectId) {
     conditions.push(eq(traces.projectId, filter.projectId));
   }
   if (filter.workflowName) {
-    conditions.push(
-      sql`attributes->>'mastra.workflow' = ${filter.workflowName}`,
-    );
+    conditions.push(sql`attributes->>'mastra.workflow' = ${filter.workflowName}`);
   }
   if (filter.status) {
     conditions.push(eq(traces.status, filter.status));
@@ -191,10 +180,7 @@ export async function getWorkflowRuns(filter: {
 
   const where = and(...conditions);
 
-  const [countResult] = await db
-    .select({ total: count() })
-    .from(traces)
-    .where(where);
+  const [countResult] = await db.select({ total: count() }).from(traces).where(where);
 
   const rows = await db
     .select()

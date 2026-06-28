@@ -1,8 +1,7 @@
 import { Redis } from "ioredis";
+import { config } from "../lib/config.js";
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-
-export const redis = new Redis(redisUrl, {
+export const redis = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: 3,
   retryStrategy(times) {
     if (times > 3) return null;

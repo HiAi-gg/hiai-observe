@@ -4,6 +4,8 @@
  * Sends alert notifications via Gotify push notification server.
  */
 
+import { config as appConfig } from "../../lib/config.js";
+
 interface GotifyAlert {
   title: string;
   status: "critical" | "warning" | "recovered";
@@ -31,10 +33,10 @@ function getPriority(status: GotifyAlert["status"]): number {
 export async function sendGotifyAlert(
   server: string,
   alert: GotifyAlert,
-  config?: { server?: string; token?: string }
+  config?: { server?: string; token?: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const targetServer = config?.server || server || process.env.GOTIFY_SERVER;
-  const token = config?.token || process.env.GOTIFY_TOKEN;
+  const targetServer = config?.server || server || appConfig.GOTIFY_SERVER;
+  const token = config?.token || appConfig.GOTIFY_TOKEN;
   if (!targetServer) {
     return { ok: false, error: "Gotify server URL not configured" };
   }

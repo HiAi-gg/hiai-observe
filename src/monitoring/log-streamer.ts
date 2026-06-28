@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getConfig } from "./config.js";
+import { config, getMonitoringConfig } from "../lib/config.js";
 import { logger } from "../lib/logger.js";
 
 export interface LogEntry {
@@ -65,7 +65,7 @@ export class TokenBucket {
  * Returns parsed stream type and payload string.
  */
 export function parseDockerLogFrame(
-  buffer: Buffer
+  buffer: Buffer,
 ): { stream: "stdout" | "stderr"; payload: string } | null {
   if (buffer.length < 8) return null;
 
@@ -88,9 +88,7 @@ export function parseRawLogLine(line: string): {
   timestamp: string;
   message: string;
 } {
-  const timestampMatch = line.match(
-    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(.*)$/
-  );
+  const timestampMatch = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(.*)$/);
   if (timestampMatch) {
     return { timestamp: timestampMatch[1]!, message: timestampMatch[2]! };
   }
@@ -104,9 +102,9 @@ export function parseRawLogLine(line: string): {
  */
 function dockerFetchOpts(
   dockerSocket: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): { url: string; opts: RequestInit } {
-  const cfg = getConfig();
+  const cfg = getMonitoringConfig();
   if (cfg.dockerHost) {
     return {
       url: cfg.dockerHost,
@@ -128,20 +126,18 @@ async function attachToContainerLogs(
   dockerSocket: string,
   onFrame: (entry: LogEntry) => void,
   containerNames?: Map<string, string>,
-  canAccept?: () => boolean
+  canAccept?: () => boolean,
 ): Promise<AbortController> {
   const controller = new AbortController();
 
   const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket, controller.signal);
-  const url = `${baseUrl}${getConfig().dockerApiPrefix}/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
+  const url = `${baseUrl}${getMonitoringConfig().dockerApiPrefix}/containers/${containerId}/logs?follow=1&stdout=1&stderr=1&timestamps=1`;
 
   try {
     const response = await fetch(url, opts);
 
     if (!response.ok || !response.body) {
-      console.error(
-        `[log-streamer] Failed to attach to ${containerId}: ${response.status}`
-      );
+      logger.error(`[log-streamer] Failed to attach to ${containerId}: ${response.status}`);
       return controller;
     }
 
@@ -189,7 +185,7 @@ async function attachToContainerLogs(
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
-          console.error(`[log-streamer] Stream error for ${containerId}:`, err.message);
+          logger.error(`[log-streamer] Stream error for ${containerId}: ${err.message}`);
         }
       }
     };
@@ -197,7 +193,7 @@ async function attachToContainerLogs(
     pump();
   } catch (err: unknown) {
     if (err instanceof Error && err.name !== "AbortError") {
-      console.error(`[log-streamer] Connection error for ${containerId}:`, err.message);
+      logger.error(`[log-streamer] Connection error for ${containerId}: ${err.message}`);
     }
   }
 
@@ -212,15 +208,15 @@ async function attachToContainerLogs(
 export function startLogStreamer(
   containerIds: string[],
   onBatch: LogBatchCallback,
-  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock",
-  containerNames?: Map<string, string>
+  dockerSocket = config.DOCKER_SOCKET,
+  containerNames?: Map<string, string>,
 ): () => void {
-  const config = getConfig();
+  const monitoringCfg = getMonitoringConfig();
   const controllers: AbortController[] = [];
   const batch: LogEntry[] = [];
   const buckets = new Map<string, TokenBucket>();
 
-  const maxLinesPerSec = config.logMaxLinesPerSec;
+  const maxLinesPerSec = monitoringCfg.logMaxLinesPerSec;
 
   const flush = () => {
     if (batch.length > 0) {
@@ -229,28 +225,32 @@ export function startLogStreamer(
     }
   };
 
-  const interval = setInterval(flush, config.logBatchIntervalMs || BATCH_INTERVAL_MS);
+  const interval = setInterval(flush, monitoringCfg.logBatchIntervalMs || BATCH_INTERVAL_MS);
 
   for (const containerId of containerIds) {
-    const bucket = maxLinesPerSec > 0
-      ? new TokenBucket(maxLinesPerSec, maxLinesPerSec)
-      : null;
+    const bucket = maxLinesPerSec > 0 ? new TokenBucket(maxLinesPerSec, maxLinesPerSec) : null;
     if (bucket) buckets.set(containerId, bucket);
 
     const canAccept = () => {
-      return config.logMaxBufferSize <= 0 || batch.length < config.logMaxBufferSize;
+      return monitoringCfg.logMaxBufferSize <= 0 || batch.length < monitoringCfg.logMaxBufferSize;
     };
 
-    attachToContainerLogs(containerId, dockerSocket, (entry) => {
-      if (config.logSampleRate < 1.0 && Math.random() >= config.logSampleRate) {
-        return;
-      }
-      if (bucket && !bucket.consume()) return;
-      batch.push(entry);
-      if (batch.length >= BATCH_MAX_SIZE) {
-        flush();
-      }
-    }, containerNames, canAccept).then((controller) => {
+    attachToContainerLogs(
+      containerId,
+      dockerSocket,
+      (entry) => {
+        if (monitoringCfg.logSampleRate < 1.0 && Math.random() >= monitoringCfg.logSampleRate) {
+          return;
+        }
+        if (bucket && !bucket.consume()) return;
+        batch.push(entry);
+        if (batch.length >= BATCH_MAX_SIZE) {
+          flush();
+        }
+      },
+      containerNames,
+      canAccept,
+    ).then((controller) => {
       controllers.push(controller);
     });
   }
@@ -268,11 +268,14 @@ export function startLogStreamer(
  * List running containers via Docker Engine API.
  */
 export async function listContainers(
-  dockerSocket = process.env.DOCKER_SOCKET || "/var/run/docker.sock"
+  dockerSocket = config.DOCKER_SOCKET,
 ): Promise<Array<{ id: string; name: string }>> {
   try {
     const { url: baseUrl, opts } = dockerFetchOpts(dockerSocket);
-    const response = await fetch(`${baseUrl}${getConfig().dockerApiPrefix}/containers/json`, opts);
+    const response = await fetch(
+      `${baseUrl}${getMonitoringConfig().dockerApiPrefix}/containers/json`,
+      opts,
+    );
 
     if (!response.ok) return [];
 

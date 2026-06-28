@@ -1,17 +1,19 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { config } from "./config.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const KEY_ENV = "ENCRYPTION_KEY";
 
 export function hasEncryptionKey(): boolean {
-  return !!process.env[KEY_ENV];
+  return !!config.ENCRYPTION_KEY;
 }
 
 function getKey(): Buffer {
-  const hex = process.env[KEY_ENV]!;
+  const hex = config.ENCRYPTION_KEY!;
   const raw = Buffer.from(hex, "hex");
-  if (raw.length !== 32) throw new Error(`${KEY_ENV} must be 64 hex characters (32 bytes for AES-256)`);
+  if (raw.length !== 32)
+    throw new Error(`${KEY_ENV} must be 64 hex characters (32 bytes for AES-256)`);
   return raw;
 }
 
@@ -34,6 +36,9 @@ export function decrypt(ciphertext: string): string {
   if (!iv || !encrypted || !tag) return ciphertext;
   const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(iv, "base64"));
   decipher.setAuthTag(Buffer.from(tag, "base64"));
-  const decrypted = Buffer.concat([decipher.update(Buffer.from(encrypted, "base64")), decipher.final()]);
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encrypted, "base64")),
+    decipher.final(),
+  ]);
   return decrypted.toString("utf8");
 }

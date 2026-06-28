@@ -8,18 +8,18 @@
  * Skip in CI by default — run with INTEGRATION=1 bun test tests/integration/
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { and, eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db } from "../../src/store/db.js";
+import { events, issues } from "../../src/store/schema.js";
 import {
-  createTestProject,
-  cleanupTestData,
-  waitForCondition,
   apiFetch,
+  cleanupTestData,
+  createTestProject,
   isServerReachable,
   TEST_BASE_URL,
+  waitForCondition,
 } from "./helpers.js";
-import { db } from "../../src/store/db.js";
-import { issues, events } from "../../src/store/schema.js";
-import { eq, and } from "drizzle-orm";
 
 const SKIP = !(process.env.INTEGRATION === "1");
 
@@ -96,18 +96,11 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
 
     // Verify event was stored
     await waitForCondition(async () => {
-      const stored = await db
-        .select()
-        .from(events)
-        .where(eq(events.projectId, projectId))
-        .limit(1);
+      const stored = await db.select().from(events).where(eq(events.projectId, projectId)).limit(1);
       return stored.length > 0 ? stored : null;
     }, 5000);
 
-    const storedEvents = await db
-      .select()
-      .from(events)
-      .where(eq(events.projectId, projectId));
+    const storedEvents = await db.select().from(events).where(eq(events.projectId, projectId));
 
     expect(storedEvents.length).toBeGreaterThanOrEqual(1);
     expect(storedEvents[0].exceptionType).toBe("TypeError");
@@ -171,24 +164,14 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
       const count = await db
         .select()
         .from(events)
-        .where(
-          and(
-            eq(events.projectId, projectId),
-            eq(events.exceptionType, "RangeError"),
-          ),
-        );
+        .where(and(eq(events.projectId, projectId), eq(events.exceptionType, "RangeError")));
       return count.length >= 3 ? count : null;
     }, 5000);
 
     // Check that exactly one issue was created for this exception type
-    const issueList = await db
-      .select()
-      .from(issues)
-      .where(eq(issues.projectId, projectId));
+    const issueList = await db.select().from(issues).where(eq(issues.projectId, projectId));
 
-    const rangeErrorIssues = issueList.filter(
-      (i) => i.title?.includes("RangeError"),
-    );
+    const rangeErrorIssues = issueList.filter((i) => i.title?.includes("RangeError"));
 
     expect(rangeErrorIssues.length).toBe(1);
     expect(rangeErrorIssues[0].count).toBeGreaterThanOrEqual(3);
@@ -255,12 +238,7 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
       const stored = await db
         .select()
         .from(events)
-        .where(
-          and(
-            eq(events.projectId, projectId),
-            eq(events.exceptionType, "Error"),
-          ),
-        )
+        .where(and(eq(events.projectId, projectId), eq(events.exceptionType, "Error")))
         .limit(1);
       return stored.length > 0 ? stored : null;
     }, 5000);
@@ -268,12 +246,7 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
     const storedEvents = await db
       .select()
       .from(events)
-      .where(
-        and(
-          eq(events.projectId, projectId),
-          eq(events.exceptionType, "Error"),
-        ),
-      )
+      .where(and(eq(events.projectId, projectId), eq(events.exceptionType, "Error")))
       .limit(1);
 
     expect(storedEvents.length).toBe(1);

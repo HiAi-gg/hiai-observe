@@ -5,7 +5,7 @@
  * - Public paths bypass auth
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Bun.password.verify for bcrypt checks
 vi.stubGlobal("Bun", {
@@ -47,7 +47,8 @@ function getDbChain() {
 
 // ── Public path helper (mirrors middleware logic) ────────────────────────
 const PUBLIC_PATHS = [
-  "/health",
+  "/api/health", // Canonical HiAi ecosystem health endpoint
+  "/health", // Legacy alias for backwards compatibility
   "/metrics",
   "/api/status",
   "/api/subscribers/public",
@@ -178,7 +179,9 @@ describe("lookupProject", () => {
   });
 
   it("returns project on DB hit", async () => {
-    chain.limit.mockResolvedValueOnce([{ id: "proj-1", apiKeyHash: "$2b$10$fakehash", apiKey: null }]);
+    chain.limit.mockResolvedValueOnce([
+      { id: "proj-1", apiKeyHash: "$2b$10$fakehash", apiKey: null },
+    ]);
 
     const { lookupProject } = await import("../../src/lib/auth.js");
     const result = await lookupProject("new-key-1");
@@ -196,7 +199,9 @@ describe("lookupProject", () => {
   });
 
   it("serves from cache on second lookup (cache hit)", async () => {
-    chain.limit.mockResolvedValueOnce([{ id: "proj-cache", apiKeyHash: "$2b$10$fakehash", apiKey: null }]);
+    chain.limit.mockResolvedValueOnce([
+      { id: "proj-cache", apiKeyHash: "$2b$10$fakehash", apiKey: null },
+    ]);
 
     const { lookupProject } = await import("../../src/lib/auth.js");
 
@@ -231,6 +236,8 @@ describe("lookupProject", () => {
 describe("isPublicPath", () => {
   it.each([
     "/",
+    "/api/health",
+    "/api/health/details",
     "/health",
     "/health/details",
     "/metrics",

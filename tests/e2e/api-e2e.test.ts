@@ -7,16 +7,16 @@
  * Run: INTEGRATION=1 bun run test tests/e2e/api-e2e.test.ts
  */
 
-import { describe, it, expect, } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   apiFetch,
-  createTestProjectViaApi,
-  cleanupProject,
-  sentryExceptionPayload,
-  otlpTracePayload,
-  waitFor,
   BASE_URL,
+  cleanupProject,
+  createTestProjectViaApi,
   MASTER_KEY,
+  otlpTracePayload,
+  sentryExceptionPayload,
+  waitFor,
 } from "./helpers.js";
 
 const enabled = !!process.env.INTEGRATION;
@@ -33,7 +33,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("1. health check returns ok", async () => {
     const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(5000) });
     expect(res.status).toBe(200);
-    const body = await res.json() as { status: string };
+    const body = (await res.json()) as { status: string };
     expect(body.status).toBe("ok");
   });
 
@@ -58,7 +58,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
       apiKey: projectApiKey,
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { id: string };
+    const body = (await res.json()) as { id: string };
     expect(body.id).toBeTruthy();
   });
 
@@ -67,7 +67,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("4. issue was created from Sentry event", async () => {
     const result = await waitFor(async () => {
       const res = await apiFetch(`/api/issues?projectId=${projectId}`, { apiKey: MASTER_KEY });
-      const body = await res.json() as { data: Array<{ id: string; title: string }> };
+      const body = (await res.json()) as { data: Array<{ id: string; title: string }> };
       return body.data.length > 0 ? body.data[0] : null;
     });
     issueId = result?.id;
@@ -79,7 +79,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("5. event stored with stack trace", async () => {
     const res = await apiFetch(`/api/events?issueId=${issueId}`, { apiKey: MASTER_KEY });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: Array<{ stackTrace: string | null }> };
+    const body = (await res.json()) as { data: Array<{ stackTrace: string | null }> };
     expect(body.data.length).toBeGreaterThan(0);
     // Stack trace should be JSON stringified array of frames
     if (body.data[0]?.stackTrace) {
@@ -101,7 +101,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
       }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { monitor: { id: string; name: string } };
+    const body = (await res.json()) as { monitor: { id: string; name: string } };
     monitorId = body.monitor.id;
     expect(body.monitor.name).toBe("E2E Test Monitor");
   });
@@ -111,7 +111,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("7. monitor appears in list", async () => {
     const res = await apiFetch("/api/monitors");
     expect(res.status).toBe(200);
-    const body = await res.json() as { monitors: Array<{ id: string }> };
+    const body = (await res.json()) as { monitors: Array<{ id: string }> };
     const found = body.monitors.find((m) => m.id === monitorId);
     expect(found).toBeTruthy();
   });
@@ -135,7 +135,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
       }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { id: string; name: string };
+    const body = (await res.json()) as { id: string; name: string };
     alertId = body.id;
     expect(body.name).toBe("E2E High Error Rate");
   });
@@ -145,7 +145,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("9. alert appears in list", async () => {
     const res = await apiFetch("/api/alerts");
     expect(res.status).toBe(200);
-    const body = await res.json() as { items: Array<{ id: string }> };
+    const body = (await res.json()) as { items: Array<{ id: string }> };
     const found = body.items.find((a) => a.id === alertId);
     expect(found).toBeTruthy();
   });
@@ -156,7 +156,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
     const res = await apiFetch(`/api/alerts/${alertId}/test`, { method: "POST" });
     // May return 200 even if notification fails (channels not configured)
     expect(res.status).toBeLessThan(500);
-    const body = await res.json() as { ok?: boolean; channels?: unknown[] };
+    const body = (await res.json()) as { ok?: boolean; channels?: unknown[] };
     expect(body).toBeTruthy();
   });
 
@@ -165,7 +165,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("11. dashboard returns aggregated data", async () => {
     const res = await apiFetch("/api/dashboard");
     expect(res.status).toBe(200);
-    const body = await res.json() as {
+    const body = (await res.json()) as {
       errorCount24h: number;
       uptimePercent: number;
       activeContainers: number;
@@ -187,7 +187,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("12. export issues as JSON", async () => {
     const res = await apiFetch("/api/export/issues");
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: unknown[]; count: number };
+    const body = (await res.json()) as { data: unknown[]; count: number };
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThanOrEqual(1);
   });
@@ -217,7 +217,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("13b. trace is queryable", async () => {
     const result = await waitFor(async () => {
       const res = await apiFetch(`/api/traces?workflowName=e2e-workflow`, { apiKey: MASTER_KEY });
-      const body = await res.json() as { data: Array<{ name: string }>; total: number };
+      const body = (await res.json()) as { data: Array<{ name: string }>; total: number };
       return body.total > 0 ? body.data[0] : null;
     });
     expect(result?.name).toBe("e2e-test-span");
@@ -238,7 +238,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
 
     // Verify project is gone
     const checkRes = await apiFetch(`/api/projects`);
-    const body = await checkRes.json() as { projects: Array<{ id: string }> };
+    const body = (await checkRes.json()) as { projects: Array<{ id: string }> };
     const found = body.projects.find((p) => p.id === projectId);
     expect(found).toBeUndefined();
   });

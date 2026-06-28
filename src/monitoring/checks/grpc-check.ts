@@ -27,7 +27,7 @@ export async function runGrpcCheck(opts: GrpcCheckOptions): Promise<GrpcCheckRes
       method: "POST",
       headers: {
         "content-type": "application/grpc",
-        "te": "trailers",
+        te: "trailers",
       },
       body,
       signal: controller.signal,
@@ -35,7 +35,12 @@ export async function runGrpcCheck(opts: GrpcCheckOptions): Promise<GrpcCheckRes
     clearTimeout(t);
 
     if (!res.ok) {
-      return { isUp: false, status: "unhealthy", responseTime: Date.now() - start, error: `HTTP ${res.status}` };
+      return {
+        isUp: false,
+        status: "unhealthy",
+        responseTime: Date.now() - start,
+        error: `HTTP ${res.status}`,
+      };
     }
 
     const buf = new Uint8Array(await res.arrayBuffer());

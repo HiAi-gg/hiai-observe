@@ -114,7 +114,11 @@ async function readMemory(): Promise<{
   }
 }
 
-async function readDisk(): Promise<{ used: number; total: number; partitions: DiskPartitionStats[] }> {
+async function readDisk(): Promise<{
+  used: number;
+  total: number;
+  partitions: DiskPartitionStats[];
+}> {
   try {
     const proc = Bun.spawnSync(["df", "-B1"], {
       stdout: "pipe",
@@ -132,8 +136,13 @@ async function readDisk(): Promise<{ used: number; total: number; partitions: Di
       const mount = parts[5] ?? "";
 
       // Skip pseudo-filesystems
-      if (filesystem.startsWith("tmpfs") || filesystem.startsWith("devtmpfs") ||
-          filesystem.startsWith("shm") || filesystem === "none") continue;
+      if (
+        filesystem.startsWith("tmpfs") ||
+        filesystem.startsWith("devtmpfs") ||
+        filesystem.startsWith("shm") ||
+        filesystem === "none"
+      )
+        continue;
 
       const totalBytes = parseInt(parts[1] ?? "0", 10);
       const usedBytes = parseInt(parts[2] ?? "0", 10);
@@ -201,7 +210,9 @@ const PROC_STATE_MAP: Record<string, string> = {
 async function readTopProcesses(): Promise<TopProcess[]> {
   try {
     const procDir = "/proc";
-    const _entries = await Bun.file(procDir).text().catch(() => "");
+    const _entries = await Bun.file(procDir)
+      .text()
+      .catch(() => "");
     // /proc listing isn't directly text-readable; use readdirSync instead
     const dirEntries: string[] = [];
     const { readdirSync } = await import("node:fs");
@@ -216,13 +227,21 @@ async function readTopProcesses(): Promise<TopProcess[]> {
     }
 
     // Read /proc/stat for CPU total to compute per-process CPU%
-    const statContent = await Bun.file("/proc/stat").text().catch(() => "");
+    const statContent = await Bun.file("/proc/stat")
+      .text()
+      .catch(() => "");
     const cpuLine = statContent.split("\n")[0] ?? "";
     const cpuParts = cpuLine.split(/\s+/).slice(1).map(Number);
     const totalCpuTime = cpuParts.reduce((a, b) => a + b, 0);
 
     const _pageSizeKb = 4; // default page size 4KB
-    const processes: Array<{ pid: number; name: string; cpuPercent: number; memoryMb: number; state: string }> = [];
+    const processes: Array<{
+      pid: number;
+      name: string;
+      cpuPercent: number;
+      memoryMb: number;
+      state: string;
+    }> = [];
 
     // Sample top N PIDs by reading stat files (limit to avoid overhead)
     const samplePids = dirEntries.slice(0, 200);
@@ -231,8 +250,12 @@ async function readTopProcesses(): Promise<TopProcess[]> {
       samplePids.map(async (pid) => {
         try {
           const [statText, statusText] = await Promise.all([
-            Bun.file(`${procDir}/${pid}/stat`).text().catch(() => ""),
-            Bun.file(`${procDir}/${pid}/status`).text().catch(() => ""),
+            Bun.file(`${procDir}/${pid}/stat`)
+              .text()
+              .catch(() => ""),
+            Bun.file(`${procDir}/${pid}/status`)
+              .text()
+              .catch(() => ""),
           ]);
           if (!statText) return null;
 
@@ -252,9 +275,8 @@ async function readTopProcesses(): Promise<TopProcess[]> {
           const vmMatch = statusText.match(/VmRSS:\s+(\d+)/);
           const memoryKb = vmMatch ? parseInt(vmMatch[1] ?? "0", 10) : 0;
 
-          const cpuPercent = totalCpuTime > 0
-            ? Math.round((totalTime / totalCpuTime) * 10000) / 100
-            : 0;
+          const cpuPercent =
+            totalCpuTime > 0 ? Math.round((totalTime / totalCpuTime) * 10000) / 100 : 0;
 
           return {
             pid: parseInt(pid, 10),
@@ -266,7 +288,7 @@ async function readTopProcesses(): Promise<TopProcess[]> {
         } catch {
           return null;
         }
-      })
+      }),
     );
 
     for (const p of perPidReads) {

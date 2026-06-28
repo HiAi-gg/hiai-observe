@@ -17,7 +17,7 @@ packages/*/dist/
 # Internal planning / audit files (not for open-source)
 todo.md
 new.md
-AGENTS.md
+todo.md.bak
 AUDIT_*.md
 PARITY_REPORT.md
 PERF_AUDIT.md

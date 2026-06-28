@@ -76,7 +76,7 @@ export async function checkCert(host: string, port: number = 443): Promise<CertI
       },
     );
 
-    socket.on("error", (err) => {
+    socket.on("error", (err: Error) => {
       socket.destroy();
       safeReject(new Error(`TLS connection failed: ${err.message}`));
     });

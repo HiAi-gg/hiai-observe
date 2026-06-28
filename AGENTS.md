@@ -10,7 +10,7 @@
 - **Runtime:** Bun 1.3.14+ (no Node, no npm, no yarn)
 - **Backend:** Elysia 1.4.28+ (ESM-only, single-container: API + workers + frontend)
 - **Frontend:** Svelte 5.55+ + SvelteKit 2.60+ (`/frontend`, dark mode, WebSocket live updates)
-- **UI:** `@hiai/ui` + shadcn-svelte (тема `.theme-observe`, OBS1)
+- **UI:** `@hiai-gg/hiai-ui` + shadcn-svelte (тема `.theme-observe`, OBS1)
 - **ORM:** Drizzle ORM 0.45.2+ (23 tables, compound indexes)
 - **Validation:** Zod 3.25+
 - **Auth:** Better Auth + API key (Bearer) на всех чувствительных маршрутах; public для health/metrics/status
@@ -22,7 +22,7 @@
 - **Tests:** Vitest (500 passed / 35 skipped, coverage 27.25% threshold 25%)
 - **Структура:** `src/api/` (32 Elysia route plugins) + `src/ingestion/` (Sentry/OTLP parsers) + `src/mastra/` + `src/middleware/` + `src/monitoring/` + `src/workers/` + `src/lib/` + `src/store/` + `src/alerts/` + `frontend/` + `drizzle/` (versioned SQL migrations) + `scripts/` + `tests/` + `docs/`
 - **env только через** `src/lib/config.ts` (Zod-validated, emits `summarizeConfig()` banner at boot). `process.env` ЗАПРЕЩЁН где-либо ещё в `src/` — проверяется `grep -r 'process.env' src/ --include='*.ts' | grep -v config.ts`
-- **Импорт токенов:** `@hiai/ui/styles/tokens.css` (OBS1: theme→`tokens.css`)
+- **Импорт токенов:** `@hiai-gg/hiai-ui/styles/tokens.css` (OBS1: theme→`tokens.css`)
 - **Порты:** API `8001` · frontend dev `5174` (Vite/SvelteKit) · example integration `8000`
 - **Health check (canonical):** `GET /api/health` (DB+Redis+deps+workers); legacy `GET /health` сохранён для совместимости
 - **Frontend dev auth:** Vite `define` + custom transform plugin инжектит `HIAI_OBSERVE_API_KEY` at build time — НИКОГДА `localStorage.getItem("hiai-observe-api-key")` напрямую (причина 401)
@@ -47,7 +47,7 @@
 - [`docs/hiai-ecosystem/CONVENTIONS.md`](../../docs/hiai-ecosystem/CONVENTIONS.md) — **правила и топология** (§1 стек, §2 структура, §3 порты, §4 дизайн-токены, §5 auth/RBAC, **§6 plugin/embed-контракт** — observe как embeddable)
 - [`docs/hiai-ecosystem/ARCHITECTURE.md`](../../docs/hiai-ecosystem/ARCHITECTURE.md) — архитектура (роли host/module, карта подключений observe)
 - [`docs/hiai-ecosystem/PORTS.md`](../../docs/hiai-ecosystem/PORTS.md) — реестр портов (observe = 8001)
-- [`docs/hiai-ecosystem/DESIGN_SYSTEM.md`](../../docs/hiai-ecosystem/DESIGN_SYSTEM.md) — дизайн-токены и `@hiai/ui` контракт (`@hiai/ui` тема `.theme-observe`)
+- [`docs/hiai-ecosystem/DESIGN_SYSTEM.md`](../../docs/hiai-ecosystem/DESIGN_SYSTEM.md) — дизайн-токены и `@hiai-gg/hiai-ui` контракт (`@hiai-gg/hiai-ui` тема `.theme-observe`)
 - [`docs/hiai-ecosystem/PLUGIN_CONTRACT.md`](../../docs/hiai-ecosystem/PLUGIN_CONTRACT.md) — контракт plugin/embed-контракта
 
 ### Project-specific (root + docs/)
@@ -67,8 +67,8 @@
 - [`../HIAI_CONVENTIONS.md`](../HIAI_CONVENTIONS.md) — правила, plugin contract §6
 - [`../../docs/archive/HIAI_ECOSYSTEM_UNIFICATION_PLAN.md`](../../docs/archive/HIAI_ECOSYSTEM_UNIFICATION_PLAN.md) — U3 (observe as embeddable)
 - [`../../docs/archive/HIAI_PROJECTS_ROADMAP.md`](../../docs/archive/HIAI_PROJECTS_ROADMAP.md) — **проектный план, секция "hiai-observe", фазы OBS1–OBS2**
-- [`../../docs/archive/HIAI_UI_PACKAGE_PLAN.md`](../../docs/archive/HIAI_UI_PACKAGE_PLAN.md) — `@hiai/ui`: контракт потребления + тема `.theme-observe`
-- [`../../packages/hiai-ui/README.md`](../../packages/hiai-ui/README.md) — `@hiai/ui`: контракт потребления
+- [`../../docs/archive/HIAI_UI_PACKAGE_PLAN.md`](../../docs/archive/HIAI_UI_PACKAGE_PLAN.md) — `@hiai-gg/hiai-ui`: контракт потребления + тема `.theme-observe`
+- [`../../packages/hiai-ui/README.md`](../../packages/hiai-ui/README.md) — `@hiai-gg/hiai-ui`: контракт потребления
 
 > **Примечание:** Этот файл (`AGENTS.md`) и `todo.md` добавлены в `.gitignore` и не коммитятся.
 > Они содержат оперативные инструкции для агентов и могут меняться без review.
@@ -84,10 +84,10 @@ HiAi Observe — part of the HiAi ecosystem. Role: **shared telemetry module** (
 **Shared truth lives in the `projects/` root:**
 - [`../HIAI_CONVENTIONS.md`](../HIAI_CONVENTIONS.md) — rules, topology, plugin contract §6.
 - [`../../docs/archive/HIAI_ECOSYSTEM_UNIFICATION_PLAN.md`](../../docs/archive/HIAI_ECOSYSTEM_UNIFICATION_PLAN.md) — U3 (observe as embeddable module).
-- [`../../packages/hiai-ui/README.md`](../../packages/hiai-ui/README.md) — **@hiai/ui**: consumption contract + observe theme `.theme-observe`; plan — [`../../docs/archive/HIAI_UI_PACKAGE_PLAN.md`](../../docs/archive/HIAI_UI_PACKAGE_PLAN.md).
+- [`../../packages/hiai-ui/README.md`](../../packages/hiai-ui/README.md) — **@hiai-gg/hiai-ui**: consumption contract + observe theme `.theme-observe`; plan — [`../../docs/archive/HIAI_UI_PACKAGE_PLAN.md`](../../docs/archive/HIAI_UI_PACKAGE_PLAN.md).
 - [`../../docs/archive/HIAI_PROJECTS_ROADMAP.md`](../../docs/archive/HIAI_PROJECTS_ROADMAP.md) — **project plan (section "hiai-observe", phases OBS1–OBS2)**.
 
-**What's next (only unification/integration):** OBS1 — theme→`tokens.css`, consuming `@hiai/ui` →
+**What's next (only unification/integration):** OBS1 — theme→`tokens.css`, consuming `@hiai-gg/hiai-ui` →
 OBS2 — `docs/EMBED.md`, plugin manifest, per-tenant/per-site scope, embed in admin/dashboard.
 
 ### Project Documents (index; everything except core is reference/historical)
@@ -130,7 +130,7 @@ Unified, self-hosted observability platform for AI Agents and TypeScript backend
 | Wave 0 | P0 fixes (Drizzle regen, pre-commit, version bump) | ✅ Complete |
 | Wave 1 | Docs sync + 16 endpoints + QW-OTLP-PROTO | ✅ Complete |
 | Wave 2 | OBS0 — Zod 3.25+, `src/lib/config.ts`, `/api/health` alias | ✅ Complete |
-| Wave 3 | OBS1 — `@hiai/ui` theme/component unification | ✅ Complete |
+| Wave 3 | OBS1 — `@hiai-gg/hiai-ui` theme/component unification | ✅ Complete |
 | Wave 4 | OBS2 — `EMBED.md`, plugin manifest, tenant filter, tenant-health | ✅ Complete |
 | Wave 5 | Platform Maturation (14 items) | 🟡 **11/14** (remaining: CI-E2E, PM-INF-1, PM-RBAC) |
 | Wave 6 | Strategic Initiatives | ⏸ Not started |

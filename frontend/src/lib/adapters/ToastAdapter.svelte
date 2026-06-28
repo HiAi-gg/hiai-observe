@@ -1,7 +1,7 @@
 <script lang="ts">
-// ToastAdapter — local toast notification, no @hiai/ui equivalent yet.
+// ToastAdapter — local toast notification, no @hiai-gg/hiai-ui equivalent yet.
 //
-// @hiai/ui exposes a `notificationStore` in `stores/notifications.svelte.ts`
+// @hiai-gg/hiai-ui exposes a `notificationStore` in `stores/notifications.svelte.ts`
 // (id, message, type, duration) — the same data model this component renders.
 // However, the store has no DOM rendering; consuming apps are expected to
 // build their own renderer on top of it. This file is the renderer for
@@ -9,7 +9,7 @@
 // `lib/stores.svelte.ts`, which is the project's local mirror of the
 // canonical store.
 //
-// When @hiai/ui ships a renderer primitive, this adapter should wrap it.
+// When @hiai-gg/hiai-ui ships a renderer primitive, this adapter should wrap it.
 //
 // Local API (used by frontend):
 //   message: string

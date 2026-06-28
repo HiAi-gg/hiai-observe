@@ -54,7 +54,7 @@ export default defineConfig({
     exclude: [
       "lucide-svelte",
       "svelte-tiptap",
-      "@hiai/ui",
+      "@hiai-gg/hiai-ui",
       // bits-ui ships .svelte files; esbuild has no .svelte loader, so it
       // must be processed by the Svelte plugin in the main pipeline.
       "bits-ui",

@@ -3,8 +3,7 @@
   "version": "0.2.0",
   "type": "module",
   "workspaces": [
-    "packages/hiai-observe",
-    "../../packages/hiai-ui"
+    "packages/hiai-observe"
   ],
   "scripts": {
     "db:generate": "drizzle-kit generate",

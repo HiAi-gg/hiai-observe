@@ -18,7 +18,7 @@
 - `entrypoints` — базовые URL, health/openapi, ingest-эндпоинты (Sentry, OTLP, agent).
 - `auth` — режимы аутентификации (bearer / api-key-header / sentry-dsn / ws-query) и ссылка на [AUTH_BRIDGE.md](AUTH_BRIDGE.md).
 - `scope` — модель тенантов (`?projectId=` / `?tenantId=`, 1 tenant = 1 observe project), ссылка на этот документ.
-- `ui` — тема `theme-observe`, токены `@hiai/ui/styles/tokens.css`, компоненты `@hiai/ui`.
+- `ui` — тема `theme-observe`, токены `@hiai-gg/hiai-ui/styles/tokens.css`, компоненты `@hiai-gg/hiai-ui`.
 - `endpoints` — полный список public / read / write / websocket эндпоинтов.
 - `config` — обязательные/дефолтные/опциональные env-переменные (зеркало `src/lib/config.ts`).
 - `conventions` — обратные ссылки на HIAI_CONVENTIONS, EMBED, AUTH_BRIDGE, OpenAPI.

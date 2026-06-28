@@ -1,13 +1,5 @@
 @import "tailwindcss";
-@import "@hiai/ui/styles/tokens.css";
-
-/* Tailwind v4 content scanner — shadcn-svelte's `cn(buttonVariants({...}))`
- * runtime generates utility classes (bg-primary, text-foreground, etc.) from
- * `@hiai/ui`. Vite's auto-discovery only scans the consumer project, not
- * workspace packages, so this directive tells Tailwind to scan hiai-ui's
- * source tree for class names. Path is relative to this file:
- *   frontend/src/app.css → 4 levels up → /mnt/ai_data/packages/hiai-ui/src. */
-@source "../../../../packages/hiai-ui/src";
+@import "@hiai-gg/hiai-ui/styles/tokens.css";
 
 /* Reduced-motion preference (not covered by tokens.css — observe-specific UX) */
 @media (prefers-reduced-motion: reduce) {
@@ -22,7 +14,7 @@
 }
 
 /* Document base — uses canonical shadcn tokens (--background, --foreground)
- * defined in @hiai/ui/styles/tokens.css under :root and .theme-observe. */
+ * defined in @hiai-gg/hiai-ui/styles/tokens.css under :root and .theme-observe. */
 body {
   background-color: var(--background);
   color: var(--foreground);

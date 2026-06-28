@@ -1,5 +1,5 @@
 <script lang="ts">
-// ConfirmDialogAdapter — wraps @hiai/ui ConfirmModal, preserving local API.
+// ConfirmDialogAdapter — wraps @hiai-gg/hiai-ui ConfirmModal, preserving local API.
 //
 // Local API (used by frontend):
 //   open: boolean (bindable)
@@ -7,7 +7,7 @@
 //   onconfirm: () => void
 //   oncancel:  () => void
 //
-// Canonical @hiai/ui ConfirmModal:
+// Canonical @hiai-gg/hiai-ui ConfirmModal:
 //   open: boolean (one-way)
 //   variant: "default" | "destructive"
 //   onConfirm: (reason?: string) => void
@@ -17,7 +17,7 @@
 //   variant:  danger|warning → destructive, info → default
 //   callbacks: onconfirm→onConfirm, oncancel→onCancel
 //   bindable open → mirrored to local state, set false on close.
-import { ConfirmModal } from "@hiai/ui";
+import { ConfirmModal } from "@hiai-gg/hiai-ui";
 
 interface Props {
   open?: boolean;

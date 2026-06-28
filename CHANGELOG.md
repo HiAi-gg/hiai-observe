@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Ecosystem Unification (OBS0-OBS2)
 - OBS0: Centralized Zod config, `/api/health` alias, zero `process.env` outside `config.ts`.
-- OBS1: `@hiai/ui` theme unification with `.theme-observe` design tokens.
+- OBS1: `@hiai-gg/hiai-ui` theme unification with `.theme-observe` design tokens.
 - OBS2: Embed contract (`EMBED.md` 1072 lines), plugin manifest (`plugin.json` 204 lines), tenant-scope middleware, tenant-health endpoint.
 
 ### Verified Quality Gates

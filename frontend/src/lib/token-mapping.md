@@ -1,7 +1,7 @@
-# Token mapping: observe (local) → @hiai/ui (canonical)
+# Token mapping: observe (local) → @hiai-gg/hiai-ui (canonical)
 
 OBS1.1b verification artifact. Documents the canonical → local alias layer that
-makes hiai-observe consume `@hiai/ui/styles/tokens.css` without rewriting every
+makes hiai-observe consume `@hiai-gg/hiai-ui/styles/tokens.css` without rewriting every
 component.
 
 - **Source of truth:** `/mnt/ai_data/packages/hiai-ui/src/styles/tokens.css` (blocks 1–5)
@@ -181,10 +181,10 @@ error: script "check" exited with code 1
 | TS errors | **2** | pre-existing in adapter files (`StatusBadgeAdapter.svelte`, `ConfirmDialogAdapter.svelte`) — OUT OF SCOPE for OBS1.1b (those are OBS1.2b type-narrowing tasks) |
 | a11y warnings | **15** | pre-existing in route files |
 | Svelte warnings | **2** | pre-existing (`SplitPane` state capture, button labels) |
-| Theme migration regressions | **0** | no new errors introduced by `@import "@hiai/ui/styles/tokens.css"` or `.theme-observe` block |
+| Theme migration regressions | **0** | no new errors introduced by `@import "@hiai-gg/hiai-ui/styles/tokens.css"` or `.theme-observe` block |
 
 `svelte-check` exit 1 is **expected** — the 2 TS errors and 17 warnings are all
-pre-existing. The OBS1.1b-specific change (adding `@import "@hiai/ui/styles/tokens.css"`
+pre-existing. The OBS1.1b-specific change (adding `@import "@hiai-gg/hiai-ui/styles/tokens.css"`
 + the alias block + `class="theme-observe dark"` on `<html>`) introduces **zero
 new diagnostics**.
 
@@ -203,7 +203,7 @@ new diagnostics**.
 ## 5. `@source` directive: NOT needed for OBS1.1b, REQUIRED for OBS1.2b
 
 **Current state (OBS1.1b):** Tailwind v4 + `@tailwindcss/vite` resolves
-`@import "@hiai/ui/styles/tokens.css"` automatically via Vite's CSS module
+`@import "@hiai-gg/hiai-ui/styles/tokens.css"` automatically via Vite's CSS module
 graph. `.theme-observe` rules are plain CSS selectors with no class scanning
 required — they're applied to whatever element carries the class.
 
@@ -214,7 +214,7 @@ blocks, base). The `@theme` mapping (`bg-primary`, `text-foreground`, etc.)
 are *referenced* from somewhere.
 
 **OBS1.2b (component swap):** when we replace `frontend/src/lib/components/StatusBadge.svelte`
-and `ConfirmDialog.svelte` with their `@hiai/ui` counterparts, the package
+and `ConfirmDialog.svelte` with their `@hiai-gg/hiai-ui` counterparts, the package
 components reference utility classes like `bg-primary`, `text-primary-foreground`,
 `border-input`, etc. that come from shadcn-svelte's `cn(buttonVariants({ ... }))`
 runtime. Tailwind v4's content scanner must see those classes — but Vite's
@@ -224,7 +224,7 @@ auto-discovery only scans the **consumer** project, not workspace packages.
 
 ```css
 @import "tailwindcss";
-@import "@hiai/ui/styles/tokens.css";
+@import "@hiai-gg/hiai-ui/styles/tokens.css";
 @source "../../../../../packages/hiai-ui/src";   /* observe is at projects/hiai-observe/frontend — packages/ is 5 levels up */
 ```
 

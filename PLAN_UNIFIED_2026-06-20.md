@@ -21,7 +21,7 @@
 | 0 | P0 fixes (Drizzle regen, pre-commit, v0.1.9) | ✅ Complete | 2026-06-20 |
 | 1 | Docs sync + 16 endpoints + QW-OTLP-PROTO | ✅ Complete | 2026-06-20 |
 | 2 | OBS0 — Zod 3.25+, `config.ts`, `/api/health` | ✅ Complete | 2026-06-20 |
-| 3 | OBS1 — `@hiai/ui` theme/component unification | ✅ Complete | 2026-06-20 |
+| 3 | OBS1 — `@hiai-gg/hiai-ui` theme/component unification | ✅ Complete | 2026-06-20 |
 | 4 | OBS2 — `EMBED.md`, plugin manifest, tenant filter, tenant-health | ✅ Complete | 2026-06-20 |
 | 5 | Platform Maturation (14 items) | 🟡 **11/14** | Active |
 | 6 | Strategic Initiatives (ClickHouse, cost engine, custom dashboard, anomaly) | ⏸ Not started | — |
@@ -64,7 +64,7 @@ Dependencies shown below. Max parallelism within each group.
 |---|---|---|---|---|---|---|---|
 | W2.1 | OBS0.1 Zod 3.24→3.25+ | coder | 2h | — | package.json ×2 | bun install + typecheck green | ✅ |
 | W2.2 | OBS0.3 /api/health alias | coder | 1h | — | src/index.ts, src/api/health.ts, src/middleware/auth.ts | /api/health works, /health still works | ✅ |
-| W2.3 | OBS0.5 Add @hiai/ui dep | coder | 0.5h | — | frontend/package.json | bun install resolves @hiai/ui | ✅ |
+| W2.3 | OBS0.5 Add @hiai-gg/hiai-ui dep | coder | 0.5h | — | frontend/package.json | bun install resolves @hiai-gg/hiai-ui | ✅ |
 
 ### Group B (after W2.1): OBS0.4
 | ID | Task | Owner | Effort | Depends On | Files | DoD | Status |
@@ -85,13 +85,13 @@ Depends on W2.3 (OBS0.5).
 | ID | Task | Owner | Effort | Depends On | Files | DoD | Status |
 |---|---|---|---|---|---|---|---|
 | W3.1 | OBS1.1b Verify token mapping | coder | 1h | W2.3 | frontend/src/app.css, app.html | dark theme visually matches current | ✅ |
-| W3.2 | OBS1.2a Replace 4 duplicate components | coder | 6h | W2.3 | 4 .svelte files | StatusBadge, ConfirmDialog, Pagination, Toast from @hiai/ui | ✅ |
+| W3.2 | OBS1.2a Replace 4 duplicate components | coder | 6h | W2.3 | 4 .svelte files | StatusBadge, ConfirmDialog, Pagination, Toast from @hiai-gg/hiai-ui | ✅ |
 | W3.3 | OBS1.2b Retheme 9 observe components | coder | 10h | W2.3 | 9 .svelte files | all hex/oklch replaced with canonical tokens | ✅ |
 
 ### Group B (after Group A): OBS1.2c
 | ID | Task | Owner | Effort | Depends On | Files | DoD | Status |
 |---|---|---|---|---|---|---|---|
-| W3.4 | OBS1.2c Rewrite app.css | coder | 4h | W3.1+W3.2+W3.3 | frontend/src/app.css | @import @hiai/ui, 0 local hex tokens | ✅ |
+| W3.4 | OBS1.2c Rewrite app.css | coder | 4h | W3.1+W3.2+W3.3 | frontend/src/app.css | @import @hiai-gg/hiai-ui, 0 local hex tokens | ✅ |
 
 ---
 
@@ -192,7 +192,7 @@ Wave 4A: OBS2.1+2.2+2.3a (4h) ──┐                 │        │
 |---|---|---|---|
 | Zod 3.25 breaks ingestion schemas | M | H | W2.4 dedicated verification |
 | config.ts consolidation misses a variable | M | M | grep process.env as gate + bun test |
-| @hiai/ui components have different props | M | H | Adapter wrapper if mismatch; manual page walkthrough |
+| @hiai-gg/hiai-ui components have different props | M | H | Adapter wrapper if mismatch; manual page walkthrough |
 | Token mapping gives visual drift | H | M | Screenshot diff for each page before/after |
 | tenant_id migration breaks backward compat | L | H | Nullable, no default. Existing = NULL → no filtering |
 | Plugin manifest needs runtime env | M | M | Manifest = factory: createObservePlugin(config) |

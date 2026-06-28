@@ -55,7 +55,7 @@ Built for indie developers, small teams, and AI agents who want answers to three
 | **Wave 0** | P0 fixes (Drizzle regen, pre-commit hook, version bump → 0.1.9) | ✅ Complete |
 | **Wave 1** | Documentation sync + QW-OTLP-PROTO + 16 API endpoint docs | ✅ Complete |
 | **Wave 2** | OBS0 — Convention hygiene (Zod 3.25+, `src/lib/config.ts`, `/api/health` alias) | ✅ Complete |
-| **Wave 3** | OBS1 — UI unification via `@hiai/ui` | ✅ Complete |
+| **Wave 3** | OBS1 — UI unification via [`@hiai-gg/hiai-ui`](https://www.npmjs.com/package/@hiai-gg/hiai-ui) | ✅ Complete |
 | **Wave 4** | OBS2 — Integration / embed (`EMBED.md`, plugin manifest, tenant filter, tenant-health) | ✅ Complete |
 | **Wave 5** | Platform Maturation (14 items) | 🟡 **11/14 done** — see below |
 | **Wave 6** | Strategic Initiatives (ClickHouse, cost engine, custom dashboard, anomaly detection) | ⏸ Not started |

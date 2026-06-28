@@ -69,8 +69,8 @@
   "ui": {
     "framework": "sveltekit",
     "theme": "theme-observe",
-    "tokens": "@hiai/ui/styles/tokens.css",
-    "components": ["@hiai/ui"],
+    "tokens": "@hiai-gg/hiai-ui/styles/tokens.css",
+    "components": ["@hiai-gg/hiai-ui"],
     "themeClass": ".theme-observe"
   },
   "endpoints": {

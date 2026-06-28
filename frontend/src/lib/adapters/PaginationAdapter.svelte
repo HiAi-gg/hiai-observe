@@ -1,11 +1,11 @@
 <script lang="ts">
-// PaginationAdapter — local pagination control, no @hiai/ui equivalent yet.
+// PaginationAdapter — local pagination control, no @hiai-gg/hiai-ui equivalent yet.
 //
-// @hiai/ui has `DataTable` with internal pagination, but it owns its own data
+// @hiai-gg/hiai-ui has `DataTable` with internal pagination, but it owns its own data
 // and table rendering. Pages in this project compose a custom table with a
 // standalone pagination control, so the canonical DataTable is not a drop-in.
 //
-// When a standalone `Pagination` primitive lands in @hiai/ui, this adapter
+// When a standalone `Pagination` primitive lands in @hiai-gg/hiai-ui, this adapter
 // should be rewritten to wrap it (mirroring the StatusBadge / ConfirmModal
 // adapter pattern).
 //

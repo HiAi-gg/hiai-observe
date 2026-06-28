@@ -23,6 +23,9 @@ PARITY_REPORT.md
 PERF_AUDIT.md
 PLAN_TO_10.md
 A11Y_AUDIT.md
+agent-protocol.md
+AUTH_BRIDGE.md
+backup.md
 
 # Local dev overrides (docker-compose.dev.yml uses local infra)
 docker-compose.dev.yml

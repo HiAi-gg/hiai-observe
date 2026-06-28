@@ -23,7 +23,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
 COPY packages/ ./packages/
-RUN bun install --production --frozen-lockfile 2>/dev/null || bun install --production
+RUN HUSKY=0 bun install --production --frozen-lockfile 2>/dev/null || bun install --production
 
 # ── Stage 4: Runtime ──────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runtime

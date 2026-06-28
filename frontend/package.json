@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hiai-gg/hiai-ui": "^0.0.6"
+    "@hiai-gg/hiai-ui": "0.0.7"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.2.12",

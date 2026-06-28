@@ -51,4 +51,11 @@ screenshot-*.png
 
 # Bob agent state (local only)
 .bob/
+skills/
 .opencode/
+
+# Cleanup artifacts
+docker-compose.image.yml
+CHANGES_VERIFIED.md
+PLAN_UNIFIED_2026-06-20.md
+UPDATES_SUMMARY.md

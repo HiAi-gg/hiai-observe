@@ -51,7 +51,6 @@ screenshot-*.png
 
 # Bob agent state (local only)
 .bob/
-skills/
 .opencode/
 
 # Cleanup artifacts

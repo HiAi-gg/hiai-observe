@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
 COPY packages/ ./packages/
-RUN bun install --frozen-lockfile 2>/dev/null || bun install
+RUN HUSKY=0 bun install --frozen-lockfile 2>/dev/null || HUSKY=0 bun install
 COPY src/ src/
 COPY tsconfig.json ./
 RUN bun build src/index.ts --outdir dist --target bun

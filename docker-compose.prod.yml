@@ -9,9 +9,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      docker-socket-proxy:
+        condition: service_healthy
     restart: unless-stopped
     ports:
       - "8001:8001"
+    environment:
+      DOCKER_HOST: "tcp://docker-socket-proxy:2375"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -58,6 +68,43 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - observe
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      CONTAINERS: 1
+      EVENTS: 1
+      SYSTEM: 1
+      POST: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      GRPC: 0
+      IMAGES: 0
+      INFO: 0
+      NETWORKS: 0
+      NODES: 0
+      PLUGINS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      TASKS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run/proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - observe
 

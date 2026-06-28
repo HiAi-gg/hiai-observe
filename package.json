@@ -24,7 +24,7 @@
     "gen-key": "bun run scripts/generate-api-key.ts",
     "docker:prod": "docker compose -f docker-compose.prod.yml up -d",
     "docker:dev": "docker compose up -d",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.2.0",

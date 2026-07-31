@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-31
+
+### Fixed
+- **Mastra exporter is now a real `ObservabilityExporter`.** `HiaiObserveExporter`
+  (`@hiai-gg/hiai-observe/mastra`) now `extends BaseExporter` from
+  `@mastra/observability` and implements Mastra 1.16+'s event-based
+  `_exportTracingEvent(event: TracingEvent)` contract. Previously it only exposed
+  a batch `export(spans)` method that Mastra never calls, forcing every consumer
+  (e.g. hiai-kit) to ship a brittle adapter shim with `as any` casts. The
+  exporter can now be passed directly into an `Observability` config — no adapter
+  required.
+- **Correct span conversion.** Mastra `ExportedSpan`s are now mapped properly to
+  OTLP: `id` → `spanId`, `startTime`/`endTime` (`Date`) → nanosecond strings,
+  structured `attributes`/`metadata`/`requestContext`/`input`/`output` flattened
+  into typed OTLP key/value pairs (string/int/double/bool discrimination), and
+  `errorInfo` → `ERROR` status.
+- **Fresh version strings** in the exported OTLP payload (`hiai.exporter.version`
+  and scope version now follow the package version instead of being pinned to
+  stale `0.1.x` values).
+
+### Changed
+- `@mastra/core` is now an optional peer dependency of the npm package
+  (only required when using the Mastra exporter); `@mastra/observability` is a
+  dev dependency for typecheck/build. The SDK, CLI, and MCP entry points still
+  work without Mastra installed.
+
+### Documentation
+- README §4 (Mastra exporter) rewritten with the correct Mastra 1.16+ wiring:
+  `new Observability({ configs: { default: { exporters } } })` passed to
+  `new Mastra({ observability })`.
+
+### Tests
+- Added `tests/mastra/exporter.test.ts` (6 tests): exporter contract, SPAN_ENDED
+  buffering, OTLP conversion + version, error mapping, no-retry-on-401,
+  flush/shutdown lifecycle.
+
 ## [0.2.0] - 2026-06-27
 
 ### Production Readiness
@@ -307,6 +343,7 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.2.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.7...v0.1.8

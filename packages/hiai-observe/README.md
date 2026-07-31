@@ -63,19 +63,44 @@ const { data: issues } = await observe.issues.list({ status: "unresolved" });
 
 ## 4. Mastra exporter
 
+`HiaiObserveExporter` implements Mastra 1.16+'s `ObservabilityExporter`
+interface (it extends `BaseExporter` from `@mastra/observability`), so it can be
+passed straight into an `Observability` config — no adapter shim required.
+
+`@mastra/core` and `@mastra/observability` are **peer dependencies** (only
+needed when you use the exporter; the SDK/CLI/MCP entry points work without them).
+
+```bash
+npm install @mastra/core @mastra/observability
+```
+
 ```ts
 import { Mastra } from "@mastra/core";
+import { Observability } from "@mastra/observability";
 import { HiaiObserveExporter } from "@hiai-gg/hiai-observe/mastra";
 
-const mastra = new Mastra({
-  observability: {
-    exporters: [new HiaiObserveExporter({
-      endpoint: "http://localhost:8001",
-      apiKey: process.env.HIAI_OBSERVE_API_KEY,
-    })],
+const observability = new Observability({
+  configs: {
+    default: {
+      serviceName: "my-app",
+      exporters: [new HiaiObserveExporter({
+        endpoint: "http://localhost:8001",
+        apiKey: process.env.HIAI_OBSERVE_API_KEY,
+        // optional: serviceName, batchSize, flushInterval, timeout, maxRetries,
+        // and the standard BaseExporter options (logger, logLevel, customSpanFormatter)
+      })],
+    },
   },
 });
+
+new Mastra({ observability, /* agents, workflows, ... */ });
 ```
+
+The exporter receives Mastra's `TracingEvent`s, buffers completed
+(`SPAN_ENDED`) spans, and flushes them in batches to `POST /v1/traces` with
+retry + exponential backoff. It converts Mastra `ExportedSpan`s into the OTLP
+shape HiAi Observe ingests (Date → nanosecond strings, typed attribute values,
+error → `ERROR` status).
 
 ## 5. Host metrics agent — `hiai-observe-agent` (Bun only)
 

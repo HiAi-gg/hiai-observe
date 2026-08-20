@@ -1,0 +1,26 @@
+RELEASE_PROCESS.md
+  s_33bb548fe49366::t_0a0466fae85edc 7
+  s_33bb548fe49366::t_6d60b3adaa4c8e 17-18,22
+packages/hiai-observe/README.md
+  s_33bb548fe49366::t_f448e086566d56 117
+.github/workflows/ci.yml
+  s_33bb548fe49366::t_10624e9fd1052b 5,7
+.github/workflows/docker.yml
+  s_33bb548fe49366::t_58d9b55629bf72 5,8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "45163ddb0a458310f72f88a2f47f509e5b8227a3",
+  "prompts": {},
+  "sessions": {
+    "s_33bb548fe49366": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e262862c-7147-4552-98cd-4aafd7452a98",
+        "model": "cursor-grok-4.6-medium"
+      },
+      "human_author": "vlgalib <vlgalib@users.noreply.github.com>"
+    }
+  }
+}

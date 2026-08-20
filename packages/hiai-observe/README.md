@@ -114,7 +114,7 @@ HIAI_OBSERVE_URL=http://observe-host:8001 API_KEY=ho_your_key \
 ```
 
 Future improvements (disk/network/per-container/temperature/GPU from remote
-hosts) are tracked in the project [ROADMAP](https://github.com/HiAi-gg/hiai-observe/blob/master/docs/ROADMAP.md) (`PM-INF-1`).
+hosts) are tracked in the project [ROADMAP](https://github.com/HiAi-gg/hiai-observe/blob/main/docs/ROADMAP.md) (`PM-INF-1`).
 
 > **Runtime support:** the SDK, CLI (`hiai-observe`), and MCP server
 > (`hiai-observe-mcp`) run on **Node ≥ 18 and Bun**. The agent

@@ -4,7 +4,7 @@ Operational checklist for cutting a release of HiAi Observe.
 
 ## 1. Pre-release (local)
 
-- [ ] All work for the release is merged to `master`
+- [ ] All work for the release is merged to `main`
 - [ ] `bun run typecheck` passes (0 errors)
 - [ ] `bun run test` passes (243+ tests)
 - [ ] `CHANGELOG.md` has an entry for the new version
@@ -14,12 +14,12 @@ Operational checklist for cutting a release of HiAi Observe.
 ## 2. Cut the release (local + push)
 
 ```bash
-git checkout master
-git pull --rebase origin master
+git checkout main
+git pull --rebase origin main
 git add -A
 git commit -m "release(observe): vX.Y.Z — <one-line summary>"
 git tag -a vX.Y.Z -m "vX.Y.Z — <one-line summary>"
-git push origin master
+git push origin main
 git push origin vX.Y.Z
 ```
 

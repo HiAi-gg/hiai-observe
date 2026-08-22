@@ -23,6 +23,8 @@ import {
 
 export const BASE_URL = process.env.HIAI_OBSERVE_URL || "http://localhost:8001";
 export const MASTER_KEY = process.env.HIAI_OBSERVE_API_KEY || "test-api-key";
+/** Required for POST/DELETE /api/projects (instance-wide). */
+export const ADMIN_KEY = process.env.ADMIN_API_KEY || "";
 
 /**
  * Authenticated fetch against the API.
@@ -52,9 +54,13 @@ export async function apiFetch(
 export async function createTestProjectViaApi(
   name = "e2e-test-project",
 ): Promise<{ id: string; apiKey: string }> {
+  if (!ADMIN_KEY) {
+    throw new Error("ADMIN_API_KEY is required to create projects in e2e tests");
+  }
   const res = await apiFetch("/api/projects", {
     method: "POST",
     body: JSON.stringify({ name }),
+    apiKey: ADMIN_KEY,
   });
   if (!res.ok) throw new Error(`Failed to create project: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { project: { id: string }; apiKey: string };

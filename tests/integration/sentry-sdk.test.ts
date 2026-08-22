@@ -30,7 +30,7 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
   beforeAll(async () => {
     serverOk = await isServerReachable();
     if (!serverOk) return;
-    projectId = await createTestProject();
+    projectId = await createTestProject("sentry-sdk-integration");
   });
 
   afterAll(async () => {
@@ -277,6 +277,6 @@ describe.skipIf(SKIP)("Sentry SDK Integration", () => {
       body: JSON.stringify({ message: "test" }),
     });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 });

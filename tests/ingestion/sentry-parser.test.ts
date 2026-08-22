@@ -96,6 +96,25 @@ describe("parseSentryEvent", () => {
     expect(result.breadcrumbs[1].data).toEqual({ statusCode: 200, method: "GET" });
   });
 
+  it("parses breadcrumbs sent as a raw array", () => {
+    const raw: SentryEvent = {
+      breadcrumbs: [
+        {
+          type: "console",
+          category: "console",
+          message: "E2E test started",
+          timestamp: 1700000000,
+        },
+      ],
+    };
+
+    const result = parseSentryEvent(raw);
+
+    expect(result.breadcrumbs).toHaveLength(1);
+    expect(result.breadcrumbs[0].category).toBe("console");
+    expect(result.breadcrumbs[0].message).toBe("E2E test started");
+  });
+
   it("generates event_id if missing", () => {
     const raw: SentryEvent = { message: "test" };
     const result = parseSentryEvent(raw);

@@ -10,33 +10,39 @@ import { db } from "../../src/store/db.js";
 import { events, issues, projects, traces } from "../../src/store/schema.js";
 
 export const TEST_PROJECT_NAME = "integration-test-project";
-export const TEST_PROJECT_SLUG = "integration-test";
-export const TEST_API_KEY = "hiai-integration-test-key-12345";
+export const TEST_PROJECT_SLUG = "integration-test-project";
+/** Live-binding: overwritten by createTestProject() with the plaintext key from POST /api/projects. */
+export let TEST_API_KEY = "hiai-integration-test-key-12345";
 export const TEST_BASE_URL = process.env.HIAI_OBSERVE_URL || "http://localhost:8001";
 
+let createdProjectId: string | null = null;
+
 /**
- * Create a test project in the database and return its ID.
- * If the project already exists, return its ID.
+ * Create a test project via the admin API so the server hashes the key.
+ * Vitest runs in a Node environment, so we cannot call Bun.password here.
+ * Pass a unique `name` when suites run in parallel (slug is derived from name).
  */
-export async function createTestProject(): Promise<string> {
-  const existing = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.slug, TEST_PROJECT_SLUG))
-    .limit(1);
+export async function createTestProject(name = TEST_PROJECT_NAME): Promise<string> {
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) {
+    throw new Error("ADMIN_API_KEY is required for integration tests");
+  }
 
-  if (existing[0]) return existing[0].id;
-
-  const [created] = await db
-    .insert(projects)
-    .values({
-      name: TEST_PROJECT_NAME,
-      slug: TEST_PROJECT_SLUG,
-      apiKey: TEST_API_KEY,
-    })
-    .returning({ id: projects.id });
-
-  return created.id;
+  const res = await fetch(`${TEST_BASE_URL}/api/projects`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminKey}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create test project: ${res.status} ${await res.text()}`);
+  }
+  const data = (await res.json()) as { project: { id: string }; apiKey: string };
+  TEST_API_KEY = data.apiKey;
+  createdProjectId = data.project.id;
+  return data.project.id;
 }
 
 /**
@@ -44,15 +50,9 @@ export async function createTestProject(): Promise<string> {
  * Call this in afterAll/afterEach hooks.
  */
 export async function cleanupTestData(): Promise<void> {
-  const existing = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.slug, TEST_PROJECT_SLUG))
-    .limit(1);
-
-  if (!existing[0]) return;
-
-  const projectId = existing[0].id;
+  const projectId = createdProjectId;
+  createdProjectId = null;
+  if (!projectId) return;
 
   // Delete in FK order
   await db.delete(events).where(eq(events.projectId, projectId));

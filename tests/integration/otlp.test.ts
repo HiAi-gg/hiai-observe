@@ -31,7 +31,7 @@ describe.skipIf(SKIP)("OTLP Integration", () => {
   beforeAll(async () => {
     serverOk = await isServerReachable();
     if (!serverOk) return;
-    projectId = await createTestProject();
+    projectId = await createTestProject("otlp-integration");
   });
 
   afterAll(async () => {

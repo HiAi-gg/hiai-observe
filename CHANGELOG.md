@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- E2E/integration tests and CI: project create uses `ADMIN_API_KEY`; integration fixtures create projects via the admin API so ingest lookup succeeds under Vitest's Node environment.
+- Sentry ingest no longer 500s when `breadcrumbs` is a raw array instead of `{ values: [...] }`.
+
 ## [0.2.2] - 2026-08-22
 
 Security and tenant-isolation hardening. **Read the breaking notes before upgrading.**

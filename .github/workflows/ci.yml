@@ -105,6 +105,7 @@ jobs:
       DATABASE_URL: postgresql://observe:observe@localhost:5432/hiai_observe
       REDIS_URL: redis://localhost:6379
       HIAI_OBSERVE_API_KEY: test-api-key-e2e-00000000000000000000
+      ADMIN_API_KEY: test-admin-key-e2e-00000000000000000
       INTEGRATION: "1"
       PORT: "8001"
     steps:

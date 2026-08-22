@@ -2,7 +2,11 @@ import { Elysia, t } from "elysia";
 import { z } from "zod";
 import { groupEvent } from "../ingestion/grouper.js";
 import type { SentryEvent } from "../ingestion/sentry-parser.js";
-import { parseSentryEnvelope, parseSentryEvent } from "../ingestion/sentry-parser.js";
+import {
+  extractBreadcrumbs,
+  parseSentryEnvelope,
+  parseSentryEvent,
+} from "../ingestion/sentry-parser.js";
 import { lookupProject, resolveApiKey } from "../lib/auth.js";
 import { db } from "../store/db.js";
 import { events } from "../store/schema.js";
@@ -73,7 +77,7 @@ function buildEventContext(
   }
 
   // Keep last N breadcrumbs (most recent are most useful for triage)
-  const crumbs = Array.isArray(raw.breadcrumbs?.values) ? raw.breadcrumbs.values : [];
+  const crumbs = extractBreadcrumbs(raw.breadcrumbs);
   const trimmedCrumbs = crumbs.slice(-MAX_BREADCRUMBS_STORED).map((c) => ({
     type: typeof c?.type === "string" ? c.type : "default",
     category: typeof c?.category === "string" ? c.category : "",

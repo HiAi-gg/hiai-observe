@@ -9,11 +9,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_KEY,
   apiFetch,
   BASE_URL,
   cleanupProject,
   createTestProjectViaApi,
-  MASTER_KEY,
   otlpTracePayload,
   sentryExceptionPayload,
   waitFor,
@@ -66,18 +66,19 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
 
   it("4. issue was created from Sentry event", async () => {
     const result = await waitFor(async () => {
-      const res = await apiFetch(`/api/issues?projectId=${projectId}`, { apiKey: MASTER_KEY });
-      const body = (await res.json()) as { data: Array<{ id: string; title: string }> };
-      return body.data.length > 0 ? body.data[0] : null;
+      const res = await apiFetch(`/api/issues?projectId=${projectId}`, { apiKey: projectApiKey });
+      const body = (await res.json()) as { data?: Array<{ id: string; title: string }> };
+      return body.data && body.data.length > 0 ? body.data[0] : null;
     });
     issueId = result?.id;
-    expect(result?.title).toContain("E2E lifecycle test error");
+    // Title is exception type + value (message override is stored on the event)
+    expect(result?.title).toContain("E2E test error");
   });
 
   // ── Step 4: Event stored ─────────────────────────────────────────────────
 
   it("5. event stored with stack trace", async () => {
-    const res = await apiFetch(`/api/events?issueId=${issueId}`, { apiKey: MASTER_KEY });
+    const res = await apiFetch(`/api/events?issueId=${issueId}`, { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: Array<{ stackTrace: string | null }> };
     expect(body.data.length).toBeGreaterThan(0);
@@ -93,6 +94,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("6. create uptime monitor", async () => {
     const res = await apiFetch("/api/monitors", {
       method: "POST",
+      apiKey: projectApiKey,
       body: JSON.stringify({
         name: "E2E Test Monitor",
         url: "https://httpbin.org/status/200",
@@ -109,7 +111,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   // ── Step 6: Monitor listed ───────────────────────────────────────────────
 
   it("7. monitor appears in list", async () => {
-    const res = await apiFetch("/api/monitors");
+    const res = await apiFetch("/api/monitors", { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { monitors: Array<{ id: string }> };
     const found = body.monitors.find((m) => m.id === monitorId);
@@ -121,6 +123,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   it("8. create alert rule", async () => {
     const res = await apiFetch("/api/alerts", {
       method: "POST",
+      apiKey: projectApiKey,
       body: JSON.stringify({
         name: "E2E High Error Rate",
         projectId,
@@ -143,7 +146,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   // ── Step 8: Alert listed ─────────────────────────────────────────────────
 
   it("9. alert appears in list", async () => {
-    const res = await apiFetch("/api/alerts");
+    const res = await apiFetch("/api/alerts", { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { items: Array<{ id: string }> };
     const found = body.items.find((a) => a.id === alertId);
@@ -153,7 +156,10 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   // ── Step 9: Test alert ───────────────────────────────────────────────────
 
   it("10. test alert endpoint works", async () => {
-    const res = await apiFetch(`/api/alerts/${alertId}/test`, { method: "POST" });
+    const res = await apiFetch(`/api/alerts/${alertId}/test`, {
+      method: "POST",
+      apiKey: projectApiKey,
+    });
     // May return 200 even if notification fails (channels not configured)
     expect(res.status).toBeLessThan(500);
     const body = (await res.json()) as { ok?: boolean; channels?: unknown[] };
@@ -163,7 +169,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   // ── Step 10: Dashboard ───────────────────────────────────────────────────
 
   it("11. dashboard returns aggregated data", async () => {
-    const res = await apiFetch("/api/dashboard");
+    const res = await apiFetch("/api/dashboard", { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       errorCount24h: number;
@@ -185,7 +191,7 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   // ── Step 11: Export ──────────────────────────────────────────────────────
 
   it("12. export issues as JSON", async () => {
-    const res = await apiFetch("/api/export/issues");
+    const res = await apiFetch("/api/export/issues", { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[]; count: number };
     expect(Array.isArray(body.data)).toBe(true);
@@ -193,11 +199,11 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   });
 
   it("12b. export issues as CSV", async () => {
-    const res = await apiFetch("/api/export/issues?format=csv");
+    const res = await apiFetch("/api/export/issues?format=csv", { apiKey: projectApiKey });
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("id,title,type,status");
-    expect(text).toContain("E2E lifecycle test error");
+    expect(text).toContain("E2E test error");
   });
 
   // ── Step 12: OTLP traces ────────────────────────────────────────────────
@@ -216,9 +222,11 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
 
   it("13b. trace is queryable", async () => {
     const result = await waitFor(async () => {
-      const res = await apiFetch(`/api/traces?workflowName=e2e-workflow`, { apiKey: MASTER_KEY });
-      const body = (await res.json()) as { data: Array<{ name: string }>; total: number };
-      return body.total > 0 ? body.data[0] : null;
+      const res = await apiFetch(`/api/traces?workflowName=e2e-workflow`, {
+        apiKey: projectApiKey,
+      });
+      const body = (await res.json()) as { data?: Array<{ name: string }>; total?: number };
+      return body.total && body.total > 0 && body.data?.[0] ? body.data[0] : null;
     });
     expect(result?.name).toBe("e2e-test-span");
   });
@@ -227,17 +235,23 @@ describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
 
   it("14. cleanup: delete project and all related data", async () => {
     // Delete via API
-    const res = await apiFetch(`/api/monitors/${monitorId}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/monitors/${monitorId}`, {
+      method: "DELETE",
+      apiKey: projectApiKey,
+    });
     expect(res.status).toBe(200);
 
-    const res2 = await apiFetch(`/api/alerts/${alertId}`, { method: "DELETE" });
+    const res2 = await apiFetch(`/api/alerts/${alertId}`, {
+      method: "DELETE",
+      apiKey: projectApiKey,
+    });
     expect(res2.status).toBe(200);
 
     // Delete project via DB cleanup (API delete cascades in future)
     await cleanupProject(projectId);
 
-    // Verify project is gone
-    const checkRes = await apiFetch(`/api/projects`);
+    // Verify project is gone (admin list is instance-wide)
+    const checkRes = await apiFetch(`/api/projects`, { apiKey: ADMIN_KEY });
     const body = (await checkRes.json()) as { projects: Array<{ id: string }> };
     const found = body.projects.find((p) => p.id === projectId);
     expect(found).toBeUndefined();

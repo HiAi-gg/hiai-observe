@@ -65,6 +65,7 @@ vi.mock("../../src/ingestion/sentry-parser.js", () => ({
     rawPayload: {},
   }),
   parseSentryEnvelope: vi.fn().mockReturnValue([]),
+  extractBreadcrumbs: vi.fn().mockReturnValue([]),
 }));
 
 // ── Mock grouper ──────────────────────────────────────────────────────

@@ -34,15 +34,23 @@ export interface SentryEvent {
       };
     }>;
   };
-  breadcrumbs?: {
-    values?: Array<{
-      type?: string;
-      category?: string;
-      message?: string;
-      data?: Record<string, unknown>;
-      timestamp?: number;
-    }>;
-  };
+  breadcrumbs?:
+    | {
+        values?: Array<{
+          type?: string;
+          category?: string;
+          message?: string;
+          data?: Record<string, unknown>;
+          timestamp?: number;
+        }>;
+      }
+    | Array<{
+        type?: string;
+        category?: string;
+        message?: string;
+        data?: Record<string, unknown>;
+        timestamp?: number;
+      }>;
   user?: {
     id?: string;
     email?: string;
@@ -139,9 +147,31 @@ function parseException(event: SentryEvent): ParsedEvent["exception"] {
   };
 }
 
+type RawBreadcrumb = {
+  type?: string;
+  category?: string;
+  message?: string;
+  data?: Record<string, unknown>;
+  timestamp?: number;
+};
+
+/** Sentry sends `{ values: [...] }`; some clients (and our e2e helper) send a raw array. */
+export function extractBreadcrumbs(
+  breadcrumbs: SentryEvent["breadcrumbs"] | unknown,
+): RawBreadcrumb[] {
+  if (Array.isArray(breadcrumbs)) return breadcrumbs;
+  if (
+    breadcrumbs &&
+    typeof breadcrumbs === "object" &&
+    Array.isArray((breadcrumbs as { values?: unknown }).values)
+  ) {
+    return (breadcrumbs as { values: RawBreadcrumb[] }).values;
+  }
+  return [];
+}
+
 function parseBreadcrumbs(event: SentryEvent): ParsedEvent["breadcrumbs"] {
-  const crumbs = event.breadcrumbs?.values ?? [];
-  return crumbs.map((c) => ({
+  return extractBreadcrumbs(event.breadcrumbs).map((c) => ({
     type: c.type ?? "default",
     category: c.category ?? "",
     message: c.message ?? "",

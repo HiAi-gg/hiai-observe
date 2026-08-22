@@ -1,0 +1,25 @@
+.github/notes/v0.2.2.md
+  s_6ff1d768cb1ce7::t_f93ec33c3cc1d0 1-14
+AGENTS.md
+  s_6ff1d768cb1ce7::t_a90798fe24c340 16,22,41,106,138,185
+src/api/tenant-health.ts
+  s_6ff1d768cb1ce7::t_9d9e3a56559f89 3,46-49
+tests/lib/project-scope.test.ts
+  s_6ff1d768cb1ce7::t_3ad569ce6b4d92 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "2aee4a89fa249d447bceb302ab5ca4eabb0e21fc",
+  "prompts": {},
+  "sessions": {
+    "s_6ff1d768cb1ce7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1b4b4342-a7fe-422a-9bd6-9dbb3d006b87",
+        "model": "grok-4.6"
+      },
+      "human_author": "vlgalib <vlgalib@users.noreply.github.com>"
+    }
+  }
+}

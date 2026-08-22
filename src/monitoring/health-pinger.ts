@@ -46,11 +46,12 @@ async function sendPing(): Promise<void> {
     const timeout = setTimeout(() => controller.abort(), 10_000);
 
     const res = await fetch(url, {
-      method: "GET",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "hiai-observe/1.0",
       },
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 

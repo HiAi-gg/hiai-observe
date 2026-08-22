@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Elysia, t } from "elysia";
+import { requireAdminKey } from "../lib/admin-auth.js";
 import { lookupProject } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import type { LogEntry } from "../monitoring/log-streamer.js";
@@ -8,6 +9,7 @@ import { getRecentLogs, subscribeAllLogs, subscribeLogs } from "../store/log-pub
 interface WsClient {
   ws: { send: (data: string) => void };
   projectId: string;
+  admin: boolean;
   unsubscribes: Array<() => void>;
 }
 
@@ -73,7 +75,7 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
     const sendFn = (data: string) => ws.send(data);
 
     // Always defer auth to the first message
-    clients.set(id, { ws: { send: sendFn }, projectId: "", unsubscribes: [] });
+    clients.set(id, { ws: { send: sendFn }, projectId: "", admin: false, unsubscribes: [] });
     wsToClientId.set(ws, id);
     startPing(id, sendFn);
     ws.send(
@@ -93,6 +95,15 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
     // Handle first-message auth (required — query string auth is no longer accepted)
     if (!client.projectId) {
       if (body.action === "auth" && body.key) {
+        const admin = requireAdminKey({ authorization: `Bearer ${body.key}` });
+        if (admin.ok) {
+          client.projectId = "*";
+          client.admin = true;
+          ws.send(JSON.stringify({ type: "authenticated", projectId: "*", admin: true }));
+          stopPing(clientId);
+          startPing(clientId, (d) => ws.send(d));
+          return;
+        }
         const projectId = await authenticateWs(body.key);
         if (!projectId) {
           ws.send(JSON.stringify({ type: "error", error: "Invalid API key" }));
@@ -100,6 +111,7 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
           return;
         }
         client.projectId = projectId;
+        client.admin = false;
         ws.send(JSON.stringify({ type: "authenticated", projectId }));
 
         // Clear the deferred ping and start normal one
@@ -123,6 +135,10 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
     if (body.action === "subscribe" && body.containerId) {
       try {
         const unsub = await subscribeLogs(body.containerId, (entry: LogEntry) => {
+          const entryProject = (entry as LogEntry & { projectId?: string }).projectId;
+          if (!client.admin && client.projectId !== "*" && entryProject !== client.projectId) {
+            return;
+          }
           try {
             ws.send(JSON.stringify({ type: "log", data: entry }));
           } catch {
@@ -148,6 +164,10 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
     } else if (body.action === "subscribe_all") {
       try {
         const unsub = await subscribeAllLogs((entry: LogEntry) => {
+          const entryProject = (entry as LogEntry & { projectId?: string }).projectId;
+          if (!client.admin) {
+            if (!entryProject || entryProject !== client.projectId) return;
+          }
           try {
             ws.send(JSON.stringify({ type: "log", data: entry }));
           } catch {

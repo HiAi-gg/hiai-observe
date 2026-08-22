@@ -60,9 +60,9 @@ Built for indie developers, small teams, and AI agents who want answers to three
 | **Wave 5** | Platform Maturation (14 items) | 🟡 **11/14 done** — see below |
 | **Wave 6** | Strategic Initiatives (ClickHouse, cost engine, custom dashboard, anomaly detection) | ⏸ Not started |
 
-**Wave 5 progress:** QW-DRIZZLE-REGEN ✅ · QW-ZOD ✅ · QW-LOG-DOWNLOAD ✅ · QW-MODEL-PRICING ✅ · coverage threshold (25% lines) ✅ · OTLP logs endpoint ✅ · per-project rate limits ✅ · 99 API route tests ✅ · AI enrichment (gen_ai.* dual naming) ✅ · TCP port monitoring ✅ · startup config banner ✅ · ⏳ **CI-E2E**, **PM-INF-1** (mature multi-host), **PM-RBAC** (1–2 wks, critical path), **PM-AUDIT**.
+**Wave 5 progress:** QW-DRIZZLE-REGEN ✅ · QW-ZOD ✅ · QW-LOG-DOWNLOAD ✅ · QW-MODEL-PRICING ✅ · coverage threshold (25% lines) ✅ · OTLP logs endpoint ✅ · per-project rate limits ✅ · 99 API route tests ✅ · AI enrichment (gen_ai.* dual naming) ✅ · TCP port monitoring ✅ · startup config banner ✅ · CI-E2E job ✅ · tenant isolation / SSRF / secure headers ✅ · ⏳ **PM-INF-1** (mature multi-host), **PM-RBAC** (SSO/users), **PM-AUDIT**.
 
-**Quality gates:** `tsc --noEmit` 0 errors · `vitest run` **500 passed / 35 skipped** (535 total) · coverage **27.25% lines** (threshold 25%) · `bun build` 2.15 MB / 630 modules.
+**Quality gates:** `tsc --noEmit` 0 errors · `vitest run` **588 passed / 30 skipped** · frontend **150 passed**.
 
 
 
@@ -80,7 +80,7 @@ echo "HIAI_OBSERVE_API_KEY=ho_$(openssl rand -hex 24)" >> .env
 docker compose up -d
 
 # Check health
-curl http://localhost:8001/health
+curl -fsS http://localhost:8001/api/health
 ```
 
 Open `http://localhost:8001` — that's it.
@@ -95,7 +95,7 @@ Don't want to run commands manually? Copy-paste one of these prompts into your A
 Install HiAi Observe (https://github.com/HiAi-gg/hiai-observe) for me:
 1. Clone the repo, copy .env.example to .env
 2. Generate a secure API key with openssl rand -hex 24 and set it as HIAI_OBSERVE_API_KEY
-3. Run docker compose up -d and verify health at http://localhost:8001/health
+3. Run docker compose up -d and verify health at http://localhost:8001/api/health
 4. If the server has <512MB RAM, add the small VPS preset to .env:
    LOG_MAX_LINES_PER_SEC=100
    LOG_SAMPLE_RATE=0.1
@@ -117,7 +117,7 @@ Set up HiAi Observe as a self-hosted observability layer:
   a) @hiai-gg/hiai-observe/mastra for Mastra projects
   b) @sentry/node with DSN http://apikey@localhost:8001/1 for Sentry
   c) OTLPTraceExporter pointing to http://localhost:8001/v1/traces
-- Verify: curl http://localhost:8001/health and open UI
+- Verify: curl -fsS http://localhost:8001/api/health and open UI
 ```
 
 ### GitHub Copilot (Chat)
@@ -428,7 +428,7 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-Current: **v0.1.9** — post-release, in active Wave 5 Platform Maturation:
+Current: **v0.2.2** — security/isolation hardening (see CHANGELOG breaking notes):
 [`@hiai-gg/hiai-observe`](https://www.npmjs.com/package/@hiai-gg/hiai-observe) on
 npm (SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP server + `hiai-observe-agent`),
 multi-arch Docker images at [`vgalibov/hiai-observe`](https://hub.docker.com/r/vgalibov/hiai-observe),

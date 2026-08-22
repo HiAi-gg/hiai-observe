@@ -2,6 +2,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Elysia, t } from "elysia";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+
+const MAX_SOURCEMAP_BYTES = 10 * 1024 * 1024;
 
 const SOURCEMAPS_DIR = join(process.cwd(), "sourcemaps");
 
@@ -20,6 +23,16 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
     "/:projectId",
     async ({ params, request, set }) => {
       try {
+        const scope = await applyScope({
+          request,
+          query: { projectId: params.projectId },
+          set,
+        });
+        if (!isScope(scope)) return scope;
+        if (!scope.admin && scope.projectId !== params.projectId) {
+          set.status = 403;
+          return { error: "Forbidden: project mismatch" };
+        }
         await ensureDir(SOURCEMAPS_DIR);
         const dir = projectDir(params.projectId);
         await ensureDir(dir);
@@ -35,6 +48,10 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
         if (!release) {
           set.status = 400;
           return { error: "Missing 'release' in form data" };
+        }
+        if (file.size > MAX_SOURCEMAP_BYTES) {
+          set.status = 413;
+          return { error: "Payload too large", detail: "Max size: 10MB" };
         }
 
         const safeName = release.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -56,7 +73,17 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
   // Download source map for a release
   .get(
     "/:projectId/:release",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      if (!assertResourceProject(params.projectId, scope.projectId, scope.admin)) {
+        set.status = 403;
+        return { error: "Forbidden: project mismatch" };
+      }
+
       const dir = projectDir(params.projectId);
       const safeName = params.release.replace(/[^a-zA-Z0-9._-]/g, "_");
       const filePath = join(dir, `${safeName}.map`);
@@ -82,7 +109,17 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
   // List uploaded source maps for a project
   .get(
     "/:projectId",
-    async ({ params }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      if (!assertResourceProject(params.projectId, scope.projectId, scope.admin)) {
+        set.status = 403;
+        return { error: "Forbidden: project mismatch" };
+      }
+
       const dir = projectDir(params.projectId);
       if (!existsSync(dir)) return { releases: [] };
 
@@ -98,7 +135,17 @@ export const sourcemapsRoutes = new Elysia({ prefix: "/api/sourcemaps" })
   // Delete a source map
   .delete(
     "/:projectId/:release",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      if (!assertResourceProject(params.projectId, scope.projectId, scope.admin)) {
+        set.status = 403;
+        return { error: "Forbidden: project mismatch" };
+      }
+
       const { unlink } = await import("node:fs/promises");
       const dir = projectDir(params.projectId);
       const safeName = params.release.replace(/[^a-zA-Z0-9._-]/g, "_");

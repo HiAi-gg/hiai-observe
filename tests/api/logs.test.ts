@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock db module
 vi.mock("../../src/store/db.js", () => ({
@@ -30,7 +30,7 @@ vi.mock("../../src/store/schema.js", () => ({
   },
 }));
 
-import { searchLogs, getLogContainers, clearLogs } from "../../src/store/logs.js";
+import { clearLogs, getLogContainers, searchLogs } from "../../src/store/logs.js";
 
 describe("logs data access", () => {
   beforeEach(() => {

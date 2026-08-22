@@ -13,13 +13,13 @@
 - **UI:** `@hiai-gg/hiai-ui` + shadcn-svelte (тема `.theme-observe`, OBS1)
 - **ORM:** Drizzle ORM 0.45.2+ (23 tables, compound indexes)
 - **Validation:** Zod 3.25+
-- **Auth:** Better Auth + API key (Bearer) на всех чувствительных маршрутах; public для health/metrics/status
+- **Auth:** Project API key (Bearer / X-Api-Key) scoped to one project; `ADMIN_API_KEY` for instance-wide admin. Public: health/metrics/status. No Better Auth.
 - **DB:** PostgreSQL 18+ (events, issues, traces, uptime history)
 - **Cache:** Redis 8+ (pub/sub live log streaming, alert dedup, **3-bucket rate limiting** IP+API-key+Project)
 - **Telemetry:** Sentry SDK (drop-in) + OTLP HTTP/JSON+protobuf (traces, metrics, **logs**)
 - **Mastra native:** `HiaiObserveExporter` (`@hiai-observe/mastra-exporter`) — gen_ai.* dual naming, per-model pricing
 - **Lint:** Biome 2.5+
-- **Tests:** Vitest (500 passed / 35 skipped, coverage 27.25% threshold 25%)
+- **Tests:** Vitest (588 passed / 30 skipped unit; frontend 150 passed)
 - **Структура:** `src/api/` (32 Elysia route plugins) + `src/ingestion/` (Sentry/OTLP parsers) + `src/mastra/` + `src/middleware/` + `src/monitoring/` + `src/workers/` + `src/lib/` + `src/store/` + `src/alerts/` + `frontend/` + `drizzle/` (versioned SQL migrations) + `scripts/` + `tests/` + `docs/`
 - **env только через** `src/lib/config.ts` (Zod-validated, emits `summarizeConfig()` banner at boot). `process.env` ЗАПРЕЩЁН где-либо ещё в `src/` — проверяется `grep -r 'process.env' src/ --include='*.ts' | grep -v config.ts`
 - **Импорт токенов:** `@hiai-gg/hiai-ui/styles/tokens.css` (OBS1: theme→`tokens.css`)
@@ -38,7 +38,7 @@
 - `README.md` — обзор, quick start, интеграция (Mastra / Sentry / OTLP)
 - `AGENTS.md` — этот файл: правила + указатель на канонические документы + индекс документов
 - `todo.md` — живой статус задач (Wave 5/6 backlog)
-- `CHANGELOG.md` — история релизов (v0.1.9 active)
+- `CHANGELOG.md` — история релизов (v0.2.2 active)
 - `RELEASE_PROCESS.md` — процесс релиза
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` — стандартные OSS
 
@@ -103,7 +103,7 @@ OBS2 — `docs/EMBED.md`, plugin manifest, per-tenant/per-site scope, embed in a
 Unified, self-hosted observability platform for AI Agents and TypeScript backends. Replaces Bugsink + Uptime Kuma + Beszel + Dozzle + basic LLM tracing with one lightweight container.
 
 **What agents should know before working here:**
-- Production status: **v0.1.9 — in active Wave 5 Platform Maturation (11/14 items done)**
+- Production status: **v0.2.2** — isolation/SSRF/headers/CI-E2E in-tree; remaining Wave 5: PM-INF-1, PM-RBAC (SSO)
 - Sentry SDK compatibility is a hard requirement for error tracking (drop-in replacement)
 - Mastra native integration is the differentiator — traces, workflows, tools, token usage, latency
 - Must run comfortably on small VPS (<512MB RAM target)
@@ -135,7 +135,7 @@ Unified, self-hosted observability platform for AI Agents and TypeScript backend
 | Wave 5 | Platform Maturation (14 items) | 🟡 **11/14** (remaining: CI-E2E, PM-INF-1, PM-RBAC) |
 | Wave 6 | Strategic Initiatives | ⏸ Not started |
 
-**Quality gates:** `tsc --noEmit` 0 errors · `bunx vitest run` **500 passed / 35 skipped** (535 total) · coverage **27.25% lines** (threshold 25%) · `bun build` 2.15 MB / 630 modules.
+**Quality gates:** `tsc --noEmit` 0 errors · `bunx vitest run` **588 passed / 30 skipped** · frontend `bun run test` **150 passed**.
 
 ## Canonical Commands
 
@@ -182,7 +182,7 @@ bun run gen-key
 | `frontend/` | Svelte 5 + SvelteKit 2.60+ (port 5174), 10 pages, dark mode, WebSocket live updates |
 | `drizzle/` | Versioned SQL migrations (`0000_initial.sql`, `0001_per_project_rate_limit.sql`) |
 | `scripts/` | Seed demo data, reset, generate API keys, backup, partition tables |
-| `tests/` | 41 test files (500 passed / 35 skipped) |
+| `tests/` | 60 test files (588 passed / 30 skipped) |
 | `docs/` | API reference, integration guide, architecture overview, configuration, EMBED, production, ROADMAP |
 | `.github/workflows/` | CI pipeline (lint, typecheck, test, build, Docker) |
 

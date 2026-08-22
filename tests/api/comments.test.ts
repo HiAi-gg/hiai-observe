@@ -84,6 +84,8 @@ vi.mock("../../src/lib/auth.js", () => ({
 
 vi.mock("../../src/lib/rbac.js", () => ({
   checkWriteAccess: vi.fn(async () => true),
+  checkDeleteAccess: vi.fn(async () => true),
+  denyIfCannotDelete: vi.fn(async () => null),
 }));
 
 vi.mock("../../src/middleware/auth.js", async () => {
@@ -270,7 +272,7 @@ describe("POST /api/issues/:id/comments", () => {
 // ── DELETE /api/comments/:id ─────────────────────────────────────────
 describe("DELETE /api/comments/:id", () => {
   it("deletes the comment and returns { deleted: true }", async () => {
-    queue = [[{ id: COMMENT_ID }]];
+    queue = [[{ id: COMMENT_ID, issueId: ISSUE_ID }], [{ projectId: "proj-1" }]];
     const res = await commentsRoutes.handle(
       new Request(`http://localhost/api/comments/${COMMENT_ID}`, { method: "DELETE" }),
     );

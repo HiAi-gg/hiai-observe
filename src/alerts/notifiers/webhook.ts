@@ -76,6 +76,9 @@ export async function sendWebhookAlert(
   }
 
   try {
+    const { assertSafeHttpUrl } = await import("../../lib/ssrf.js");
+    await assertSafeHttpUrl(targetUrl);
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 
@@ -84,15 +87,15 @@ export async function sendWebhookAlert(
       headers,
       body,
       signal: controller.signal,
+      redirect: "error",
     });
 
     clearTimeout(timeout);
 
     if (!response.ok) {
-      const errorBody = await response.text();
       return {
         ok: false,
-        error: `Webhook error ${response.status}: ${errorBody}`,
+        error: `Webhook error ${response.status}`,
       };
     }
 

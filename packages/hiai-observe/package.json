@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/hiai-observe",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "HiAi Observe — client SDK, CLI, MCP server, and Mastra exporter for the HiAi Observe observability platform.",
   "type": "module",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.25.0"
   },
   "peerDependencies": {
@@ -55,8 +55,8 @@
     }
   },
   "devDependencies": {
-    "@mastra/core": "1.36.0",
-    "@mastra/observability": "1.16.3",
+    "@mastra/core": "1.61.0",
+    "@mastra/observability": "1.17.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.3",
     "@types/bun": "^1.2.10"

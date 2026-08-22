@@ -83,6 +83,8 @@ vi.mock("../../src/lib/auth.js", () => ({
 
 vi.mock("../../src/lib/rbac.js", () => ({
   checkWriteAccess: vi.fn(async () => true),
+  checkDeleteAccess: vi.fn(async () => true),
+  denyIfCannotDelete: vi.fn(async () => null),
 }));
 
 vi.mock("../../src/middleware/auth.js", async () => {

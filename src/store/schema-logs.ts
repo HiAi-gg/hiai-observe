@@ -1,1 +1,1 @@
-export { logs, type LogEntry, type NewLogEntry } from "./schema.js";
+export { type LogEntry, logs, type NewLogEntry } from "./schema.js";

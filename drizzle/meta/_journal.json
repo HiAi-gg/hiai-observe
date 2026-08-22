@@ -15,6 +15,13 @@
       "when": 1781961214435,
       "tag": "0001_per_project_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787370000000,
+      "tag": "0002_logs_project_id",
+      "breakpoints": true
     }
   ]
 }

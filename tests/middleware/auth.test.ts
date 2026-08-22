@@ -38,6 +38,7 @@ if (typeof globalThis.Bun === "undefined") (globalThis as any).Bun = {};
 };
 
 const { resolveApiKey } = await import("../../src/lib/auth.js");
+const { isPublicPath } = await import("../../src/middleware/auth.js");
 const { db } = await import("../../src/store/db.js");
 
 // Access the shared chain mock (returned by db.select())
@@ -45,24 +46,7 @@ function getDbChain() {
   return (db.select as ReturnType<typeof vi.fn>)();
 }
 
-// ── Public path helper (mirrors middleware logic) ────────────────────────
-const PUBLIC_PATHS = [
-  "/api/health", // Canonical HiAi ecosystem health endpoint
-  "/health", // Legacy alias for backwards compatibility
-  "/metrics",
-  "/api/status",
-  "/api/subscribers/public",
-  "/api/badges",
-  "/api/openapi.json",
-  "/v1/traces",
-  "/v1/metrics",
-  "/api/logs/stream",
-  "/api/observe/logs/stream",
-];
-
-function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
-}
+// ── Public path helper (imported from middleware) ────────────────────────
 
 // ── resolveApiKey ────────────────────────────────────────────────────────
 describe("resolveApiKey", () => {
@@ -237,11 +221,8 @@ describe("isPublicPath", () => {
   it.each([
     "/",
     "/api/health",
-    "/api/health/details",
     "/health",
-    "/health/details",
     "/metrics",
-    "/metrics/prometheus",
     "/api/status",
     "/api/status/overview",
     "/api/subscribers/public",
@@ -251,9 +232,11 @@ describe("isPublicPath", () => {
     "/v1/traces/batch",
     "/v1/metrics",
     "/v1/metrics/otlp",
-    "/api/logs/stream",
-    "/api/logs/stream?container=nginx",
-    "/api/observe/logs/stream",
+    "/v1/logs",
+    "/embed",
+    "/embed/dashboard",
+    "/api/admin/cleanup",
+    "/api/tenant/acme/health",
   ])("allows public path: %s", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });
@@ -261,8 +244,9 @@ describe("isPublicPath", () => {
   it.each([
     "/api/issues",
     "/api/events",
-    "/api/admin/cleanup",
-    "/v1/logs",
+    "/api/health/details",
+    "/api/logs/stream",
+    "/api/observe/logs/stream",
     "/dashboard",
     "/api/projects",
   ])("blocks protected path: %s", (path) => {

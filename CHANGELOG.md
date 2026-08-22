@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-22
+
+Security and tenant-isolation hardening. **Read the breaking notes before upgrading.**
+
+### Upgrade
+
+1. Apply `drizzle/0002_logs_project_id.sql` (or restart the container so `scripts/migrate.ts` runs).
+2. Set `ADMIN_API_KEY` if you create/delete projects from admin-bridge or the UI.
+3. Behind a reverse proxy set `TRUST_PROXY=true`.
+4. To persist notification secrets in production, set `ENCRYPTION_KEY` (64 hex chars).
+5. Status-page public subscribe now posts `{ slug, email }`, not `{ projectId, email }`.
+6. Log streaming: use WebSocket `{ action: "auth", key }` or `Authorization` on SSE — `?key=` is gone.
+
+### Breaking
+
+- A project API key only sees **its own** project. Omitting `?projectId=` no longer dumps the instance.
+- `POST /api/projects` and `DELETE /api/projects/:id` require `ADMIN_API_KEY`.
+- `GET /health` and `GET /api/health` return `{ status, version }` only. Full payload: `GET /api/health/details` with the admin key.
+- `GET /api/logs/stream?key=` is removed. Authenticate with `Authorization` / `X-Api-Key`.
+- `POST /api/subscribers/public` requires `slug` (project slug), not a project UUID.
+
+### Security
+- Project API keys are scoped to their own project. Cross-project project create/delete requires `ADMIN_API_KEY`.
+- Security headers and metrics hooks use `as: "global"` so they apply to child routes.
+- SSRF guards on HTTP/TCP uptime checks and outbound webhooks (private/link-local/metadata denied).
+- Rate limiter no longer trusts `X-Real-IP` unless `TRUST_PROXY=true`. Sentry ingest path limits apply. `/embed/dashboard` is rate-limited. Redis keys collapse UUIDs.
+- Logs have optional `project_id`; host Docker rows are admin-only.
+- Production `onError` does not leak exception strings.
+
+### Added
+- `src/lib/project-scope.ts` — tenant vs admin scope helper.
+- Drizzle migration `0002_logs_project_id.sql`.
+- SPA static serving from `frontend/build` (adapter-static + fallback) in the API process.
+- CI e2e job (`INTEGRATION=1`) and frontend unit-test job.
+- API tests for badges, export, fingerprint-rules, infrastructure, logs-ws contract, notifications, saved-searches, search, sourcemaps, status-page, subscribers, tenant-health.
+- `docs/AUTH_BRIDGE.md`, `docs/agent-protocol.md`, `docs/backup.md`.
+
+### Changed
+- Fingerprint rule `total` is a full count, not the current page length.
+- Tenant `DELETE` routes call `checkDeleteAccess` (`projects.api_role`).
+- Docker/CI healthcheck uses canonical `GET /api/health`.
+- Frontend package version aligned to 0.2.2.
+
 ## [0.2.1] - 2026-07-31
 
 ### Fixed
@@ -343,6 +386,7 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.2.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.8...v0.1.9

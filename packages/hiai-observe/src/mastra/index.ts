@@ -33,7 +33,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 1000;
 
 /** Exporter + SDK version, reported in resource/scope attributes. */
-const EXPORTER_VERSION = "0.2.1";
+const EXPORTER_VERSION = "0.2.2";
 
 /** Discriminator literal for completed spans (see TracingEventType.SPAN_ENDED). */
 const SPAN_ENDED = "span_ended";

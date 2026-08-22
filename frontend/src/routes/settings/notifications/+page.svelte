@@ -1,6 +1,6 @@
 <script lang="ts">
-import { getNotificationChannels, testAllAlerts } from "$lib/api";
-import { apiKey } from "$lib/stores.svelte";
+import { getNotificationChannels, testAllAlerts, updateNotificationConfig } from "$lib/api";
+import { currentProject } from "$lib/stores.svelte";
 
 let channels = $state<
   Array<{
@@ -33,8 +33,11 @@ async function loadChannels() {
     loading = true;
     const result = await getNotificationChannels();
     channels = result.channels;
-  } catch {
-    // silent
+  } catch (e) {
+    saveResult = {
+      message: e instanceof Error ? e.message : "Failed to load channels",
+      success: false,
+    };
   } finally {
     loading = false;
   }
@@ -61,40 +64,55 @@ async function handleSaveConfig() {
   saving = true;
   saveResult = null;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10_000);
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (apiKey.current) headers["Authorization"] = `Bearer ${apiKey.current}`;
-    const res = await fetch("/api/alerts/config", {
-      method: "POST",
-      headers,
-      signal: controller.signal,
-      body: JSON.stringify({
-        telegram: { botToken: telegramBotToken, chatId: telegramChatId },
-        discord: { webhookUrl: discordWebhookUrl },
-        smtp: { host: smtpHost, port: smtpPort, user: smtpUser, pass: smtpPass, from: smtpFrom },
-      }),
-    });
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      saveResult = {
-        message: "Configuration saved. Restart the server to apply changes.",
-        success: true,
-      };
-      await loadChannels();
-    } else {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      saveResult = {
-        message: (err as { error?: string }).error ?? "Failed to save",
-        success: false,
-      };
+    const projectId = currentProject.current;
+    if (!projectId) {
+      saveResult = { message: "Select a project first", success: false };
+      return;
     }
+    const saves: Promise<unknown>[] = [];
+    if (telegramBotToken || telegramChatId) {
+      saves.push(
+        updateNotificationConfig("telegram", {
+          projectId,
+          config: { botToken: telegramBotToken, chatId: telegramChatId },
+          enabled: true,
+        }),
+      );
+    }
+    if (discordWebhookUrl) {
+      saves.push(
+        updateNotificationConfig("discord", {
+          projectId,
+          config: { webhookUrl: discordWebhookUrl },
+          enabled: true,
+        }),
+      );
+    }
+    if (smtpHost) {
+      saves.push(
+        updateNotificationConfig("email", {
+          projectId,
+          config: {
+            host: smtpHost,
+            port: smtpPort,
+            user: smtpUser,
+            pass: smtpPass,
+            from: smtpFrom,
+          },
+          enabled: true,
+        }),
+      );
+    }
+    if (saves.length === 0) {
+      saveResult = { message: "Nothing to save", success: false };
+      return;
+    }
+    await Promise.all(saves);
+    saveResult = { message: "Configuration saved", success: true };
+    await loadChannels();
   } catch (e) {
     saveResult = {
-      message:
-        e instanceof Error && e.name === "AbortError"
-          ? "Request timed out"
-          : "Failed to save configuration",
+      message: e instanceof Error ? e.message : "Failed to save configuration",
       success: false,
     };
   } finally {

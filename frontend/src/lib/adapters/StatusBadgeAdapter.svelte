@@ -44,7 +44,6 @@ const statusMap: Record<string, string> = {
 // original status string (with a sensible capitalization for readability).
 let canonicalStatus = $derived(statusMap[status] ?? status);
 let canonicalSize: "sm" | "default" | "lg" = $derived(size === "md" ? "default" : "sm");
-let displayStatus = $derived(status || "unknown");
 </script>
 
-<StatusBadge status={canonicalStatus} size={canonicalSize} label={displayStatus} />
+<StatusBadge status={canonicalStatus} size={canonicalSize} />

@@ -6,8 +6,8 @@
  * Reuses incoming X-Request-ID if present.
  */
 
-import { Elysia } from "elysia";
 import { randomUUID } from "node:crypto";
+import { Elysia } from "elysia";
 
 export const requestIdPlugin = new Elysia({ name: "request-id" })
   .derive({ as: "global" }, ({ request }) => {

@@ -187,6 +187,7 @@ describe("issues API", () => {
 
   describe("PATCH /api/issues/:id (update status)", () => {
     it("updates status to resolved", async () => {
+      mockSelectSequence([[mockIssue]]);
       mockUpdate([{ ...mockIssue, status: "resolved" }]);
 
       const res = await issuesPlugin.handle(

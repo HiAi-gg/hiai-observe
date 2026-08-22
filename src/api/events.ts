@@ -1,20 +1,28 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { events } from "../store/schema.js";
 
 export const eventsPlugin = new Elysia({ prefix: "/api" })
   .get(
     "/events",
-    async ({ query }) => {
-      const { issueId, projectId, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { issueId, limit = "50", offset = "0" } = query;
       const lim = parseLimit(limit);
       const off = parseOffset(offset);
 
       const conditions = [];
       if (issueId) conditions.push(eq(events.issueId, issueId));
-      if (projectId) conditions.push(eq(events.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(events.projectId, scope.projectId));
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
       const [rows, total] = await Promise.all([
@@ -44,9 +52,15 @@ export const eventsPlugin = new Elysia({ prefix: "/api" })
   )
   .get(
     "/events/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const event = await db.select().from(events).where(eq(events.id, params.id)).limit(1);
-      if (!event[0]) {
+      if (!event[0] || !assertResourceProject(event[0].projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Event not found" };
       }

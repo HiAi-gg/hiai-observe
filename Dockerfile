@@ -2,7 +2,7 @@
 FROM oven/bun:1-alpine AS frontend-build
 WORKDIR /app
 COPY frontend/package.json frontend/bun.lock* ./
-RUN bun install --frozen-lockfile 2>/dev/null || bun install
+RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
 
@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
 COPY packages/ ./packages/
-RUN HUSKY=0 bun install --frozen-lockfile 2>/dev/null || HUSKY=0 bun install
+RUN HUSKY=0 bun install --frozen-lockfile
 COPY src/ src/
 COPY tsconfig.json ./
 RUN bun build src/index.ts --outdir dist --target bun
@@ -23,7 +23,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
 COPY packages/ ./packages/
-RUN HUSKY=0 bun install --production --frozen-lockfile 2>/dev/null || HUSKY=0 bun install --production
+RUN HUSKY=0 bun install --production --frozen-lockfile
 
 # ── Stage 4: Runtime ──────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runtime
@@ -54,7 +54,7 @@ ENV PORT=8001
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8001/health || exit 1
+  CMD curl -fsS http://localhost:8001/api/health || exit 1
 
 USER bun
 

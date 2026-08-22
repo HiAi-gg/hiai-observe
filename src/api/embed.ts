@@ -29,7 +29,10 @@
 
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { adminKeyFromRequest } from "../lib/admin-auth.js";
+import { lookupProject, resolveApiKey } from "../lib/auth.js";
 import { config } from "../lib/config.js";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { resolveProjectId } from "../middleware/auth.js";
 import { db } from "../store/db.js";
 import { alerts, events, issues, projects, uptimeMonitors } from "../store/schema.js";
@@ -241,25 +244,47 @@ export const embedRoutes = new Elysia({ prefix: "/embed" })
       // Handler-level auth — required because /embed/* is in PUBLIC_PATHS
       // (for /embed and /embed/status/:slug which ARE public), so the
       // global authGuard does not run for /embed/dashboard.
-      const requestProjectId = await resolveProjectId(request);
+      // resolveProjectId skips PUBLIC_PATHS, so re-read the key from headers.
+      const admin = adminKeyFromRequest(request);
+      let requestProjectId = await resolveProjectId(request);
       if (!requestProjectId) {
+        const authHeader = request.headers.get("authorization");
+        const apiKeyHeader = request.headers.get("x-api-key");
+        const parsed =
+          resolveApiKey(authHeader ?? undefined) ??
+          (apiKeyHeader ? { apiKey: apiKeyHeader.trim() } : null);
+        if (parsed) {
+          const project = await lookupProject(parsed.apiKey);
+          requestProjectId = project?.projectId;
+        }
+      }
+      if (!admin.ok && !requestProjectId) {
         set.status = 401;
         return { error: "Unauthorized" };
       }
 
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const q = query as Record<string, string | undefined>;
-      const projectId = q.projectId ?? q.tenantId;
+      const scopedProjectId = scope.projectId;
       const limit = Math.min(Math.max(Number(q.limit ?? "10") || 10, 1), 50);
       const oneDayAgo = new Date(Date.now() - 24 * 3600_000);
 
-      // projectsCount — admin scope (no projectId) returns total;
-      // project scope returns 1 (only the calling project is visible).
+      // Tenant keys never see instance-wide totals. Admin without a
+      // requested project is unscoped (projectsCount = all).
       const projectsCountRow = await db.select({ value: count() }).from(projects);
-      const projectsCount = projectId ? 1 : (projectsCountRow[0]?.value ?? 0);
+      const projectsCount = scopedProjectId ? 1 : (projectsCountRow[0]?.value ?? 0);
 
-      const issueFilter = projectId ? eq(issues.projectId, projectId) : undefined;
-      const alertFilter = projectId ? eq(alerts.projectId, projectId) : undefined;
-      const monitorFilter = projectId ? eq(uptimeMonitors.projectId, projectId) : undefined;
+      const issueFilter = scopedProjectId ? eq(issues.projectId, scopedProjectId) : undefined;
+      const alertFilter = scopedProjectId ? eq(alerts.projectId, scopedProjectId) : undefined;
+      const monitorFilter = scopedProjectId
+        ? eq(uptimeMonitors.projectId, scopedProjectId)
+        : undefined;
 
       const [activeIssuesRow, activeAlertsRow, monitorRows, recentEventRows] = await Promise.all([
         db
@@ -289,7 +314,11 @@ export const embedRoutes = new Elysia({ prefix: "/embed" })
             createdAt: events.createdAt,
           })
           .from(events)
-          .where(projectId ? eq(events.projectId, projectId) : gte(events.createdAt, oneDayAgo))
+          .where(
+            scopedProjectId
+              ? eq(events.projectId, scopedProjectId)
+              : gte(events.createdAt, oneDayAgo),
+          )
           .orderBy(desc(events.createdAt))
           .limit(limit),
       ]);

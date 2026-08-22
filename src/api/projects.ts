@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { adminKeyFromRequest } from "../lib/admin-auth.js";
 import { hashApiKey, maskApiKey } from "../lib/auth.js";
+import {
+  applyScope,
+  assertResourceProject,
+  authProjectIdFromRequest,
+  isScope,
+} from "../lib/project-scope.js";
+import { checkAdminAccess } from "../lib/rbac.js";
 import { db } from "../store/db.js";
 import {
   alertHistory,
@@ -19,7 +27,14 @@ import {
 
 export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
 
-  .get("/", async () => {
+  .get("/", async ({ request, query, set }) => {
+    const scope = await applyScope({
+      request,
+      query: query as Record<string, unknown>,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
     const items = await db
       .select({
         id: projects.id,
@@ -29,6 +44,7 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
         createdAt: projects.createdAt,
       })
       .from(projects)
+      .where(scope.projectId ? eq(projects.id, scope.projectId) : undefined)
       .orderBy(projects.createdAt);
 
     return {
@@ -41,7 +57,12 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
 
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      if (!adminKeyFromRequest(request).ok) {
+        set.status = 403;
+        return { error: "Forbidden: creating projects requires ADMIN_API_KEY" };
+      }
+
       const apiKey = `ho_${randomUUID().replace(/-/g, "")}`;
       const slug = body.name
         .toLowerCase()
@@ -73,7 +94,25 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
 
   .post(
     "/:id/rotate-key",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const admin = adminKeyFromRequest(request).ok;
+      const authProjectId = admin ? undefined : await authProjectIdFromRequest(request);
+
+      if (!admin) {
+        if (!authProjectId) {
+          set.status = 401;
+          return { error: "Unauthorized" };
+        }
+        if (params.id !== authProjectId) {
+          set.status = 403;
+          return { error: "Forbidden: cannot rotate another project's key" };
+        }
+        if (!(await checkAdminAccess(params.id))) {
+          set.status = 403;
+          return { error: "Forbidden" };
+        }
+      }
+
       const newKey = `ho_${randomUUID().replace(/-/g, "")}`;
       const { hash, prefix } = await hashApiKey(newKey);
 
@@ -97,7 +136,12 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
 
   .delete(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      if (!adminKeyFromRequest(request).ok) {
+        set.status = 403;
+        return { error: "Forbidden: deleting projects requires ADMIN_API_KEY" };
+      }
+
       const [existing] = await db
         .select({ id: projects.id })
         .from(projects)
@@ -159,7 +203,13 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
 
   .put(
     "/:id/rate-limit",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       // Validate the project exists first — returning 404 on a missing
       // project is clearer than a silent update of zero rows.
       const [existing] = await db
@@ -167,7 +217,7 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
         .from(projects)
         .where(eq(projects.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.id, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Project not found" };
       }

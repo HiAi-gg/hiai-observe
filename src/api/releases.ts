@@ -8,6 +8,7 @@
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { events, issues, releases } from "../store/schema.js";
 
@@ -18,13 +19,19 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── List releases for a project ─────────────────────────────────────
   .get(
     "/",
-    async ({ query }) => {
-      const { projectId, environment, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      const { environment, limit = "50", offset = "0" } = query;
       const lim = parseLimit(limit);
       const off = parseOffset(offset);
 
       const conditions = [];
-      if (projectId) conditions.push(eq(releases.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(releases.projectId, scope.projectId));
       if (environment) conditions.push(eq(releases.environment, environment));
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -50,6 +57,7 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
     {
       query: t.Object({
         projectId: t.Optional(t.String({ format: "uuid" })),
+        tenantId: t.Optional(t.String()),
         environment: t.Optional(t.Union(VALID_ENVIRONMENTS.map((e) => t.Literal(e)))),
         limit: t.Optional(t.String()),
         offset: t.Optional(t.String()),
@@ -60,9 +68,15 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── Get single release ──────────────────────────────────────────────
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [release] = await db.select().from(releases).where(eq(releases.id, params.id)).limit(1);
-      if (!release) {
+      if (!release || !assertResourceProject(release.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Release not found" };
       }
@@ -74,11 +88,23 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── Create release ──────────────────────────────────────────────────
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot create releases for another project" };
+      }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
+
       const [created] = await db
         .insert(releases)
         .values({
-          projectId: body.projectId,
+          projectId: boundProjectId,
           version: body.version,
           environment: body.environment ?? "production",
           deployedAt: body.deployedAt ? new Date(body.deployedAt) : null,
@@ -101,13 +127,19 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── Update release (deployedAt) ─────────────────────────────────────
   .put(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
         .select()
         .from(releases)
         .where(eq(releases.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Release not found" };
       }
@@ -143,9 +175,15 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── Release health ──────────────────────────────────────────────────
   .get(
     "/:id/health",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [release] = await db.select().from(releases).where(eq(releases.id, params.id)).limit(1);
-      if (!release) {
+      if (!release || !assertResourceProject(release.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Release not found" };
       }
@@ -194,13 +232,19 @@ export const releasesRoutes = new Elysia({ prefix: "/api/releases" })
   // ── Delete release ──────────────────────────────────────────────────
   .delete(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
-        .select({ id: releases.id })
+        .select({ id: releases.id, projectId: releases.projectId })
         .from(releases)
         .where(eq(releases.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Release not found" };
       }

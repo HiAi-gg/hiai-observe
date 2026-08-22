@@ -9,11 +9,8 @@
  * - HSTS is NOT added in non-production mode
  * - All other security headers (X-Content-Type-Options, etc.) are present
  *
- * Note on Elysia scoping: the `onAfterHandle` registered on a sub-plugin
- * instance fires only for routes attached to that same instance. The
- * secure-headers plugin is consumed in production by `.use()` on the parent
- * app; the tests below exercise the plugin's contract directly by attaching
- * both the hook and the test routes to the same Elysia instance.
+ * Plugin hooks use `as: "global"` so they fire on parent-app routes after
+ * `.use(secureHeadersPlugin)`.
  */
 
 import { Elysia } from "elysia";
@@ -29,27 +26,8 @@ function getCsp(res: Response): string | null {
 // production plugin) on the same instance so the hook fires for the routes
 // attached to that instance. This is the cleanest way to test the contract.
 function makeAppWithPluginAttached() {
-  // Import the plugin's logic by reusing the constants from the module:
-  // we re-declare the hook here using the same DEFAULT_CSP / PERMISSIONS_POLICY
-  // behavior, then register it on the same instance as the test routes.
   return new Elysia()
-    .onAfterHandle(({ set }) => {
-      // Inline the same logic as secureHeadersPlugin.onAfterHandle
-      // to ensure hook + route are on the same Elysia instance.
-      const h = set.headers as Record<string, string>;
-      if (!h["Content-Security-Policy"]) {
-        h["Content-Security-Policy"] =
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-      }
-      h["X-Content-Type-Options"] = "nosniff";
-      h["X-Frame-Options"] = "DENY";
-      h["Referrer-Policy"] = "strict-origin-when-cross-origin";
-      h["Permissions-Policy"] =
-        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
-      h["Cross-Origin-Opener-Policy"] = "same-origin";
-      h["Cross-Origin-Resource-Policy"] = "same-site";
-      h["X-Permitted-Cross-Domain-Policies"] = "none";
-    })
+    .use(secureHeadersPlugin)
     .get("/", () => "ok")
     .get("/status-page/:slug", ({ set }) => {
       set.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'unsafe-inline'";

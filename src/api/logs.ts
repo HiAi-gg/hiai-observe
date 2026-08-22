@@ -1,6 +1,7 @@
-import { gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { lookupProject } from "../lib/auth.js";
+import { lookupProject, resolveApiKey } from "../lib/auth.js";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { subscribeAllLogs, subscribeLogs } from "../store/log-pubsub.js";
 import {
@@ -13,20 +14,36 @@ import {
 } from "../store/logs.js";
 import { logs } from "../store/schema.js";
 
+function logScopeFilter(scope: { projectId: string | undefined; admin: boolean }) {
+  if (scope.projectId) return eq(logs.projectId, scope.projectId);
+  if (scope.admin) return undefined;
+  return sql`false`;
+}
+
 export const logsPlugin = new Elysia({ prefix: "/api/logs" })
-  .get("/stats", async () => {
+  .get("/stats", async ({ request, query, set }) => {
+    const scope = await applyScope({
+      request,
+      query: query as Record<string, unknown>,
+      set,
+    });
+    if (!isScope(scope)) return scope;
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const projectFilter = logScopeFilter(scope);
+    const window = projectFilter
+      ? and(gte(logs.timestamp, since24h), projectFilter)
+      : gte(logs.timestamp, since24h);
     const [totalResult, byLevel, byContainer, byHour] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(logs).where(gte(logs.timestamp, since24h)),
+      db.select({ count: sql<number>`count(*)` }).from(logs).where(window),
       db
         .select({ level: logs.level, count: sql<number>`count(*)` })
         .from(logs)
-        .where(gte(logs.timestamp, since24h))
+        .where(window)
         .groupBy(logs.level),
       db
         .select({ container: logs.containerName, count: sql<number>`count(*)` })
         .from(logs)
-        .where(gte(logs.timestamp, since24h))
+        .where(window)
         .groupBy(logs.containerName)
         .orderBy(sql`count(*) desc`)
         .limit(10),
@@ -36,7 +53,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
           count: sql<number>`count(*)`,
         })
         .from(logs)
-        .where(gte(logs.timestamp, since24h))
+        .where(window)
         .groupBy(sql`date_trunc('hour', ${logs.timestamp})`)
         .orderBy(sql`date_trunc('hour', ${logs.timestamp})`),
     ]);
@@ -71,13 +88,24 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   )
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
       const { container, level, search, regex, fuzzy, from, to, limit, offset } = query;
+      const scoped = {
+        projectId: scope.projectId,
+        includeHostLogs: scope.admin && !scope.projectId,
+      };
 
       // Regex search uses PostgreSQL ~ operator
       if (regex) {
         try {
           const result = await searchLogsRegex({
+            ...scoped,
             pattern: regex,
             container: container || undefined,
             level: level || undefined,
@@ -99,6 +127,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
       if (fuzzy) {
         try {
           const result = await searchLogsFuzzy({
+            ...scoped,
             term: fuzzy,
             container: container || undefined,
             level: level || undefined,
@@ -111,6 +140,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         } catch {
           // Fallback to ILIKE if pg_trgm not available
           const result = await searchLogs({
+            ...scoped,
             container: container || undefined,
             level: level || undefined,
             search: fuzzy,
@@ -124,6 +154,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
       }
 
       const result = await searchLogs({
+        ...scoped,
         container: container || undefined,
         level: level || undefined,
         search: search || undefined,
@@ -151,23 +182,35 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   )
   .get(
     "/stream",
-    async ({ query, set }) => {
-      const key = query.key;
-      if (!key) {
+    async ({ query, request, set }) => {
+      const parsed =
+        resolveApiKey(request.headers.get("authorization") ?? undefined) ??
+        (request.headers.get("x-api-key")
+          ? { apiKey: request.headers.get("x-api-key")!.trim() }
+          : null);
+      if (!parsed) {
         set.status = 401;
-        return { error: "Authentication required via ?key=<apikey>" };
+        return { error: "Authentication required via Authorization or X-Api-Key" };
       }
-      const project = await lookupProject(key);
+      const project = await lookupProject(parsed.apiKey);
       if (!project) {
         set.status = 401;
         return { error: "Invalid API key" };
       }
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
 
       set.headers["Content-Type"] = "text/event-stream";
       set.headers["Cache-Control"] = "no-cache";
       set.headers["Connection"] = "keep-alive";
 
       const container = query.container;
+      const scopedProjectId = scope.projectId;
+      const admin = scope.admin;
 
       let unsub: (() => void) | undefined;
       let pingInterval: any;
@@ -180,6 +223,10 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
               entry.container_id !== container &&
               entry.container_name !== container
             ) {
+              return;
+            }
+            const entryProject = entry.projectId ?? entry.project_id;
+            if (!admin && scopedProjectId && entryProject !== scopedProjectId) {
               return;
             }
             try {
@@ -212,24 +259,42 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     },
     {
       query: t.Object({
-        key: t.Optional(t.String()),
         container: t.Optional(t.String()),
       }),
     },
   )
-  .get("/containers", async () => {
-    const containers = await getLogContainers();
+  .get("/containers", async ({ request, query, set }) => {
+    const scope = await applyScope({
+      request,
+      query: query as Record<string, unknown>,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+    const containers = await getLogContainers({
+      projectId: scope.projectId,
+      includeHostLogs: scope.admin && !scope.projectId,
+    });
     return { data: containers };
   })
   .delete(
     "/",
-    async ({ query, set }) => {
+    async ({ query, request, set }) => {
       if (!query.confirm) {
         set.status = 400;
         return { error: "Must provide confirm=true to delete logs" };
       }
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
       const before = query.before ? new Date(query.before) : undefined;
-      const deleted = await clearLogs(before);
+      const deleted = await clearLogs({
+        before,
+        projectId: scope.projectId,
+        includeHostLogs: scope.admin && !scope.projectId,
+      });
       return { deleted };
     },
     {

@@ -346,6 +346,7 @@ export const logs = pgTable(
   "logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
     containerId: varchar("container_id", { length: 128 }).notNull(),
     containerName: varchar("container_name", { length: 256 }).notNull(),
     stream: varchar("stream", { length: 8 }).notNull(),
@@ -358,6 +359,7 @@ export const logs = pgTable(
     index("logs_container_id_idx").on(t.containerId),
     index("logs_timestamp_idx").on(t.timestamp),
     index("logs_container_timestamp_idx").on(t.containerId, t.timestamp),
+    index("logs_project_timestamp_idx").on(t.projectId, t.timestamp),
   ],
 );
 

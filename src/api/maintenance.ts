@@ -7,6 +7,7 @@
 
 import { and, count, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { maintenanceWindows } from "../store/schema.js";
 
@@ -15,12 +16,19 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── List maintenance windows (active + upcoming by default) ─────────
   .get(
     "/",
-    async ({ query }) => {
-      const { projectId, status, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { status, limit = "50", offset = "0" } = query;
       const now = new Date();
 
       const conditions = [];
-      if (projectId) conditions.push(eq(maintenanceWindows.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(maintenanceWindows.projectId, scope.projectId));
 
       if (status === "active") {
         conditions.push(lte(maintenanceWindows.startsAt, now));
@@ -55,6 +63,7 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
     {
       query: t.Object({
         projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
         status: t.Optional(
           t.Union([t.Literal("active"), t.Literal("upcoming"), t.Literal("past")]),
         ),
@@ -67,14 +76,21 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── Get currently active windows (convenience) ──────────────────────
   .get(
     "/active/now",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const now = new Date();
       const conditions = [
         lte(maintenanceWindows.startsAt, now),
         gte(maintenanceWindows.endsAt, now),
       ];
-      if (query.projectId) {
-        conditions.push(eq(maintenanceWindows.projectId, query.projectId));
+      if (scope.projectId) {
+        conditions.push(eq(maintenanceWindows.projectId, scope.projectId));
       }
 
       const items = await db
@@ -88,6 +104,7 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
     {
       query: t.Object({
         projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
       }),
     },
   )
@@ -95,13 +112,19 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── Get single maintenance window ───────────────────────────────────
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [window] = await db
         .select()
         .from(maintenanceWindows)
         .where(eq(maintenanceWindows.id, params.id))
         .limit(1);
-      if (!window) {
+      if (!window || !assertResourceProject(window.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Maintenance window not found" };
       }
@@ -113,7 +136,18 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── Create maintenance window ───────────────────────────────────────
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot create windows for another project" };
+      }
+
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
 
@@ -122,10 +156,12 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
         return { error: "endsAt must be after startsAt" };
       }
 
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
+
       const [created] = await db
         .insert(maintenanceWindows)
         .values({
-          projectId: body.projectId,
+          projectId: boundProjectId,
           name: body.name,
           description: body.description ?? null,
           startsAt,
@@ -151,13 +187,19 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── Update maintenance window ───────────────────────────────────────
   .put(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
-        .select({ id: maintenanceWindows.id })
+        .select({ id: maintenanceWindows.id, projectId: maintenanceWindows.projectId })
         .from(maintenanceWindows)
         .where(eq(maintenanceWindows.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Maintenance window not found" };
       }
@@ -200,13 +242,19 @@ export const maintenanceRoutes = new Elysia({ prefix: "/api/maintenance" })
   // ── Delete maintenance window ───────────────────────────────────────
   .delete(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
-        .select({ id: maintenanceWindows.id })
+        .select({ id: maintenanceWindows.id, projectId: maintenanceWindows.projectId })
         .from(maintenanceWindows)
         .where(eq(maintenanceWindows.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Maintenance window not found" };
       }

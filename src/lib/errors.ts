@@ -26,5 +26,7 @@ export function notFound(message = "Not found") {
 }
 
 export function internal(message = "Internal error") {
-  return { error: message, detail: isProd ? undefined : message };
+  // Never put exception text in `error`. Production omits `detail` entirely.
+  if (isProd) return { error: "Internal error" };
+  return { error: "Internal error", detail: message };
 }

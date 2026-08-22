@@ -2,6 +2,7 @@ import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { uptimeChecks, uptimeMonitors } from "./schema.js";
 
+/** When `projectId` is provided, results are always limited to that project. */
 export async function getMonitors(projectId?: string, group?: string) {
   const conditions = [];
   if (projectId) conditions.push(eq(uptimeMonitors.projectId, projectId));

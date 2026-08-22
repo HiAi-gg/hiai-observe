@@ -226,7 +226,7 @@ describe("per-project rate limits — override applied", () => {
     // bucket.
     const projectKey = redisCalls.find((k) => k.startsWith(`rl:proj:${projectId}:`));
     expect(projectKey).toBeDefined();
-    expect(projectKey).toContain("10.0.0.4");
+    expect(projectKey).toContain("direct");
     expect(projectKey).toContain("/api/issues");
     expect(projectKey).toContain(":60000");
   });

@@ -15,6 +15,10 @@ All configuration is done through environment variables. Copy `.env.example` to 
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error` |
 | `HIAI_OBSERVE_API_KEY` | No | — | Bootstrap API key for the default admin project. Generate with `openssl rand -hex 24` |
 | `CORS_ORIGIN` | No | `false` | Allowed CORS origin URL, or `false` to disable |
+| `TRUST_PROXY` | No | — | Set `true` to trust `X-Forwarded-For` / `X-Real-IP` from a reverse proxy |
+| `DOCKER_HOST` | No | — | Docker TCP URL (overrides `DOCKER_SOCKET`, e.g. socket proxy) |
+| `HIAI_DISABLE_LOG_WORKER` | No | — | Set `1` to disable the Docker log stream worker |
+| `OBSERVE_URL` | No | `http://localhost:8001` | Public URL of this instance (plugin/host integration) |
 
 ### Docker Monitoring
 
@@ -58,6 +62,17 @@ All configuration is done through environment variables. Copy `.env.example` to 
 | `SMTP_USER` | No | — | SMTP username |
 | `SMTP_PASS` | No | — | SMTP password |
 | `SMTP_FROM` | No | — | From address for alert emails |
+| `SLACK_WEBHOOK_URL` | No | — | Slack incoming webhook |
+| `WEBHOOK_URL` | No | — | Generic webhook URL |
+| `WEBHOOK_SECRET` | No | — | HMAC secret for `X-Hiai-Signature` |
+| `PAGERDUTY_ROUTING_KEY` | No | — | PagerDuty Events API v2 routing key |
+| `TEAMS_WEBHOOK_URL` | No | — | Microsoft Teams webhook |
+| `NTFY_TOPIC` | No | — | ntfy topic |
+| `NTFY_SERVER` | No | — | ntfy server URL |
+| `GOTIFY_SERVER` | No | — | Gotify server URL |
+| `GOTIFY_TOKEN` | No | — | Gotify app token |
+| `PUSHOVER_USER_KEY` | No | — | Pushover user key |
+| `PUSHOVER_TOKEN` | No | — | Pushover application token |
 
 ### Data Retention
 

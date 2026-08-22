@@ -1,96 +1,102 @@
 <script lang="ts">
-  import { getStatusPage, createPublicSubscriber, type StatusPageData, type Incident } from "$lib/api";
-  import { page } from "$app/state";
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
+import { page } from "$app/state";
+import {
+  createPublicSubscriber,
+  getStatusPage,
+  type Incident,
+  type StatusPageData,
+} from "$lib/api";
 
-  let slug = $state(page.url.searchParams.get("slug") || "");
-  let data = $state<StatusPageData | null>(null);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
-  let lastUpdated = $state<Date | null>(null);
+let slug = $state(page.url.searchParams.get("slug") || "");
+let data = $state<StatusPageData | null>(null);
+let loading = $state(true);
+let error = $state<string | null>(null);
+let lastUpdated = $state<Date | null>(null);
 
-  let subscriberEmail = $state("");
-  let subscribeLoading = $state(false);
-  let subscribeSuccess = $state(false);
-  let subscribeError = $state<string | null>(null);
+let subscriberEmail = $state("");
+let subscribeLoading = $state(false);
+let subscribeSuccess = $state(false);
+let subscribeError = $state<string | null>(null);
 
-  async function loadStatus() {
-    if (!slug) {
-      loading = false;
-      return;
-    }
-    try {
-      error = null;
-      const res = await getStatusPage(slug);
-      data = res;
-      lastUpdated = new Date();
-    } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load status page";
-      data = null;
-    } finally {
-      loading = false;
-    }
+async function loadStatus() {
+  if (!slug) {
+    loading = false;
+    return;
   }
+  try {
+    error = null;
+    const res = await getStatusPage(slug);
+    data = res;
+    lastUpdated = new Date();
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to load status page";
+    data = null;
+  } finally {
+    loading = false;
+  }
+}
 
-  $effect(() => {
+$effect(() => {
+  if (slug) {
+    loadStatus();
+  }
+});
+
+onMount(() => {
+  const interval = setInterval(() => {
     if (slug) {
       loadStatus();
     }
-  });
+  }, 60_000);
+  return () => clearInterval(interval);
+});
 
-  onMount(() => {
-    const interval = setInterval(() => {
-      if (slug) {
-        loadStatus();
-      }
-    }, 60_000);
-    return () => clearInterval(interval);
-  });
-
-  async function handleSubscribe(e: SubmitEvent) {
-    e.preventDefault();
-    if (!data?.project?.id || !subscriberEmail) return;
-    try {
-      subscribeLoading = true;
-      subscribeSuccess = false;
-      subscribeError = null;
-      await createPublicSubscriber(data.project.id, subscriberEmail);
-      subscribeSuccess = true;
-      subscriberEmail = "";
-    } catch (e) {
-      subscribeError = e instanceof Error ? e.message : "Failed to subscribe";
-    } finally {
-      subscribeLoading = false;
-    }
+async function handleSubscribe(e: SubmitEvent) {
+  e.preventDefault();
+  if (!data?.project?.slug || !subscriberEmail) return;
+  try {
+    subscribeLoading = true;
+    subscribeSuccess = false;
+    subscribeError = null;
+    await createPublicSubscriber(data.project.slug, subscriberEmail);
+    subscribeSuccess = true;
+    subscriberEmail = "";
+  } catch (e) {
+    subscribeError = e instanceof Error ? e.message : "Failed to subscribe";
+  } finally {
+    subscribeLoading = false;
   }
+}
 
-  function generateBars(uptimePercent: number): Array<{ success: boolean; label: string }> {
-    const totalBars = 30;
-    const bars: Array<{ success: boolean; label: string }> = [];
-    const failedCount = Math.round(((100 - uptimePercent) / 100) * totalBars);
-    
-    for (let i = 0; i < totalBars; i++) {
-      const isFailed = failedCount > 0 && 
-        (failedCount === 1 ? i === totalBars - 5 : (i % Math.floor(totalBars / failedCount) === 0)) && 
-        bars.filter(b => !b.success).length < failedCount;
-      bars.push({
-        success: !isFailed,
-        label: isFailed ? "Outage / Degraded" : "Operational"
-      });
-    }
-    return bars;
-  }
+function generateBars(uptimePercent: number): Array<{ success: boolean; label: string }> {
+  const totalBars = 30;
+  const bars: Array<{ success: boolean; label: string }> = [];
+  const failedCount = Math.round(((100 - uptimePercent) / 100) * totalBars);
 
-  function formatDuration(createdAt: string, resolvedAt?: string | null): string {
-    const start = new Date(createdAt).getTime();
-    const end = resolvedAt ? new Date(resolvedAt).getTime() : Date.now();
-    const diffMs = end - start;
-    const diffMins = Math.floor(diffMs / 60_000);
-    if (diffMins < 60) return `${diffMins}m`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
-    return `${Math.floor(diffHours / 24)}d ${diffHours % 24}h`;
+  for (let i = 0; i < totalBars; i++) {
+    const isFailed =
+      failedCount > 0 &&
+      (failedCount === 1 ? i === totalBars - 5 : i % Math.floor(totalBars / failedCount) === 0) &&
+      bars.filter((b) => !b.success).length < failedCount;
+    bars.push({
+      success: !isFailed,
+      label: isFailed ? "Outage / Degraded" : "Operational",
+    });
   }
+  return bars;
+}
+
+function formatDuration(createdAt: string, resolvedAt?: string | null): string {
+  const start = new Date(createdAt).getTime();
+  const end = resolvedAt ? new Date(resolvedAt).getTime() : Date.now();
+  const diffMs = end - start;
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
+  return `${Math.floor(diffHours / 24)}d ${diffHours % 24}h`;
+}
 </script>
 
 <div class="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">

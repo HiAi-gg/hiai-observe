@@ -58,17 +58,28 @@ function saveApiKey() {
 async function handleCreateAlert() {
   if (!newAlertName || !newAlertTarget) return;
   await createAlert({
-    project_id: "default",
+    projectId: currentProject.current || "",
     name: newAlertName,
     condition: {
-      metric: newAlertMetric,
-      operator: newAlertOperator,
+      type: (newAlertMetric || "error_rate") as
+        | "error_rate"
+        | "uptime_down"
+        | "resource_threshold"
+        | "trace_error"
+        | "token_usage"
+        | "recovery"
+        | "cert_expiry",
+      operator: (newAlertOperator === ">" ? "gt" : newAlertOperator === "<" ? "lt" : "gt") as
+        | "gt"
+        | "lt"
+        | "eq"
+        | "gte"
+        | "lte",
       threshold: newAlertThreshold,
-      duration_seconds: newAlertDuration,
+      duration: newAlertDuration,
     },
     channels: [{ type: newAlertChannel, target: newAlertTarget }],
-    is_active: true,
-    cooldown_seconds: 300,
+    cooldownSeconds: 300,
   });
   newAlertName = "";
   newAlertTarget = "";

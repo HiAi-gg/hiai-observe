@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import {
   alerts,
@@ -19,25 +20,27 @@ export interface HourlyBucket {
 
 export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" }).get(
   "/",
-  async ({ query }) => {
-    // `tenantId` is accepted as an alias for `projectId` per
-    // docs/EMBED.md §"Scope Parameters". tenantScopePlugin normalises
-    // both forms into `query.projectId` (see src/middleware/tenant-scope.ts),
-    // so reading `query.projectId` here is sufficient — but we also accept
-    // `query.tenantId` directly for callers that hit the route without the
-    // global plugin in their test harness.
-    const q = query as Record<string, string | undefined>;
-    const projectId = q.projectId ?? q.tenantId;
+  async ({ query, request, set }) => {
+    const scope = await applyScope({
+      request,
+      query: query as Record<string, unknown>,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
+    const scopedProjectId = scope.projectId;
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const fiveMinsAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    // Build optional projectId filter
-    const projectFilter = projectId ? eq(events.projectId, projectId) : undefined;
-    const issueProjectFilter = projectId ? eq(issues.projectId, projectId) : undefined;
-    const traceProjectFilter = projectId ? eq(traces.projectId, projectId) : undefined;
-    const monitorProjectFilter = projectId ? eq(uptimeMonitors.projectId, projectId) : undefined;
-    const alertProjectFilter = projectId ? eq(alerts.projectId, projectId) : undefined;
+    // Tenant always has scope.projectId; admin without query is unscoped.
+    const projectFilter = scopedProjectId ? eq(events.projectId, scopedProjectId) : undefined;
+    const issueProjectFilter = scopedProjectId ? eq(issues.projectId, scopedProjectId) : undefined;
+    const traceProjectFilter = scopedProjectId ? eq(traces.projectId, scopedProjectId) : undefined;
+    const monitorProjectFilter = scopedProjectId
+      ? eq(uptimeMonitors.projectId, scopedProjectId)
+      : undefined;
+    const alertProjectFilter = scopedProjectId ? eq(alerts.projectId, scopedProjectId) : undefined;
 
     const [
       errorCountRow,
@@ -208,7 +211,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" }).get(
 
     return {
       // Dashboard overview fields (OBS2.4 — for /embed/dashboard parity)
-      projectsCount: projectId ? 1 : (projectsCountRow[0]?.value ?? 0),
+      projectsCount: scopedProjectId ? 1 : (projectsCountRow[0]?.value ?? 0),
       activeIssues,
       activeAlerts: activeAlerts[0]?.value ?? 0,
       healthStatus,

@@ -62,6 +62,19 @@ vi.mock("../../src/store/db.js", () => ({ db: dbMock }));
 //    falls through to 401, and stub hashApiKey to avoid Bun.password.hash
 //    (vitest runs in Node where Bun global is unavailable).
 // ──────────────────────────────────────────────────────────────────────
+const ADMIN_BEARER = "Bearer test-admin-key";
+vi.mock("../../src/lib/admin-auth.js", () => ({
+  adminKeyFromRequest: vi.fn((req: Request) => {
+    const h = req.headers.get("authorization") ?? "";
+    if (h === "Bearer test-admin-key") return { ok: true };
+    return { ok: false, status: 401, error: "Missing admin API key" };
+  }),
+  requireAdminKey: vi.fn((headers: Record<string, string | undefined>) => {
+    if (headers.authorization === "Bearer test-admin-key") return { ok: true };
+    return { ok: false, status: 401, error: "Missing admin API key" };
+  }),
+}));
+
 vi.mock("../../src/lib/auth.js", async () => {
   const actual = await vi.importActual<any>("../../src/lib/auth.js");
   return {
@@ -219,7 +232,7 @@ describe("POST /api/projects/", () => {
     const res = await projectsRoutes.handle(
       new Request("http://localhost/api/projects/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", authorization: ADMIN_BEARER },
         body: JSON.stringify({ name: "My Project" }),
       }),
     );
@@ -250,7 +263,7 @@ describe("POST /api/projects/", () => {
     const res = await projectsRoutes.handle(
       new Request("http://localhost/api/projects/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", authorization: ADMIN_BEARER },
         body: JSON.stringify({ name: "Hello, World! 2026" }),
       }),
     );
@@ -284,7 +297,10 @@ describe("DELETE /api/projects/:id", () => {
     dbMock.delete.mockReturnValue(makeChain(undefined));
 
     const res = await projectsRoutes.handle(
-      new Request(`http://localhost/api/projects/${PROJECT_ID}`, { method: "DELETE" }),
+      new Request(`http://localhost/api/projects/${PROJECT_ID}`, {
+        method: "DELETE",
+        headers: { authorization: ADMIN_BEARER },
+      }),
     );
 
     expect(res.status).toBe(200);
@@ -299,7 +315,10 @@ describe("DELETE /api/projects/:id", () => {
     enqueue([]); // existence check returns nothing
 
     const res = await projectsRoutes.handle(
-      new Request(`http://localhost/api/projects/${NONEXISTENT_ID}`, { method: "DELETE" }),
+      new Request(`http://localhost/api/projects/${NONEXISTENT_ID}`, {
+        method: "DELETE",
+        headers: { authorization: ADMIN_BEARER },
+      }),
     );
 
     expect(res.status).toBe(404);
@@ -323,7 +342,10 @@ describe("POST /api/projects/:id/rotate-key", () => {
     );
 
     const res = await projectsRoutes.handle(
-      new Request(`http://localhost/api/projects/${PROJECT_ID}/rotate-key`, { method: "POST" }),
+      new Request(`http://localhost/api/projects/${PROJECT_ID}/rotate-key`, {
+        method: "POST",
+        headers: { authorization: ADMIN_BEARER },
+      }),
     );
 
     expect(res.status).toBe(200);
@@ -341,6 +363,7 @@ describe("POST /api/projects/:id/rotate-key", () => {
     const res = await projectsRoutes.handle(
       new Request(`http://localhost/api/projects/${NONEXISTENT_ID}/rotate-key`, {
         method: "POST",
+        headers: { authorization: ADMIN_BEARER },
       }),
     );
 
@@ -369,7 +392,7 @@ describe("PUT /api/projects/:id/rate-limit", () => {
     const res = await projectsRoutes.handle(
       new Request(`http://localhost/api/projects/${PROJECT_ID}/rate-limit`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", authorization: ADMIN_BEARER },
         body: JSON.stringify({ rateLimit: 250 }),
       }),
     );

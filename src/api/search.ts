@@ -7,6 +7,7 @@
 import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { parseLimit } from "../lib/pagination.js";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { events, issues, projects, traces } from "../store/schema.js";
 
@@ -15,8 +16,15 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
   // ── Cross-project search ────────────────────────────────────────────
   .get(
     "/",
-    async ({ query }) => {
-      const { q, projectId, limit = "50" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { q, limit = "50" } = query;
       const lim = parseLimit(limit);
 
       if (!q || q.trim().length < 2) {
@@ -28,7 +36,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
       // Search issues
       const issueConditions = [ilike(issues.title, pattern)];
-      if (projectId) issueConditions.push(eq(issues.projectId, projectId));
+      if (scope.projectId) issueConditions.push(eq(issues.projectId, scope.projectId));
 
       const matchedIssues = await db
         .select({
@@ -47,7 +55,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
       // Search events by message
       const eventConditions = [ilike(events.message, pattern)];
-      if (projectId) eventConditions.push(eq(events.projectId, projectId));
+      if (scope.projectId) eventConditions.push(eq(events.projectId, scope.projectId));
 
       const matchedEvents = await db
         .select({
@@ -65,7 +73,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
       // Search traces by name
       const traceConditions = [ilike(traces.name, pattern)];
-      if (projectId) traceConditions.push(eq(traces.projectId, projectId));
+      if (scope.projectId) traceConditions.push(eq(traces.projectId, scope.projectId));
 
       const matchedTraces = await db
         .select({
@@ -121,6 +129,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
       query: t.Object({
         q: t.String({ minLength: 1 }),
         projectId: t.Optional(t.String({ format: "uuid" })),
+        tenantId: t.Optional(t.String()),
         limit: t.Optional(t.String()),
       }),
     },

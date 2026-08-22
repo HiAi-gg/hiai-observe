@@ -24,42 +24,57 @@ const KEY_LIMITS: Record<string, RateLimitConfig> = {
   "/api/:projectId/envelope": { windowMs: 60_000, maxRequests: 10000 },
 };
 
-function getLimitForPath(path: string): RateLimitConfig {
-  for (const [pattern, config] of Object.entries(DEFAULT_LIMITS)) {
-    if (path.startsWith(pattern.replace(/\/:(\w+)/g, ""))) {
-      return config;
+function isSentryIngestPath(path: string): boolean {
+  return /^\/api\/[^/]+\/(store|envelope)$/.test(path);
+}
+
+function longestPrefixMatch(path: string, table: Record<string, RateLimitConfig>): RateLimitConfig {
+  if (isSentryIngestPath(path)) {
+    return (
+      table["/api/:projectId/store"] ?? table["/api"] ?? { windowMs: 60_000, maxRequests: 100 }
+    );
+  }
+  const entries = Object.entries(table).sort(
+    (a, b) => b[0].replace(/\/:(\w+)/g, "").length - a[0].replace(/\/:(\w+)/g, "").length,
+  );
+  for (const [pattern, cfg] of entries) {
+    const prefix = pattern.replace(/\/:(\w+)/g, "");
+    if (path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(prefix)) {
+      return cfg;
     }
   }
   return { windowMs: 60_000, maxRequests: 100 };
 }
 
+function getLimitForPath(path: string): RateLimitConfig {
+  return longestPrefixMatch(path, DEFAULT_LIMITS);
+}
+
 function getKeyLimitForPath(path: string): RateLimitConfig {
-  for (const [pattern, config] of Object.entries(KEY_LIMITS)) {
-    if (path.startsWith(pattern.replace(/\/:(\w+)/g, ""))) {
-      return config;
-    }
-  }
-  return { windowMs: 60_000, maxRequests: 200 };
+  return longestPrefixMatch(path, KEY_LIMITS);
+}
+
+/** Collapse UUIDs so Redis keys cannot grow without bound. */
+function pathBucket(path: string): string {
+  return path.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ":id");
 }
 
 const TRUST_PROXY = config.TRUST_PROXY === "true";
 
 function getClientIp(request: Request): string {
-  // When behind a trusted reverse proxy, prefer forwarded headers
   if (TRUST_PROXY) {
-    return (
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "unknown"
-    );
+    const forwarded = request.headers.get("x-forwarded-for");
+    if (forwarded) {
+      const hops = forwarded
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return hops[hops.length - 1] ?? "unknown";
+    }
+    return request.headers.get("x-real-ip") || "unknown";
   }
-
-  // Direct connection: use socket address (not spoofable by client)
-  return (
-    (request as unknown as { socket?: { remoteAddress?: string } }).socket?.remoteAddress ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  // Untrusted: never honor client-supplied forwarding headers.
+  return "direct";
 }
 
 async function checkLimit(
@@ -234,15 +249,15 @@ export const rateLimiterPlugin = new Elysia()
       path === "/api/health" ||
       path === "/health" ||
       path === "/metrics" ||
-      path.startsWith("/metrics") ||
       path === "/status" ||
       path.startsWith("/status/") ||
       path === "/embed" ||
-      path.startsWith("/embed/")
+      (path.startsWith("/embed/") && !path.startsWith("/embed/dashboard"))
     ) {
       return undefined;
     }
 
+    const bucket = pathBucket(path);
     const config = getLimitForPath(path);
     const clientIp = getClientIp(request);
 
@@ -252,8 +267,8 @@ export const rateLimiterPlugin = new Elysia()
     const keyLimit = hasKey ? getKeyLimitForPath(path) : null;
     const keyPrefix = hasKey ? apiKey.slice(0, 8) : null;
 
-    const ipKey = `rl:ip:${clientIp}:${path}`;
-    const keyBasedKey = hasKey ? `rl:key:${keyPrefix}:${path}` : null;
+    const ipKey = `rl:ip:${clientIp}:${bucket}`;
+    const keyBasedKey = hasKey ? `rl:key:${keyPrefix}:${bucket}` : null;
 
     // Per-project override: if the caller authenticated as a project that
     // has a custom rate limit configured, we apply that limit on top of
@@ -269,7 +284,7 @@ export const rateLimiterPlugin = new Elysia()
       const override = await getProjectRateLimit(projectId);
       if (override) {
         projectLimitConfig = projectOverrideToConfig(override);
-        projectKey = `rl:proj:${projectId}:${clientIp}:${path}:${projectLimitConfig.windowMs}`;
+        projectKey = `rl:proj:${projectId}:${clientIp}:${bucket}:${projectLimitConfig.windowMs}`;
       }
     }
 

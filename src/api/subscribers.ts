@@ -1,51 +1,41 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { lookupProject, resolveApiKey } from "../lib/auth.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+import { denyIfCannotDelete } from "../lib/rbac.js";
 import { db } from "../store/db.js";
 import { projects, statusSubscribers } from "../store/schema.js";
-
-async function authorizeProject(authHeader: string | undefined): Promise<string | null> {
-  const parsed = resolveApiKey(authHeader);
-  if (!parsed) return null;
-  const project = await lookupProject(parsed.apiKey);
-  return project?.projectId ?? null;
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
   .get(
     "/",
-    async ({ query, headers, set }) => {
-      const projectId = await authorizeProject(headers.authorization);
-      if (!projectId) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-      const filterProjectId = query.projectId ?? projectId;
-      if (filterProjectId !== projectId) {
-        set.status = 403;
-        return { error: "Forbidden" };
-      }
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
       const offset = Math.max(query.offset ?? 0, 0);
+      const where = scope.projectId ? eq(statusSubscribers.projectId, scope.projectId) : undefined;
       const rows = await db
         .select()
         .from(statusSubscribers)
-        .where(eq(statusSubscribers.projectId, projectId))
+        .where(where)
         .orderBy(desc(statusSubscribers.createdAt))
         .limit(limit)
         .offset(offset);
-      const totalRows = await db
-        .select({ total: count() })
-        .from(statusSubscribers)
-        .where(eq(statusSubscribers.projectId, projectId));
+      const totalRows = await db.select({ total: count() }).from(statusSubscribers).where(where);
       const total = totalRows[0]?.total ?? 0;
       return { data: rows, total, limit, offset };
     },
     {
       query: t.Object({
         projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
         limit: t.Optional(t.Number()),
         offset: t.Optional(t.Number()),
       }),
@@ -53,16 +43,18 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
   )
   .post(
     "/",
-    async ({ body, headers, set }) => {
-      const projectId = await authorizeProject(headers.authorization);
-      if (!projectId) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-      if (body.projectId !== projectId) {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
         set.status = 403;
         return { error: "Forbidden" };
       }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
       const email = body.email.trim().toLowerCase();
       if (!EMAIL_RE.test(email)) {
         set.status = 400;
@@ -71,7 +63,9 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
       const existing = await db
         .select()
         .from(statusSubscribers)
-        .where(and(eq(statusSubscribers.projectId, projectId), eq(statusSubscribers.email, email)));
+        .where(
+          and(eq(statusSubscribers.projectId, boundProjectId), eq(statusSubscribers.email, email)),
+        );
       if (existing.length > 0) {
         set.status = 409;
         return { error: "Email already subscribed" };
@@ -79,7 +73,7 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
       const insertedRows = await db
         .insert(statusSubscribers)
         .values({
-          projectId,
+          projectId: boundProjectId,
           email,
           isVerified: body.autoVerify ?? false,
         })
@@ -109,7 +103,7 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
       const [project] = await db
         .select()
         .from(projects)
-        .where(eq(projects.id, body.projectId))
+        .where(eq(projects.slug, body.slug))
         .limit(1);
       if (!project) {
         set.status = 404;
@@ -119,7 +113,7 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
         .select()
         .from(statusSubscribers)
         .where(
-          and(eq(statusSubscribers.projectId, body.projectId), eq(statusSubscribers.email, email)),
+          and(eq(statusSubscribers.projectId, project.id), eq(statusSubscribers.email, email)),
         );
       if (existing.length > 0) {
         set.status = 409;
@@ -128,7 +122,7 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
       const insertedRows = await db
         .insert(statusSubscribers)
         .values({
-          projectId: body.projectId,
+          projectId: project.id,
           email,
           isVerified: false,
         })
@@ -137,53 +131,57 @@ export const subscribersPlugin = new Elysia({ prefix: "/api/subscribers" })
         set.status = 500;
         return { error: "Insert failed" };
       }
-      return insertedRows[0];
+      return { id: insertedRows[0].id, subscribed: true };
     },
     {
       body: t.Object({
-        projectId: t.String(),
+        slug: t.String({ minLength: 1 }),
         email: t.String(),
       }),
     },
   )
-  .delete("/:id", async ({ params, headers, set }) => {
-    const projectId = await authorizeProject(headers.authorization);
-    if (!projectId) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
+  .delete("/:id", async ({ params, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+    const denied = await denyIfCannotDelete(scope, set);
+    if (denied) return denied;
+
     const rows = await db
       .select()
       .from(statusSubscribers)
       .where(eq(statusSubscribers.id, params.id));
-    if (rows.length === 0 || !rows[0]) {
+    if (
+      rows.length === 0 ||
+      !rows[0] ||
+      !assertResourceProject(rows[0].projectId, scope.projectId, scope.admin)
+    ) {
       set.status = 404;
       return { error: "Subscriber not found" };
-    }
-    if (rows[0].projectId !== projectId) {
-      set.status = 403;
-      return { error: "Forbidden" };
     }
     await db.delete(statusSubscribers).where(eq(statusSubscribers.id, params.id));
     return { deleted: true, id: params.id };
   })
-  .post("/:id/verify", async ({ params, headers, set }) => {
-    const projectId = await authorizeProject(headers.authorization);
-    if (!projectId) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
+  .post("/:id/verify", async ({ params, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
     const rows = await db
       .select()
       .from(statusSubscribers)
       .where(eq(statusSubscribers.id, params.id));
-    if (rows.length === 0 || !rows[0]) {
+    if (
+      rows.length === 0 ||
+      !rows[0] ||
+      !assertResourceProject(rows[0].projectId, scope.projectId, scope.admin)
+    ) {
       set.status = 404;
       return { error: "Subscriber not found" };
-    }
-    if (rows[0].projectId !== projectId) {
-      set.status = 403;
-      return { error: "Forbidden" };
     }
     const updatedRows = await db
       .update(statusSubscribers)

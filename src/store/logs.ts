@@ -4,6 +4,9 @@ import type { NewLogEntry } from "./schema.js";
 import { logs } from "./schema.js";
 
 interface SearchLogsParams {
+  projectId?: string;
+  /** Admin unscoped: include Docker host rows (project_id IS NULL). */
+  includeHostLogs?: boolean;
   container?: string;
   level?: string;
   search?: string;
@@ -15,6 +18,7 @@ interface SearchLogsParams {
 
 export async function insertLogs(
   entries: Array<{
+    projectId?: string | null;
     containerId: string;
     containerName: string;
     stream: string;
@@ -32,6 +36,7 @@ export async function insertLogs(
   if (entries.length === 0) return;
 
   const rows: NewLogEntry[] = entries.map((e) => ({
+    projectId: e.projectId ?? null,
     containerId: e.containerId,
     containerName: e.containerName,
     stream: e.stream,
@@ -51,10 +56,21 @@ export async function insertLogs(
   }
 }
 
+function projectScopeConditions(params: { projectId?: string; includeHostLogs?: boolean }) {
+  const conditions = [];
+  if (params.projectId) {
+    conditions.push(eq(logs.projectId, params.projectId));
+  } else if (!params.includeHostLogs) {
+    // Tenant path must always pass projectId; this branch is a safe default.
+    conditions.push(sql`false`);
+  }
+  return conditions;
+}
+
 export async function searchLogs(params: SearchLogsParams) {
   const { container, level, search, from, to, limit = 100, offset = 0 } = params;
 
-  const conditions = [];
+  const conditions = [...projectScopeConditions(params)];
   if (container) conditions.push(eq(logs.containerId, container));
   if (level) conditions.push(eq(logs.level, level));
   if (search) conditions.push(ilike(logs.message, `%${search.replace(/[%_]/g, "\\$&")}%`));
@@ -71,7 +87,9 @@ export async function searchLogs(params: SearchLogsParams) {
   return { logs: rows, total: countResult[0]?.count ?? 0, limit, offset };
 }
 
-export async function getLogContainers() {
+export async function getLogContainers(params?: { projectId?: string; includeHostLogs?: boolean }) {
+  const conditions = [...projectScopeConditions(params ?? {})];
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
   return db
     .select({
       containerId: logs.containerId,
@@ -80,23 +98,27 @@ export async function getLogContainers() {
       latest: sql<Date>`max(${logs.timestamp})`,
     })
     .from(logs)
+    .where(where)
     .groupBy(logs.containerId, logs.containerName)
     .orderBy(desc(sql`max(${logs.timestamp})`));
 }
 
-export async function clearLogs(before?: Date): Promise<number> {
-  if (before) {
-    const result = await db
-      .delete(logs)
-      .where(lte(logs.timestamp, before))
-      .returning({ id: logs.id });
-    return result.length;
-  }
-  const result = await db.delete(logs).returning({ id: logs.id });
+export async function clearLogs(opts?: {
+  before?: Date;
+  projectId?: string;
+  includeHostLogs?: boolean;
+}): Promise<number> {
+  const before = opts?.before;
+  const conditions = [...projectScopeConditions(opts ?? {})];
+  if (before) conditions.push(lte(logs.timestamp, before));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const result = await db.delete(logs).where(where).returning({ id: logs.id });
   return result.length;
 }
 
 interface SearchLogsRegexParams {
+  projectId?: string;
+  includeHostLogs?: boolean;
   pattern: string;
   container?: string;
   level?: string;
@@ -121,7 +143,7 @@ export async function searchLogsRegex(params: SearchLogsRegexParams) {
     return { logs: [], total: 0, limit, offset };
   }
 
-  const conditions = [];
+  const conditions = [...projectScopeConditions(params)];
   // Use PostgreSQL ~ operator for regex matching
   conditions.push(sql`${logs.message} ~ ${pattern}`);
   if (container) conditions.push(eq(logs.containerId, container));
@@ -140,6 +162,8 @@ export async function searchLogsRegex(params: SearchLogsRegexParams) {
 }
 
 interface SearchLogsFuzzyParams {
+  projectId?: string;
+  includeHostLogs?: boolean;
   term: string;
   container?: string;
   level?: string;
@@ -153,7 +177,7 @@ interface SearchLogsFuzzyParams {
 export async function searchLogsFuzzy(params: SearchLogsFuzzyParams) {
   const { term, container, level, from, to, limit = 100, offset = 0, threshold = 0.1 } = params;
 
-  const conditions = [];
+  const conditions = [...projectScopeConditions(params)];
   // Use pg_trgm similarity() for fuzzy matching — requires CREATE EXTENSION IF NOT EXISTS pg_trgm
   conditions.push(sql`similarity(${logs.message}, ${term}) > ${threshold}`);
   if (container) conditions.push(eq(logs.containerId, container));

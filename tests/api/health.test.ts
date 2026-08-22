@@ -19,12 +19,9 @@ describe("health endpoint", () => {
 
     const body = await res.json();
     expect(body.status).toBe("ok");
-    // Derive from package.json so version bumps don't break this test
     expect(body.version).toBe(pkg.default.version);
-    expect(typeof body.uptime).toBe("string");
-    expect(typeof body.uptimeSeconds).toBe("number");
-    expect(body.memory).toBeDefined();
-    expect(typeof body.memory.rss).toBe("string");
+    expect(body.memory).toBeUndefined();
+    expect(body.workers).toBeUndefined();
   });
 
   it("returns ok status at canonical /api/health path (HiAi ecosystem convention)", async () => {
@@ -34,10 +31,7 @@ describe("health endpoint", () => {
     const body = await res.json();
     expect(body.status).toBe("ok");
     expect(body.version).toBe(pkg.default.version);
-    expect(typeof body.uptime).toBe("string");
-    expect(typeof body.uptimeSeconds).toBe("number");
-    expect(body.memory).toBeDefined();
-    expect(typeof body.memory.rss).toBe("string");
+    expect(body.memory).toBeUndefined();
   });
 
   it("/api/health and /health return identical payloads (alias contract)", async () => {

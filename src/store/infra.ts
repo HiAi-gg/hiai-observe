@@ -125,7 +125,8 @@ export async function getContainerStatsByContainer(
     .select()
     .from(containerStats)
     .where(and(...conditions))
-    .orderBy(desc(containerStats.collectedAt));
+    .orderBy(desc(containerStats.collectedAt))
+    .limit(5000);
 }
 
 export async function getHostStatsHistory(from: Date, to: Date, hostId?: string) {
@@ -136,7 +137,8 @@ export async function getHostStatsHistory(from: Date, to: Date, hostId?: string)
     .select()
     .from(hostStats)
     .where(and(...conditions))
-    .orderBy(desc(hostStats.collectedAt));
+    .orderBy(desc(hostStats.collectedAt))
+    .limit(5000);
 }
 
 export async function getLatestContainerStats(hostId?: string) {

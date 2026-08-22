@@ -8,6 +8,8 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+import { denyIfCannotDelete } from "../lib/rbac.js";
 import { db } from "../store/db.js";
 import { issueComments, issues } from "../store/schema.js";
 
@@ -22,18 +24,24 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
   // ── List comments for an issue ──────────────────────────────────────
   .get(
     "/issues/:id/comments",
-    async ({ params, query, set }) => {
+    async ({ params, query, set, request }) => {
       const { limit = "50", offset = "0" } = query;
       const lim = parseLimit(limit);
       const off = parseOffset(offset);
 
-      // Verify issue exists
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [issue] = await db
-        .select({ id: issues.id })
+        .select({ id: issues.id, projectId: issues.projectId })
         .from(issues)
         .where(eq(issues.id, params.id))
         .limit(1);
-      if (!issue) {
+      if (!issue || !assertResourceProject(issue.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Issue not found" };
       }
@@ -71,14 +79,20 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
   // ── Add comment to an issue ─────────────────────────────────────────
   .post(
     "/issues/:id/comments",
-    async ({ params, body, set }) => {
-      // Verify issue exists
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      // Verify issue exists and belongs to the scoped project
       const [issue] = await db
-        .select({ id: issues.id })
+        .select({ id: issues.id, projectId: issues.projectId })
         .from(issues)
         .where(eq(issues.id, params.id))
         .limit(1);
-      if (!issue) {
+      if (!issue || !assertResourceProject(issue.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Issue not found" };
       }
@@ -120,13 +134,34 @@ export const commentsRoutes = new Elysia({ prefix: "/api" })
   // ── Delete comment ──────────────────────────────────────────────────
   .delete(
     "/comments/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      const denied = await denyIfCannotDelete(scope, set);
+      if (denied) return denied;
+
       const [existing] = await db
-        .select({ id: issueComments.id })
+        .select({
+          id: issueComments.id,
+          issueId: issueComments.issueId,
+        })
         .from(issueComments)
         .where(eq(issueComments.id, params.id))
         .limit(1);
       if (!existing) {
+        set.status = 404;
+        return { error: "Comment not found" };
+      }
+
+      const [issue] = await db
+        .select({ projectId: issues.projectId })
+        .from(issues)
+        .where(eq(issues.id, existing.issueId))
+        .limit(1);
+      if (!issue || !assertResourceProject(issue.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Comment not found" };
       }

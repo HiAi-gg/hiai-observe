@@ -1,49 +1,43 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { lookupProject, resolveApiKey } from "../lib/auth.js";
 import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
-import { fingerprintRules, projects } from "../store/schema.js";
-
-async function authorizeProject(authHeader: string | undefined): Promise<string | null> {
-  const parsed = resolveApiKey(authHeader);
-  if (!parsed) return null;
-  const project = await lookupProject(parsed.apiKey);
-  return project?.projectId ?? null;
-}
+import { fingerprintRules } from "../store/schema.js";
 
 export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rules" })
   .get(
     "/",
-    async ({ query, headers, set }) => {
-      const projectId = await authorizeProject(headers.authorization);
-      if (!projectId) {
-        set.status = 401;
-        return { error: "Invalid API key" };
-      }
-
-      const projectFilter = (query.projectId as string) || projectId;
-      if (projectFilter !== projectId) {
-        set.status = 403;
-        return { error: "Forbidden" };
-      }
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
 
       const limit = parseLimit(query.limit);
       const offset = parseOffset(query.offset);
 
-      const rows = await db
-        .select()
-        .from(fingerprintRules)
-        .where(eq(fingerprintRules.projectId, projectId))
-        .orderBy(desc(fingerprintRules.createdAt))
-        .limit(limit)
-        .offset(offset);
+      const where = scope.projectId ? eq(fingerprintRules.projectId, scope.projectId) : undefined;
 
-      return { data: rows, total: rows.length, limit, offset };
+      const [rows, totalRow] = await Promise.all([
+        db
+          .select()
+          .from(fingerprintRules)
+          .where(where)
+          .orderBy(desc(fingerprintRules.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ value: count() }).from(fingerprintRules).where(where),
+      ]);
+
+      return { data: rows, total: Number(totalRow[0]?.value ?? 0), limit, offset };
     },
     {
       query: t.Object({
         projectId: t.Optional(t.String({ format: "uuid" })),
+        tenantId: t.Optional(t.String()),
         limit: t.Optional(t.String()),
         offset: t.Optional(t.String()),
       }),
@@ -51,17 +45,18 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
   )
   .post(
     "/",
-    async ({ body, headers, set }) => {
-      const projectId = await authorizeProject(headers.authorization);
-      if (!projectId) {
-        set.status = 401;
-        return { error: "Invalid API key" };
-      }
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
 
-      if (body.projectId !== projectId) {
+      if (!scope.admin && body.projectId !== scope.projectId) {
         set.status = 403;
         return { error: "Forbidden" };
       }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
 
       try {
         new RegExp(body.pattern);
@@ -73,7 +68,9 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
       const existing = await db
         .select()
         .from(fingerprintRules)
-        .where(and(eq(fingerprintRules.projectId, projectId), eq(fingerprintRules.name, body.name)))
+        .where(
+          and(eq(fingerprintRules.projectId, boundProjectId), eq(fingerprintRules.name, body.name)),
+        )
         .limit(1);
 
       if (existing.length > 0) {
@@ -90,7 +87,7 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
       const inserted = await db
         .insert(fingerprintRules)
         .values({
-          projectId,
+          projectId: boundProjectId,
           name: body.name,
           pattern: body.pattern,
           groupBy: body.groupBy ?? "message",
@@ -110,20 +107,24 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
       }),
     },
   )
-  .get("/:id", async ({ params, headers, set }) => {
-    const projectId = await authorizeProject(headers.authorization);
-    if (!projectId) {
-      set.status = 401;
-      return { error: "Invalid API key" };
-    }
+  .get("/:id", async ({ params, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
 
     const row = await db
       .select()
       .from(fingerprintRules)
-      .where(and(eq(fingerprintRules.id, params.id), eq(fingerprintRules.projectId, projectId)))
+      .where(eq(fingerprintRules.id, params.id))
       .limit(1);
 
-    if (row.length === 0) {
+    if (
+      row.length === 0 ||
+      !row[0] ||
+      !assertResourceProject(row[0].projectId, scope.projectId, scope.admin)
+    ) {
       set.status = 404;
       return { error: "Not found" };
     }
@@ -131,11 +132,21 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
   })
   .put(
     "/:id",
-    async ({ params, body, headers, set }) => {
-      const projectId = await authorizeProject(headers.authorization);
-      if (!projectId) {
-        set.status = 401;
-        return { error: "Invalid API key" };
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const [existing] = await db
+        .select()
+        .from(fingerprintRules)
+        .where(eq(fingerprintRules.id, params.id))
+        .limit(1);
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
+        set.status = 404;
+        return { error: "Not found" };
       }
 
       if (body.pattern) {
@@ -155,7 +166,7 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
           groupBy: body.groupBy,
           isActive: body.isActive,
         })
-        .where(and(eq(fingerprintRules.id, params.id), eq(fingerprintRules.projectId, projectId)))
+        .where(eq(fingerprintRules.id, params.id))
         .returning();
 
       if (updated.length === 0) {
@@ -173,16 +184,26 @@ export const fingerprintRulesPlugin = new Elysia({ prefix: "/api/fingerprint-rul
       }),
     },
   )
-  .delete("/:id", async ({ params, headers, set }) => {
-    const projectId = await authorizeProject(headers.authorization);
-    if (!projectId) {
-      set.status = 401;
-      return { error: "Invalid API key" };
+  .delete("/:id", async ({ params, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
+    const [existing] = await db
+      .select()
+      .from(fingerprintRules)
+      .where(eq(fingerprintRules.id, params.id))
+      .limit(1);
+    if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
+      set.status = 404;
+      return { error: "Not found" };
     }
 
     const deleted = await db
       .delete(fingerprintRules)
-      .where(and(eq(fingerprintRules.id, params.id), eq(fingerprintRules.projectId, projectId)))
+      .where(eq(fingerprintRules.id, params.id))
       .returning();
 
     if (deleted.length === 0) {

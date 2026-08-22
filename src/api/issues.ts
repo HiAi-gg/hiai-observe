@@ -1,19 +1,28 @@
 import { and, count, desc, eq, ilike } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+import { checkDeleteAccess, denyIfCannotDelete } from "../lib/rbac.js";
 import { db } from "../store/db.js";
 import { events, issues, teamMembers } from "../store/schema.js";
 
 export const issuesPlugin = new Elysia({ prefix: "/api" })
   .get(
     "/issues",
-    async ({ query }) => {
-      const { projectId, status, search, environment, level, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { status, search, environment, level, limit = "50", offset = "0" } = query;
       const lim = parseLimit(limit);
       const off = parseOffset(offset);
 
       const conditions = [];
-      if (projectId) conditions.push(eq(issues.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(issues.projectId, scope.projectId));
       if (status) conditions.push(eq(issues.status, status));
       if (environment) conditions.push(eq(issues.environment, environment));
       if (level) {
@@ -53,9 +62,15 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
   )
   .get(
     "/issues/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const issue = await db.select().from(issues).where(eq(issues.id, params.id)).limit(1);
-      if (!issue[0]) {
+      if (!issue[0] || !assertResourceProject(issue[0].projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Issue not found" };
       }
@@ -73,7 +88,13 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
   )
   .patch(
     "/issues/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const updateData: Record<string, unknown> = {};
 
       if (body.status !== undefined) {
@@ -83,6 +104,15 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
           return { error: "Invalid status. Must be: unresolved, resolved, ignored" };
         }
         updateData.status = body.status;
+      }
+
+      const existing = await db.select().from(issues).where(eq(issues.id, params.id)).limit(1);
+      if (
+        !existing[0] ||
+        !assertResourceProject(existing[0].projectId, scope.projectId, scope.admin)
+      ) {
+        set.status = 404;
+        return { error: "Issue not found" };
       }
 
       if (body.assignedTo !== undefined) {
@@ -131,28 +161,34 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
   // Merge issues: move events from source issues to target, delete sources
   .post(
     "/issues/merge",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const { targetIssueId, sourceIssueIds } = body;
 
       // Verify target exists
       const target = await db.select().from(issues).where(eq(issues.id, targetIssueId)).limit(1);
-      if (!target[0]) {
+      if (!target[0] || !assertResourceProject(target[0].projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Target issue not found" };
       }
 
-      // Verify sources exist
+      // Verify sources exist and belong to the same scoped project
       for (const srcId of sourceIssueIds) {
         if (srcId === targetIssueId) {
           set.status = 400;
           return { error: "Cannot merge issue with itself" };
         }
-        const src = await db
-          .select({ id: issues.id })
-          .from(issues)
-          .where(eq(issues.id, srcId))
-          .limit(1);
-        if (!src[0]) {
+        const src = await db.select().from(issues).where(eq(issues.id, srcId)).limit(1);
+        if (
+          !src[0] ||
+          !assertResourceProject(src[0].projectId, scope.projectId, scope.admin) ||
+          src[0].projectId !== target[0].projectId
+        ) {
           set.status = 404;
           return { error: `Source issue ${srcId} not found` };
         }
@@ -195,15 +231,27 @@ export const issuesPlugin = new Elysia({ prefix: "/api" })
   // Delete
   .delete(
     "/issues/:id",
-    async ({ params, set }) => {
-      const existing = await db
-        .select({ id: issues.id })
-        .from(issues)
-        .where(eq(issues.id, params.id))
-        .limit(1);
-      if (!existing[0]) {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      const denied = await denyIfCannotDelete(scope, set);
+      if (denied) return denied;
+
+      const existing = await db.select().from(issues).where(eq(issues.id, params.id)).limit(1);
+      if (
+        !existing[0] ||
+        !assertResourceProject(existing[0].projectId, scope.projectId, scope.admin)
+      ) {
         set.status = 404;
         return { error: "Issue not found" };
+      }
+
+      if (!scope.admin && !(await checkDeleteAccess(existing[0].projectId))) {
+        set.status = 403;
+        return { error: "Forbidden" };
       }
 
       await db.transaction(async (tx) => {

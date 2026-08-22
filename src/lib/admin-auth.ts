@@ -10,10 +10,28 @@
  * See `docs/AUTH_BRIDGE.md` §"Observe-side implementation" for the
  * threat model and rotation guidance.
  */
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { config } from "./config.js";
 
 export type AdminKeyCheckResult = { ok: true } | { ok: false; status: number; error: string };
+
+function extractAdminToken(headers: Record<string, string | undefined>): string | undefined {
+  const auth = headers.authorization ?? headers.Authorization;
+  if (auth) {
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : auth.trim();
+    if (token) return token;
+  }
+  const apiKey = headers["x-api-key"] ?? headers["X-Api-Key"];
+  return apiKey?.trim() || undefined;
+}
+
+function tokensMatch(presented: string, expected: string): boolean {
+  // Hash both sides so comparison length is constant (SHA-256 digest)
+  // even when the presented token length differs from ADMIN_API_KEY.
+  const presentedDigest = createHash("sha256").update(presented, "utf8").digest();
+  const expectedDigest = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(presentedDigest, expectedDigest);
+}
 
 export function requireAdminKey(headers: Record<string, string | undefined>): AdminKeyCheckResult {
   const adminKey = config.ADMIN_API_KEY;
@@ -25,17 +43,13 @@ export function requireAdminKey(headers: Record<string, string | undefined>): Ad
     };
   }
 
-  const auth = headers.authorization;
-  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : auth;
+  const token = extractAdminToken(headers);
   if (!token) {
     return { ok: false, status: 401, error: "Missing admin API key" };
   }
 
-  // Constant-time comparison to prevent timing attacks
   try {
-    const tokenBuf = Buffer.from(token, "utf-8");
-    const keyBuf = Buffer.from(adminKey, "utf-8");
-    if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
+    if (!tokensMatch(token, adminKey)) {
       return { ok: false, status: 401, error: "Invalid admin API key" };
     }
   } catch {
@@ -43,4 +57,11 @@ export function requireAdminKey(headers: Record<string, string | undefined>): Ad
   }
 
   return { ok: true };
+}
+
+export function adminKeyFromRequest(request: Request): AdminKeyCheckResult {
+  return requireAdminKey({
+    authorization: request.headers.get("authorization") ?? undefined,
+    "x-api-key": request.headers.get("x-api-key") ?? undefined,
+  });
 }

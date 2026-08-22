@@ -1,7 +1,7 @@
 {
   "id": "hiai-observe",
   "name": "HiAi Observe",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "icon": "Activity",
   "description": "Shared telemetry module — observability, monitoring, alerting. Sentry-compatible error tracking, uptime monitors, OTLP traces, LLM/agent analytics, log streaming, infrastructure metrics, and per-tenant status pages. Embeddable as a module in hiai-admin, hiai-dashboard, and any HiAi host via the §6 plugin/proxy contract.",
   "navGroups": [

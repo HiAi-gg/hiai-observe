@@ -88,6 +88,21 @@ export async function runTcpCheck(opts: TcpCheckOptions): Promise<TcpCheckResult
   const timeoutMs = Math.min(Math.max(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, 100), MAX_TIMEOUT_MS);
   const target = `${opts.host}:${opts.port}`;
 
+  try {
+    const { assertSafeTcpTarget } = await import("../../lib/ssrf.js");
+    const { config } = await import("../../lib/config.js");
+    if (config.NODE_ENV !== "test") {
+      await assertSafeTcpTarget(opts.host, opts.port);
+    }
+  } catch (err) {
+    return {
+      isUp: false,
+      responseTimeMs: Date.now() - start,
+      target,
+      error: err instanceof Error ? err.message : "TCP target is not allowed",
+    };
+  }
+
   let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
   // The socket interface is only declared inside `declare module "bun"`,

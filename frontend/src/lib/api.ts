@@ -312,7 +312,28 @@ export async function getAlerts() {
   return { alerts: res.items ?? [], total: res.total ?? 0 };
 }
 
-export async function createAlert(data: Omit<AlertRule, "id" | "created_at">) {
+export async function createAlert(data: {
+  name: string;
+  projectId: string;
+  severity?: "critical" | "warning" | "info";
+  condition: {
+    type:
+      | "error_rate"
+      | "uptime_down"
+      | "resource_threshold"
+      | "trace_error"
+      | "token_usage"
+      | "recovery"
+      | "cert_expiry";
+    threshold: number;
+    duration?: number;
+    operator: "gt" | "lt" | "eq" | "gte" | "lte";
+    consecutiveFailures?: number;
+    resource?: "cpu" | "memory" | "disk";
+  };
+  channels: Array<{ type: string; target: string }>;
+  cooldownSeconds?: number;
+}) {
   return apiFetch<AlertRule>("/api/alerts", {
     method: "POST",
     body: JSON.stringify(data),
@@ -908,10 +929,10 @@ export async function createSubscriber(projectId: string, email: string, autoVer
   });
 }
 
-export async function createPublicSubscriber(projectId: string, email: string) {
-  return apiFetch<Subscriber>("/api/subscribers/public", {
+export async function createPublicSubscriber(slug: string, email: string) {
+  return apiFetch<{ id: string; subscribed: boolean }>("/api/subscribers/public", {
     method: "POST",
-    body: JSON.stringify({ projectId, email }),
+    body: JSON.stringify({ slug, email }),
   });
 }
 

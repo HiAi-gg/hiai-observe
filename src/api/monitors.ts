@@ -1,4 +1,6 @@
 import { Elysia, t } from "elysia";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+import { denyIfCannotDelete } from "../lib/rbac.js";
 import {
   createMonitor,
   deleteMonitor,
@@ -14,8 +16,15 @@ import {
 export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
   .get(
     "/",
-    async ({ query }) => {
-      const monitors = await getMonitors(query.project_id, query.group);
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const monitors = await getMonitors(scope.projectId ?? query.project_id, query.group);
 
       const ids = monitors.map((m) => m.id);
       const hours = query.hours ?? 24;
@@ -42,8 +51,15 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
 
   .get(
     "/groups",
-    async ({ query }) => {
-      const groups = await getMonitorGroups(query.project_id);
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const groups = await getMonitorGroups(scope.projectId ?? query.project_id);
       return { groups };
     },
     {
@@ -56,9 +72,15 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     },
   )
 
-  .get("/:id", async ({ params: { id }, set }) => {
+  .get("/:id", async ({ params: { id }, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
     const monitor = await getMonitor(id);
-    if (!monitor) {
+    if (!monitor || !assertResourceProject(monitor.projectId, scope.projectId, scope.admin)) {
       set.status = 404;
       return { error: "Monitor not found" };
     }
@@ -69,13 +91,25 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
 
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.project_id !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot create monitors for another project" };
+      }
+      const boundProjectId = scope.admin ? body.project_id : (scope.projectId as string);
+
       try {
         const monitor = await createMonitor({
           name: body.name,
           url: body.url,
           intervalSeconds: body.interval_seconds ?? 60,
-          projectId: body.project_id,
+          projectId: boundProjectId,
           type: body.type,
           monitorGroup: body.group,
           method: body.method,
@@ -123,7 +157,19 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
 
   .put(
     "/:id",
-    async ({ params: { id }, body }) => {
+    async ({ params: { id }, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const existing = await getMonitor(id);
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
+        set.status = 404;
+        return { error: "Monitor not found" };
+      }
+
       const monitor = await updateMonitor(id, {
         name: body.name,
         url: body.url,
@@ -166,14 +212,40 @@ export const monitorsPlugin = new Elysia({ prefix: "/api/monitors" })
     },
   )
 
-  .delete("/:id", async ({ params: { id } }) => {
+  .delete("/:id", async ({ params: { id }, request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+    const denied = await denyIfCannotDelete(scope, set);
+    if (denied) return denied;
+
+    const existing = await getMonitor(id);
+    if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
+      set.status = 404;
+      return { error: "Monitor not found" };
+    }
+
     await deleteMonitor(id);
     return { deleted: true };
   })
 
   .get(
     "/:id/checks",
-    async ({ params: { id }, query }) => {
+    async ({ params: { id }, query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const existing = await getMonitor(id);
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
+        set.status = 404;
+        return { error: "Monitor not found" };
+      }
+
       const result = await getChecks(id, {
         limit: query.limit,
         offset: query.offset,

@@ -7,6 +7,7 @@
 import { Elysia, t } from "elysia";
 import { internal } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import {
   insertContainerStats,
   insertGpuStats,
@@ -159,9 +160,17 @@ async function checkHostLimit(hostId: string): Promise<HostLimitResult> {
 
 export const agentIngestPlugin = new Elysia({ prefix: "/api/agent" }).post(
   "/ingest",
-  async ({ body, set }) => {
+  async ({ body, set, request }) => {
     try {
-      const { hostId, hostStats: hs, containers, gpu, hostInfo: info } = body;
+      const scope = await applyScope({
+        request,
+        query: {},
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      const rawHostId = body.hostId;
+      const hostId = scope.projectId ? `${scope.projectId}:${rawHostId}` : rawHostId;
+      const { hostStats: hs, containers, gpu, hostInfo: info } = body;
 
       // Per-host rate limit (60 req/min) — see checkHostLimit above.
       const limit = await checkHostLimit(hostId);

@@ -1,6 +1,6 @@
+import { eq } from "drizzle-orm";
 import { db } from "../store/db.js";
 import { projects } from "../store/schema.js";
-import { eq } from "drizzle-orm";
 
 export type ApiRole = "admin" | "member" | "readonly";
 
@@ -40,4 +40,17 @@ export async function checkDeleteAccess(projectId: string): Promise<boolean> {
 export async function checkAdminAccess(projectId: string): Promise<boolean> {
   const role = await getApiRole(projectId);
   return hasPermission(role, "manage");
+}
+
+/** Tenant deletes require member/admin. Instance admin is unrestricted. */
+export async function denyIfCannotDelete(
+  scope: { admin: boolean; projectId: string | undefined },
+  set: { status?: number | string },
+): Promise<{ error: string } | null> {
+  if (scope.admin) return null;
+  if (!scope.projectId || !(await checkDeleteAccess(scope.projectId))) {
+    set.status = 403;
+    return { error: "Forbidden: delete requires member or admin role" };
+  }
+  return null;
 }

@@ -64,6 +64,17 @@ vi.mock("../../src/store/uptime.js", () => ({
   }),
 }));
 
+vi.mock("../../src/lib/auth.js", () => ({
+  resolveApiKey: vi.fn((raw: string | undefined) => {
+    if (!raw) return null;
+    const token = raw.replace(/^Bearer\s+/i, "").trim();
+    return token ? { apiKey: token } : null;
+  }),
+  lookupProject: vi.fn(async (key: string) =>
+    key === "ho_valid_key" ? { projectId: "tenant-proj-uuid" } : null,
+  ),
+}));
+
 // auth — fake key resolves to a project id
 vi.mock("../../src/middleware/auth.js", () => ({
   resolveProjectId: vi.fn(async (req: Request) => {
@@ -95,6 +106,7 @@ vi.mock("../../src/lib/config.js", () => {
           if (prop === "EMBED_ALLOWED_ORIGINS") {
             return process.env.EMBED_ALLOWED_ORIGINS;
           }
+          if (prop === "NODE_ENV") return "test";
           return undefined;
         },
       },
@@ -238,7 +250,7 @@ describe("GET /embed/dashboard", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
     const body = await res.json();
-    expect(body.projectsCount).toBe(5);
+    expect(body.projectsCount).toBe(1);
     expect(body.activeIssues).toBe(3);
     expect(body.activeAlerts).toBe(1);
     expect(body.healthStatus).toBe("degraded");

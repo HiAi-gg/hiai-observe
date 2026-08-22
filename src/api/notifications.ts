@@ -12,6 +12,7 @@ import { sendEmailAlert } from "../alerts/notifiers/email.js";
 import { sendTelegramAlert } from "../alerts/notifiers/telegram.js";
 import { config } from "../lib/config.js";
 import { decrypt, encrypt, hasEncryptionKey } from "../lib/crypto.js";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { notificationConfig } from "../store/schema.js";
 
@@ -33,9 +34,16 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
   // List all notification configs for current project
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const conditions = [];
-      if (query.projectId) conditions.push(eq(notificationConfig.projectId, query.projectId));
+      if (scope.projectId) conditions.push(eq(notificationConfig.projectId, scope.projectId));
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
       const rows = await db.select().from(notificationConfig).where(where);
@@ -57,21 +65,31 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
       return { notifications: masked };
     },
     {
-      query: t.Object({ projectId: t.Optional(t.String()) }),
+      query: t.Object({
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
+      }),
     },
   )
 
   // Get config for specific channel
   .get(
     "/:channel",
-    async ({ params, query, set }) => {
+    async ({ params, query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       if (!VALID_CHANNELS.includes(params.channel as (typeof VALID_CHANNELS)[number])) {
         set.status = 400;
         return { error: `Invalid channel. Must be: ${VALID_CHANNELS.join(", ")}` };
       }
 
       const conditions = [eq(notificationConfig.channel, params.channel)];
-      if (query.projectId) conditions.push(eq(notificationConfig.projectId, query.projectId));
+      if (scope.projectId) conditions.push(eq(notificationConfig.projectId, scope.projectId));
       const where = and(...conditions);
 
       const [row] = await db.select().from(notificationConfig).where(where).limit(1);
@@ -97,17 +115,39 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     },
     {
       params: t.Object({ channel: t.String() }),
-      query: t.Object({ projectId: t.Optional(t.String()) }),
+      query: t.Object({
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
+      }),
     },
   )
 
   // Upsert notification config
   .put(
     "/:channel",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       if (!VALID_CHANNELS.includes(params.channel as (typeof VALID_CHANNELS)[number])) {
         set.status = 400;
         return { error: `Invalid channel. Must be: ${VALID_CHANNELS.join(", ")}` };
+      }
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot configure notifications for another project" };
+      }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
+
+      if (config.NODE_ENV === "production" && !hasEncryptionKey()) {
+        set.status = 400;
+        return {
+          error: "ENCRYPTION_KEY is required to store notification secrets in production",
+        };
       }
 
       const [existing] = await db
@@ -115,7 +155,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
         .from(notificationConfig)
         .where(
           and(
-            eq(notificationConfig.projectId, body.projectId),
+            eq(notificationConfig.projectId, boundProjectId),
             eq(notificationConfig.channel, params.channel),
           ),
         )
@@ -137,7 +177,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
       const [created] = await db
         .insert(notificationConfig)
         .values({
-          projectId: body.projectId,
+          projectId: boundProjectId,
           channel: params.channel,
           config: encryptConfig(body.config),
           enabled: body.enabled ?? true,
@@ -160,9 +200,20 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
   // Delete notification config
   .delete(
     "/:channel",
-    async ({ params, query, set }) => {
+    async ({ params, query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const conditions = [eq(notificationConfig.channel, params.channel)];
-      if (query.projectId) conditions.push(eq(notificationConfig.projectId, query.projectId));
+      if (scope.projectId) conditions.push(eq(notificationConfig.projectId, scope.projectId));
+      if (!scope.projectId) {
+        set.status = 400;
+        return { error: "projectId is required" };
+      }
       const where = and(...conditions);
 
       const deleted = await db.delete(notificationConfig).where(where).returning();
@@ -174,14 +225,24 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     },
     {
       params: t.Object({ channel: t.String() }),
-      query: t.Object({ projectId: t.Optional(t.String()) }),
+      query: t.Object({
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
+      }),
     },
   )
 
   // Test notification channel
   .post(
     "/:channel/test",
-    async ({ params, query, set }) => {
+    async ({ params, query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       if (!VALID_CHANNELS.includes(params.channel as (typeof VALID_CHANNELS)[number])) {
         set.status = 400;
         return { error: `Invalid channel. Must be: ${VALID_CHANNELS.join(", ")}` };
@@ -189,13 +250,14 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
 
       // Load config from DB or fall back to env
       let dbConfig: Record<string, string> | null = null;
-      if (query.projectId) {
+      const cfgProjectId = scope.projectId ?? query.projectId;
+      if (cfgProjectId) {
         const [row] = await db
           .select()
           .from(notificationConfig)
           .where(
             and(
-              eq(notificationConfig.projectId, query.projectId),
+              eq(notificationConfig.projectId, cfgProjectId),
               eq(notificationConfig.channel, params.channel),
             ),
           )
@@ -325,7 +387,10 @@ export const notificationsRoutes = new Elysia({ prefix: "/api/notifications" })
     },
     {
       params: t.Object({ channel: t.String() }),
-      query: t.Object({ projectId: t.Optional(t.String()) }),
+      query: t.Object({
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
+      }),
     },
   );
 

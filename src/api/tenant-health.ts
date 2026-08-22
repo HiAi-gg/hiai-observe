@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { config } from "../lib/config.js";
+import { adminKeyFromRequest } from "../lib/admin-auth.js";
 import { db } from "../store/db.js";
 import { events, issues, projects, uptimeMonitors } from "../store/schema.js";
 import { getUptimePercentages } from "../store/uptime.js";
@@ -40,31 +40,13 @@ function formatAgo(date: Date): string {
   return `${days}d`;
 }
 
-function requireAdminKey(request: Request, set: { status?: number | string }): boolean {
-  const expected = config.ADMIN_API_KEY;
-  if (!expected) {
-    // Fail closed if the operator has not configured an admin key — never
-    // silently expose tenant summaries without a shared secret in place.
-    set.status = 503;
-    return false;
-  }
-  const auth = request.headers.get("authorization");
-  const headerKey = request.headers.get("x-api-key");
-  const presented = auth?.startsWith("Bearer ")
-    ? auth.slice("Bearer ".length).trim()
-    : headerKey?.trim();
-  if (presented !== expected) {
-    set.status = 401;
-    return false;
-  }
-  return true;
-}
-
 export const tenantHealthPlugin = new Elysia().get(
   "/api/tenant/:tenantId/health",
   async ({ params, request, set }) => {
-    if (!requireAdminKey(request, set as { status?: number | string })) {
-      return { error: "Unauthorized" };
+    const admin = adminKeyFromRequest(request);
+    if (!admin.ok) {
+      set.status = admin.status;
+      return { error: admin.error };
     }
 
     const { tenantId } = params;

@@ -1,4 +1,5 @@
 import type { Context } from "elysia";
+import { adminKeyFromRequest } from "../lib/admin-auth.js";
 import { lookupProject, resolveApiKey } from "../lib/auth.js";
 import { checkWriteAccess } from "../lib/rbac.js";
 
@@ -14,42 +15,46 @@ import { checkWriteAccess } from "../lib/rbac.js";
  * directly, so the middleware must run the standard Authorization-header
  * check to prevent unauthenticated requests from reaching the handler.
  *
- * Truly public paths (no auth at all) are also listed here.
+ * Matching is exact or `prefix + "/"` — never a raw startsWith of a
+ * short token like `/api/admin` that would also skip `/api/administration`.
  */
-export const PUBLIC_PATHS = [
-  // Truly public — no auth required
-  "/api/health", // Canonical HiAi ecosystem health endpoint
-  "/health", // Legacy alias for backwards compatibility
+/** Exact public paths (children are NOT public). */
+export const PUBLIC_EXACT = new Set([
+  "/",
+  "/api/health",
+  "/health",
   "/metrics",
+  "/api/openapi.json",
+]);
+
+/** Prefix public paths: `p` and `p/...` bypass the project-key guard. */
+export const PUBLIC_PREFIXES = [
   "/api/status",
-  "/status", // Public status HTML page (iframe-friendly for hiai-dashboard)
-  "/embed", // Public embed landing + status (auth is per-handler: /embed/dashboard requires API key)
+  "/status",
+  "/embed",
   "/api/subscribers/public",
   "/api/badges",
-  "/api/openapi.json",
-  // Handler-level auth — bypasses Authorization-header middleware
-  "/v1/traces", // OTLP handler: resolveApiKey() + lookupProject()
-  "/v1/metrics", // OTLP handler: resolveApiKey() + lookupProject()
-  "/api/logs/stream", // SSE handler: ?key=<apikey> query param
-  "/api/observe/logs/stream", // Redirects to /api/logs/stream
-  "/ws/logs", // WS handler: authenticates via the first "auth" message
-  // Server-to-server admin endpoints (see docs/AUTH_BRIDGE.md §"Observe-side
-  // implementation"). Each handler enforces ADMIN_API_KEY via requireAdminKey().
-  // The global API-key guard must not run here — admin calls use a different
-  // shared secret, not a project API key.
+  "/v1/traces",
+  "/v1/metrics",
+  "/v1/logs",
+  "/ws/logs",
   "/api/admin",
-  "/api/tenant", // Tenant health summary — admin-key gated at handler level (requireAdminKey)
+  "/api/tenant",
 ];
 
-function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.some((p) => path.startsWith(p)) || path === "/";
-}
+export const PUBLIC_PATHS = [...PUBLIC_EXACT, ...PUBLIC_PREFIXES];
 
-export { isPublicPath };
+export function isPublicPath(path: string): boolean {
+  const pathname = path.split("?")[0] ?? path;
+  if (PUBLIC_EXACT.has(pathname)) return true;
+  return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 function shouldSkipAuth(path: string, method: string): boolean {
   return isPublicPath(path) || method === "OPTIONS";
 }
+
+export { isPublicPath as pathBypassesProjectGuard };
 
 export async function resolveProjectId(request: Request): Promise<string | undefined> {
   const url = new URL(request.url);
@@ -84,6 +89,11 @@ export async function authGuard({
   const path = url.pathname;
 
   if (shouldSkipAuth(path, request.method)) {
+    return undefined;
+  }
+
+  // Instance admin key is a valid alternative to a project API key.
+  if (adminKeyFromRequest(request).ok) {
     return undefined;
   }
 

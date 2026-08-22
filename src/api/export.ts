@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { applyScope, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { issues, logs, traces } from "../store/schema.js";
 
@@ -46,17 +47,27 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
 
   .get(
     "/issues",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const { from, to } = clampDateRange(
         query.from ? new Date(query.from) : undefined,
         query.to ? new Date(query.to) : undefined,
         30,
       );
 
+      const conditions = [gte(issues.lastSeen, from), lte(issues.lastSeen, to)];
+      if (scope.projectId) conditions.push(eq(issues.projectId, scope.projectId));
+
       const rows = await db
         .select()
         .from(issues)
-        .where(and(gte(issues.lastSeen, from), lte(issues.lastSeen, to)))
+        .where(and(...conditions))
         .orderBy(desc(issues.lastSeen))
         .limit(MAX_EXPORT_ROWS);
 
@@ -85,23 +96,35 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         format: t.Optional(t.Union([t.Literal("csv"), t.Literal("json")])),
         from: t.Optional(t.String({ format: "date-time" })),
         to: t.Optional(t.String({ format: "date-time" })),
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
       }),
     },
   )
 
   .get(
     "/traces",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const { from, to } = clampDateRange(
         query.from ? new Date(query.from) : undefined,
         query.to ? new Date(query.to) : undefined,
         7,
       );
 
+      const conditions = [gte(traces.startTime, from), lte(traces.startTime, to)];
+      if (scope.projectId) conditions.push(eq(traces.projectId, scope.projectId));
+
       const rows = await db
         .select()
         .from(traces)
-        .where(and(gte(traces.startTime, from), lte(traces.startTime, to)))
+        .where(and(...conditions))
         .orderBy(desc(traces.startTime))
         .limit(MAX_EXPORT_ROWS);
 
@@ -131,13 +154,22 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         format: t.Optional(t.Union([t.Literal("csv"), t.Literal("json")])),
         from: t.Optional(t.String({ format: "date-time" })),
         to: t.Optional(t.String({ format: "date-time" })),
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
       }),
     },
   )
 
   .get(
     "/logs",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const { from, to } = clampDateRange(
         query.from ? new Date(query.from) : undefined,
         query.to ? new Date(query.to) : undefined,
@@ -145,6 +177,7 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
       );
 
       const conditions = [gte(logs.timestamp, from), lte(logs.timestamp, to)];
+      if (scope.projectId) conditions.push(eq(logs.projectId, scope.projectId));
       if (query.level) conditions.push(eq(logs.level, query.level));
       if (query.container) conditions.push(eq(logs.containerId, query.container));
       const where = and(...conditions);
@@ -183,6 +216,8 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         to: t.Optional(t.String({ format: "date-time" })),
         level: t.Optional(t.String()),
         container: t.Optional(t.String()),
+        projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
       }),
     },
   );

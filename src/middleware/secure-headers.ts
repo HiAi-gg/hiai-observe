@@ -47,6 +47,7 @@ const PERMISSIONS_POLICY = [
 ].join(", ");
 
 export const secureHeadersPlugin = new Elysia({ name: "secure-headers" }).onAfterHandle(
+  { as: "global" },
   ({ set }) => {
     const h = set.headers as Record<string, string>;
 

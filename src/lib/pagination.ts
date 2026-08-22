@@ -14,8 +14,8 @@ export function parseLimit(value: unknown, defaultVal = 50, max = 200): number {
   return Math.min(Math.floor(n), max);
 }
 
-export function parseOffset(value: unknown, defaultVal = 0): number {
+export function parseOffset(value: unknown, defaultVal = 0, max = 100_000): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return defaultVal;
-  return Math.floor(n);
+  return Math.min(Math.floor(n), max);
 }

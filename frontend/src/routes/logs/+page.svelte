@@ -215,23 +215,38 @@ $effect(() => {
   loadSavedSearches();
 
   const key = apiKey.current;
-  const sseUrl =
-    `/api/logs/stream?key=${encodeURIComponent(key)}` +
-    (containerFilter ? `&container=${encodeURIComponent(containerFilter)}` : "");
-  const es = new EventSource(sseUrl);
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${proto}//${window.location.host}/ws/logs`);
 
-  es.onopen = () => {
-    connected = true;
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ action: "auth", key }));
   };
 
-  es.onmessage = (event) => {
+  ws.onmessage = (event) => {
     try {
-      const entry = JSON.parse(event.data);
-      onWsMessage(entry);
+      const msg = JSON.parse(event.data as string) as {
+        type?: string;
+        data?: unknown;
+        error?: string;
+      };
+      if (msg.type === "authenticated") {
+        connected = true;
+        if (containerFilter) {
+          ws.send(JSON.stringify({ action: "subscribe", containerId: containerFilter }));
+        } else {
+          ws.send(JSON.stringify({ action: "subscribe_all" }));
+        }
+        return;
+      }
+      if (msg.type === "log" || msg.type === "recent") {
+        onWsMessage(msg.data ?? msg);
+        return;
+      }
+      if (msg.type === "ping") return;
     } catch {}
   };
 
-  es.onerror = () => {
+  ws.onerror = () => {
     connected = false;
   };
 
@@ -245,7 +260,7 @@ $effect(() => {
   const volumeInterval = setInterval(loadVolume, 60_000);
 
   return () => {
-    es.close();
+    ws.close();
     clearInterval(volumeInterval);
     if (refreshInterval) clearInterval(refreshInterval);
   };

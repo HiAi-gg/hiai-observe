@@ -35,7 +35,7 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
         return { containers: containersWithLogs, count: stats.length, hostId: hostId ?? "local" };
       } catch (err) {
         set.status = 503;
-        return { error: "Docker unavailable", detail: String(err) };
+        return { error: "Docker unavailable" };
       }
     },
     {

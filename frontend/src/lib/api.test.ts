@@ -509,13 +509,16 @@ describe("API client", () => {
 
     it("createAlert sends POST", async () => {
       const alertData = {
-        project_id: "p1",
+        projectId: "p1",
         name: "High errors",
-        condition: { metric: "error_count", operator: ">", threshold: 10, duration_seconds: 300 },
+        condition: {
+          type: "error_rate" as const,
+          operator: "gt" as const,
+          threshold: 10,
+          duration: 300,
+        },
         channels: [{ type: "telegram" as const, target: "123" }],
-        is_active: true,
-        cooldown_seconds: 600,
-        created_at: "2026-01-01",
+        cooldownSeconds: 600,
       };
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")

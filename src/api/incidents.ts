@@ -7,6 +7,7 @@
 
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
 import { db } from "../store/db.js";
 import { incidents } from "../store/schema.js";
 
@@ -25,11 +26,18 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── List incidents ──────────────────────────────────────────────────
   .get(
     "/",
-    async ({ query }) => {
-      const { projectId, status, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { status, limit = "50", offset = "0" } = query;
 
       const conditions = [];
-      if (projectId) conditions.push(eq(incidents.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(incidents.projectId, scope.projectId));
       if (status) conditions.push(eq(incidents.status, status));
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -55,6 +63,7 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
     {
       query: t.Object({
         projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
         status: t.Optional(t.Union(VALID_STATUSES.map((s) => t.Literal(s)))),
         limit: t.Optional(t.String()),
         offset: t.Optional(t.String()),
@@ -65,10 +74,17 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── Get active (non-resolved) incidents per project ─────────────────
   .get(
     "/active",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const conditions = [ne(incidents.status, "resolved")];
-      if (query.projectId) {
-        conditions.push(eq(incidents.projectId, query.projectId));
+      if (scope.projectId) {
+        conditions.push(eq(incidents.projectId, scope.projectId));
       }
 
       const items = await db
@@ -82,6 +98,7 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
     {
       query: t.Object({
         projectId: t.Optional(t.String()),
+        tenantId: t.Optional(t.String()),
       }),
     },
   )
@@ -89,13 +106,19 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── Get single incident ─────────────────────────────────────────────
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [incident] = await db
         .select()
         .from(incidents)
         .where(eq(incidents.id, params.id))
         .limit(1);
-      if (!incident) {
+      if (!incident || !assertResourceProject(incident.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Incident not found" };
       }
@@ -107,11 +130,23 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── Create incident ─────────────────────────────────────────────────
   .post(
     "/",
-    async ({ body }) => {
+    async ({ body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot create incidents for another project" };
+      }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
+
       const [created] = await db
         .insert(incidents)
         .values({
-          projectId: body.projectId,
+          projectId: boundProjectId,
           monitorId: body.monitorId ?? null,
           title: body.title,
           status: body.status ?? "investigating",
@@ -139,13 +174,19 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── Update incident status ──────────────────────────────────────────
   .put(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
         .select()
         .from(incidents)
         .where(eq(incidents.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Incident not found" };
       }
@@ -201,13 +242,19 @@ export const incidentsRoutes = new Elysia({ prefix: "/api/incidents" })
   // ── Delete incident ─────────────────────────────────────────────────
   .delete(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
-        .select({ id: incidents.id })
+        .select({ id: incidents.id, projectId: incidents.projectId })
         .from(incidents)
         .where(eq(incidents.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Incident not found" };
       }

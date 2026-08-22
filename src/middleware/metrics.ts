@@ -45,10 +45,10 @@ function recordLatency(ms: number) {
 }
 
 export const metricsMiddleware = new Elysia()
-  .onBeforeHandle(({ request }) => {
+  .onBeforeHandle({ as: "global" }, ({ request }) => {
     (request as unknown as { _startTime: number })._startTime = performance.now();
   })
-  .onAfterHandle(({ request, set }) => {
+  .onAfterHandle({ as: "global" }, ({ request, set }) => {
     const start = (request as unknown as { _startTime: number })._startTime;
     if (start) {
       const latency = performance.now() - start;

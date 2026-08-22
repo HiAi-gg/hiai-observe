@@ -1,3 +1,4 @@
+import { assertSafeHttpUrl, SsrfError } from "../../lib/ssrf.js";
 import { checkCert } from "./cert-check.js";
 
 export interface HttpCheckConfig {
@@ -38,17 +39,33 @@ export async function runHttpCheck(
       headers.Authorization = `Bearer ${config.authValue}`;
     }
 
+    const { config: appConfig } = await import("../../lib/config.js");
+    if (appConfig.NODE_ENV !== "test") {
+      await assertSafeHttpUrl(url);
+    }
+
     const fetchOpts: RequestInit = {
       method: config?.method ?? "GET",
       headers,
       signal: controller.signal,
-      redirect: config?.maxRedirects === 0 ? "manual" : "follow",
+      redirect: "manual",
     };
     if (config?.body && fetchOpts.method !== "GET" && fetchOpts.method !== "HEAD") {
       fetchOpts.body = config.body;
     }
 
-    const res = await fetch(url, fetchOpts);
+    const maxRedirects = config?.maxRedirects ?? 5;
+    let currentUrl = url;
+    let res = await fetch(currentUrl, fetchOpts);
+    let hops = 0;
+    while (res.status >= 300 && res.status < 400 && hops < maxRedirects) {
+      const location = res.headers.get("location");
+      if (!location) break;
+      currentUrl = new URL(location, currentUrl).toString();
+      await assertSafeHttpUrl(currentUrl);
+      hops++;
+      res = await fetch(currentUrl, fetchOpts);
+    }
     const responseTimeMs = Date.now() - start;
     clearTimeout(timeout);
 
@@ -81,7 +98,8 @@ export async function runHttpCheck(
     return { statusCode: res.status, responseTimeMs, error: keywordError, success, certExpiry };
   } catch (err: unknown) {
     clearTimeout(timeout);
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message =
+      err instanceof SsrfError ? err.message : err instanceof Error ? err.message : "Unknown error";
     return {
       statusCode: null,
       responseTimeMs: Date.now() - start,

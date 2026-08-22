@@ -91,6 +91,8 @@ export async function insertTraces(
 export async function getTraces(filter: TraceFilter): Promise<TraceListResult> {
   const conditions = [];
 
+  // Missing projectId is instance-wide (admin unscoped). Callers must pass
+  // the authenticated project for tenant keys.
   if (filter.projectId) {
     conditions.push(eq(traces.projectId, filter.projectId));
   }

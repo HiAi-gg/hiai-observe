@@ -35,7 +35,7 @@ services:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: observe
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: hiai_observe
     deploy:
       resources:

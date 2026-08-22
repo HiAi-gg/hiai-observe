@@ -81,7 +81,7 @@ function checkDisk(): { status: "ok" | "degraded"; freeBytes: number } {
   return { status: "ok", freeBytes: -1 };
 }
 
-async function getHealth({ set }: { set: { status?: number | string } }) {
+async function collectHealth(set: { status?: number | string }) {
   const [postgres, redisStatus] = await Promise.all([checkPostgres(), checkRedis()]);
 
   const disk = checkDisk();
@@ -122,8 +122,20 @@ async function getHealth({ set }: { set: { status?: number | string } }) {
   };
 }
 
+async function getPublicHealth({ set }: { set: { status?: number | string } }) {
+  const full = await collectHealth(set);
+  return { status: full.status, version: full.version };
+}
+
 export const healthPlugin = new Elysia()
-  // Canonical HiAi ecosystem health endpoint.
-  .get("/api/health", getHealth)
-  // Legacy alias for backwards compatibility with existing monitors/DSN/docker healthcheck.
-  .get("/health", getHealth);
+  .get("/api/health", getPublicHealth)
+  .get("/health", getPublicHealth)
+  .get("/api/health/details", async ({ request, set }) => {
+    const { adminKeyFromRequest } = await import("../lib/admin-auth.js");
+    const admin = adminKeyFromRequest(request);
+    if (!admin.ok) {
+      set.status = admin.status;
+      return { error: admin.error };
+    }
+    return collectHealth(set);
+  });

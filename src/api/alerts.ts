@@ -8,6 +8,9 @@ import type {
   AlertSeverity,
 } from "../alerts/rules-engine.js";
 import { config } from "../lib/config.js";
+import { parseLimit, parseOffset } from "../lib/pagination.js";
+import { applyScope, assertResourceProject, isScope } from "../lib/project-scope.js";
+import { denyIfCannotDelete } from "../lib/rbac.js";
 import { db } from "../store/db.js";
 import { alertHistory, alerts } from "../store/schema.js";
 
@@ -15,10 +18,19 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .get(
     "/",
-    async ({ query }) => {
-      const { projectId, search, limit = "50", offset = "0" } = query;
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      const { search, limit = "50", offset = "0" } = query;
+      const lim = parseLimit(limit);
+      const off = parseOffset(offset);
       const conditions = [];
-      if (projectId) conditions.push(eq(alerts.projectId, projectId));
+      if (scope.projectId) conditions.push(eq(alerts.projectId, scope.projectId));
       if (search) {
         const escaped = search.replace(/[%_]/g, "\\$&");
         conditions.push(ilike(alerts.name, `%${escaped}%`));
@@ -31,16 +43,16 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
           .from(alerts)
           .where(where)
           .orderBy(desc(alerts.createdAt))
-          .limit(Number(limit))
-          .offset(Number(offset)),
+          .limit(lim)
+          .offset(off),
         db.select({ total: count() }).from(alerts).where(where),
       ]);
 
       return {
         items,
         total: totalResult[0]?.total ?? 0,
-        limit: Number(limit),
-        offset: Number(offset),
+        limit: lim,
+        offset: off,
       };
     },
     {
@@ -58,9 +70,15 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [alert] = await db.select().from(alerts).where(eq(alerts.id, params.id)).limit(1);
-      if (!alert) {
+      if (!alert || !assertResourceProject(alert.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Alert not found" };
       }
@@ -79,7 +97,7 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
       // Defense-in-depth: re-validate the condition type at runtime in case
       // the Elysia schema is ever loosened. The DB column is jsonb with no
       // CHECK constraint, so this is the only place we can reject invalid
@@ -105,11 +123,23 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
         };
       }
 
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
+      if (!scope.admin && body.projectId !== scope.projectId) {
+        set.status = 403;
+        return { error: "Forbidden: cannot create alerts for another project" };
+      }
+      const boundProjectId = scope.admin ? body.projectId : (scope.projectId as string);
+
       const [created] = await db
         .insert(alerts)
         .values({
           name: body.name,
-          projectId: body.projectId,
+          projectId: boundProjectId,
           severity: body.severity ?? "warning",
           condition: body.condition as AlertCondition,
           channels: body.channels as Array<{ type: string; target: string }>,
@@ -174,13 +204,19 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .put(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [existing] = await db
-        .select({ id: alerts.id })
+        .select({ id: alerts.id, projectId: alerts.projectId })
         .from(alerts)
         .where(eq(alerts.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Alert not found" };
       }
@@ -277,13 +313,21 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .delete(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+      const denied = await denyIfCannotDelete(scope, set);
+      if (denied) return denied;
+
       const [existing] = await db
-        .select({ id: alerts.id })
+        .select({ id: alerts.id, projectId: alerts.projectId })
         .from(alerts)
         .where(eq(alerts.id, params.id))
         .limit(1);
-      if (!existing) {
+      if (!existing || !assertResourceProject(existing.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Alert not found" };
       }
@@ -299,9 +343,15 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .post(
     "/:id/test",
-    async ({ params, set }) => {
+    async ({ params, request, set }) => {
+      const scope = await applyScope({
+        request,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const [alert] = await db.select().from(alerts).where(eq(alerts.id, params.id)).limit(1);
-      if (!alert) {
+      if (!alert || !assertResourceProject(alert.projectId, scope.projectId, scope.admin)) {
         set.status = 404;
         return { error: "Alert not found" };
       }
@@ -325,28 +375,59 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
 
   .get(
     "/history",
-    async ({ query }) => {
+    async ({ query, request, set }) => {
+      const scope = await applyScope({
+        request,
+        query: query as Record<string, unknown>,
+        set,
+      });
+      if (!isScope(scope)) return scope;
+
       const { alertId, limit = "50", offset = "0" } = query;
+      const lim = parseLimit(limit);
+      const off = parseOffset(offset);
       const conditions = [];
       if (alertId) conditions.push(eq(alertHistory.alertId, alertId));
+      if (scope.projectId) conditions.push(eq(alerts.projectId, scope.projectId));
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
       const [items, totalResult] = await Promise.all([
-        db
-          .select()
-          .from(alertHistory)
-          .where(where)
-          .orderBy(desc(alertHistory.triggeredAt))
-          .limit(Number(limit))
-          .offset(Number(offset)),
-        db.select({ total: count() }).from(alertHistory).where(where),
+        scope.projectId
+          ? db
+              .select({
+                id: alertHistory.id,
+                alertId: alertHistory.alertId,
+                triggeredAt: alertHistory.triggeredAt,
+                resolvedAt: alertHistory.resolvedAt,
+                context: alertHistory.context,
+              })
+              .from(alertHistory)
+              .innerJoin(alerts, eq(alertHistory.alertId, alerts.id))
+              .where(where)
+              .orderBy(desc(alertHistory.triggeredAt))
+              .limit(lim)
+              .offset(off)
+          : db
+              .select()
+              .from(alertHistory)
+              .where(where)
+              .orderBy(desc(alertHistory.triggeredAt))
+              .limit(lim)
+              .offset(off),
+        scope.projectId
+          ? db
+              .select({ total: count() })
+              .from(alertHistory)
+              .innerJoin(alerts, eq(alertHistory.alertId, alerts.id))
+              .where(where)
+          : db.select({ total: count() }).from(alertHistory).where(where),
       ]);
 
       return {
         items,
         total: totalResult[0]?.total ?? 0,
-        limit: Number(limit),
-        offset: Number(offset),
+        limit: lim,
+        offset: off,
       };
     },
     {
@@ -359,9 +440,20 @@ export const alertsRoutes = new Elysia({ prefix: "/api/alerts" })
   )
 
   // ── Test all active alerts ─────────────────────────────────────────────
-  .post("/test-all", async ({ set }) => {
+  .post("/test-all", async ({ request, set }) => {
+    const scope = await applyScope({
+      request,
+      set,
+    });
+    if (!isScope(scope)) return scope;
+
     try {
-      const activeAlerts = await db.select().from(alerts).where(eq(alerts.isActive, true));
+      const activeConditions = [eq(alerts.isActive, true)];
+      if (scope.projectId) activeConditions.push(eq(alerts.projectId, scope.projectId));
+      const activeAlerts = await db
+        .select()
+        .from(alerts)
+        .where(and(...activeConditions));
 
       if (activeAlerts.length === 0) {
         return { message: "No active alerts to test", results: [] };

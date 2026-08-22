@@ -82,6 +82,7 @@ function buildApp(): Elysia {
 
 // ── Fixtures ──────────────────────────────────────────────────────────
 const HOST_ID = "host-abc-123";
+const STORED_HOST_ID = `proj-1:${HOST_ID}`;
 const VALID_API_KEY = "test-api-key";
 
 const minimalHostStats = {
@@ -163,7 +164,7 @@ describe("POST /api/agent/ingest — happy paths", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.ok).toBe(true);
-    expect(json.hostId).toBe(HOST_ID);
+    expect(json.hostId).toBe(STORED_HOST_ID);
 
     expect(infraMock.insertHostStats).toHaveBeenCalledTimes(1);
     expect(infraMock.insertContainerStats).toHaveBeenCalledTimes(1);
@@ -172,7 +173,7 @@ describe("POST /api/agent/ingest — happy paths", () => {
 
     // insertHostStats receives (stats, hostId)
     const [statsArg, hostIdArg] = infraMock.insertHostStats.mock.calls[0];
-    expect(hostIdArg).toBe(HOST_ID);
+    expect(hostIdArg).toBe(STORED_HOST_ID);
     expect(statsArg.cpu_percent).toBe(minimalHostStats.cpu);
     expect(statsArg.memory_used_mb).toBe(minimalHostStats.memory);
     expect(statsArg.disk_used_gb).toBe(minimalHostStats.disk);
@@ -182,7 +183,7 @@ describe("POST /api/agent/ingest — happy paths", () => {
 
     // insertContainerStats receives (containers, hostId)
     const [containersArg, containerHostArg] = infraMock.insertContainerStats.mock.calls[0];
-    expect(containerHostArg).toBe(HOST_ID);
+    expect(containerHostArg).toBe(STORED_HOST_ID);
     expect(containersArg).toHaveLength(1);
     expect(containersArg[0].id).toBe(sampleContainer.id);
     expect(containersArg[0].cpu_percent).toBe(sampleContainer.cpu);
@@ -218,13 +219,13 @@ describe("POST /api/agent/ingest — happy paths", () => {
     ]);
 
     const [gpuArg, gpuHostArg] = infraMock.insertGpuStats.mock.calls[0];
-    expect(gpuHostArg).toBe(HOST_ID);
+    expect(gpuHostArg).toBe(STORED_HOST_ID);
     expect(gpuArg[0].gpuIndex).toBe(0);
     expect(gpuArg[0].utilizationPercent).toBe(75.0);
     expect(gpuArg[0].temperatureC).toBe(65);
 
     const [infoArg] = infraMock.upsertHostInfo.mock.calls[0];
-    expect(infoArg.hostId).toBe(HOST_ID);
+    expect(infoArg.hostId).toBe(STORED_HOST_ID);
     expect(infoArg.osName).toBe(sampleHostInfo.os);
     expect(infoArg.kernelVersion).toBe(sampleHostInfo.kernel);
     expect(infoArg.cpuModel).toBe(sampleHostInfo.cpuModel);
@@ -246,7 +247,7 @@ describe("POST /api/agent/ingest — happy paths", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.ok).toBe(true);
-    expect(json.hostId).toBe(HOST_ID);
+    expect(json.hostId).toBe(STORED_HOST_ID);
 
     // insertHostStats should run; insertContainerStats should be skipped
     // because the source only inserts when containers.length > 0.

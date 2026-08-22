@@ -361,10 +361,10 @@ describe("public-path bypass (embed + status)", () => {
 
   it("does NOT call redis.multi() for /embed/*", async () => {
     const multiSpy = vi.spyOn(redis, "multi");
-    const req = makeRequest("/embed/dashboard");
+    const req = makeRequest("/embed/status/acme");
 
     const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
-    const app = new Elysia().use(rateLimiterPlugin).get("/embed/dashboard", () => "ok");
+    const app = new Elysia().use(rateLimiterPlugin).get("/embed/status/:slug", () => "ok");
 
     const res = await app.handle(req);
     expect(res.status).toBe(200);

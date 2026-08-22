@@ -18,15 +18,15 @@ Please practice responsible disclosure: give us a reasonable window to investiga
 
 ## Supported Versions
 
-HiAi Observe is pre-1.0 (currently `0.1.x`). Security fixes are backported only to the latest minor release line. Older versions receive no patches.
+HiAi Observe is pre-1.0 (currently `0.2.x`). Security fixes are backported only to the latest minor release line. Older versions receive no patches.
 
 | Version | Supported          | Notes                                     |
 |---------|--------------------|-------------------------------------------|
-| `0.1.x` | ✅ Active          | Current development line; gets all fixes  |
-| `< 0.1` | ❌ End of life     | Upgrade to the latest `0.1.x` release     |
+| `0.2.x` | ✅ Active          | Current development line; gets all fixes  |
+| `0.1.x` | ❌ End of life     | Upgrade to the latest `0.2.x` release     |
 | `main`  | ⚠️ Best-effort     | The next minor; may receive fixes before a tagged release |
 
-**Recommendation:** Always run the latest `0.1.x` release. Watch the [GitHub Releases page](https://github.com/HiAi-gg/hiai-observe/releases) (or the `CHANGELOG.md`) for security-relevant updates and follow the standard Docker upgrade flow (`docker compose pull && docker compose up -d`).
+**Recommendation:** Always run the latest `0.2.x` release. Watch the [GitHub Releases page](https://github.com/HiAi-gg/hiai-observe/releases) (or the `CHANGELOG.md`) for security-relevant updates and follow the standard Docker upgrade flow (`docker compose pull && docker compose up -d`).
 
 ## Scope
 

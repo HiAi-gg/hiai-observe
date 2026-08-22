@@ -27,12 +27,14 @@ import { savedSearchesPlugin } from "./api/saved-searches.js";
 import { searchRoutes } from "./api/search.js";
 import { sentryIngestPlugin } from "./api/sentry-ingest.js";
 import { sourcemapsRoutes } from "./api/sourcemaps.js";
+import { tryServeSpa } from "./api/spa.js";
 import { statusPagePlugin } from "./api/status-page.js";
 import { statusPageHtmlRoutes } from "./api/status-page-html.js";
 import { subscribersPlugin } from "./api/subscribers.js";
 import { teamRoutes } from "./api/team.js";
 import { tenantHealthPlugin } from "./api/tenant-health.js";
 import { tracesRoutes } from "./api/traces.js";
+import { adminKeyFromRequest } from "./lib/admin-auth.js";
 import { ensureBootstrapProject } from "./lib/bootstrap.js";
 import { config, formatConfigSummary, summarizeConfig } from "./lib/config.js";
 import { badRequest, internal, notFound } from "./lib/errors.js";
@@ -146,8 +148,11 @@ const app = new Elysia()
   .use(cors({ origin: corsOrigin }))
   .use(metricsPlugin)
   .derive(async ({ request }) => {
+    if (adminKeyFromRequest(request).ok) {
+      return { projectId: undefined as string | undefined, isAdmin: true };
+    }
     const projectId = await resolveProjectId(request);
-    return { projectId };
+    return { projectId, isAdmin: false };
   })
   .onBeforeHandle(authGuard)
   .use(rateLimiterPlugin)
@@ -190,12 +195,15 @@ const app = new Elysia()
   .use(subscribersPlugin)
   .use(tenantHealthPlugin)
   .use(openapiRoutes)
+  .onRequest(({ request, set }) => tryServeSpa(request, set))
   .onError(({ code, error, set }) => {
     logger.error(`${code}`, { error: String(error) });
+    const isProd = config.NODE_ENV === "production";
+    const errText = String(error);
 
     if (code === "VALIDATION") {
       set.status = 400;
-      return badRequest("Invalid request", String(error));
+      return badRequest("Invalid request", isProd ? undefined : errText);
     }
 
     if (code === "NOT_FOUND") {
@@ -205,16 +213,17 @@ const app = new Elysia()
 
     if (code === "PARSE") {
       set.status = 400;
-      return badRequest("Parse error", String(error));
+      return badRequest("Parse error", isProd ? undefined : errText);
     }
 
-    // Preserve status if it was already set to an error status
-    if (typeof set.status === "number" && set.status >= 400) {
-      return { error: String(error) };
+    if (typeof set.status === "number" && set.status >= 400 && set.status < 500) {
+      if (set.status === 401) return { error: "Unauthorized" };
+      if (set.status === 403) return { error: "Forbidden" };
+      return { error: "Bad request" };
     }
 
     set.status = 500;
-    return internal(String(error));
+    return internal(errText);
   })
   .listen(port);
 

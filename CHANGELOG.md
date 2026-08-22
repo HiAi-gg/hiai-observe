@@ -44,6 +44,9 @@ Security and tenant-isolation hardening. **Read the breaking notes before upgrad
 - API tests for badges, export, fingerprint-rules, infrastructure, logs-ws contract, notifications, saved-searches, search, sourcemaps, status-page, subscribers, tenant-health.
 - `docs/AUTH_BRIDGE.md`, `docs/agent-protocol.md`, `docs/backup.md`.
 
+### Fixed
+- MCP server TypeScript build (`registerTool` + Zod) no longer fails with TS2589 on publish.
+
 ### Changed
 - Fingerprint rule `total` is a full count, not the current page length.
 - Tenant `DELETE` routes call `checkDeleteAccess` (`projects.api_role`).

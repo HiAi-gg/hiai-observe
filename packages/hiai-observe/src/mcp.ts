@@ -57,7 +57,12 @@ async function resolveProjectId(explicit?: string): Promise<string> {
   return id;
 }
 
-const server = new McpServer({ name: "hiai-observe", version: "0.1.0" });
+const server = new McpServer({ name: "hiai-observe", version: "0.2.2" });
+
+type ToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+};
 
 /** Register a read tool that maps args to an API call and returns JSON text. */
 function tool(
@@ -66,7 +71,14 @@ function tool(
   inputSchema: z.ZodRawShape,
   run: (args: Record<string, unknown>) => Promise<unknown>,
 ) {
-  server.registerTool(name, { description, inputSchema }, async (args: Record<string, unknown>) => {
+  // MCP SDK + Zod infers a recursive input type that TS 5.8 cannot instantiate
+  // (TS2589). The runtime contract is still { description, inputSchema, handler }.
+  const register = server.registerTool.bind(server) as (
+    n: string,
+    config: { description: string; inputSchema: z.ZodRawShape },
+    handler: (args: Record<string, unknown>) => Promise<ToolResult>,
+  ) => void;
+  register(name, { description, inputSchema }, async (args: Record<string, unknown>) => {
     try {
       const data = await run(args ?? {});
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };

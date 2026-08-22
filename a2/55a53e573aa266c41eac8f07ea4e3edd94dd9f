@@ -1,0 +1,16 @@
+CHANGELOG.md
+  h_c4ebb69e7d3702 47-49
+packages/hiai-observe/src/mcp.ts
+  h_c4ebb69e7d3702 60-65,74-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a255a53e573aa266c41eac8f07ea4e3edd94dd9f",
+  "prompts": {},
+  "humans": {
+    "h_c4ebb69e7d3702": {
+      "author": "vlgalib <vlgalib@users.noreply.github.com>"
+    }
+  }
+}

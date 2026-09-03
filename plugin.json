@@ -1,7 +1,7 @@
 {
   "id": "hiai-observe",
   "name": "HiAi Observe",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "icon": "Activity",
   "description": "Shared telemetry module — observability, monitoring, alerting. Sentry-compatible error tracking, uptime monitors, OTLP traces, LLM/agent analytics, log streaming, infrastructure metrics, and per-tenant status pages. Embeddable as a module in hiai-admin, hiai-dashboard, and any HiAi host via the §6 plugin/proxy contract.",
   "navGroups": [
@@ -9,15 +9,51 @@
       "label": "Observe",
       "icon": "Activity",
       "items": [
-        { "label": "Dashboard", "href": "/observe", "icon": "LayoutDashboard" },
-        { "label": "Issues", "href": "/observe/issues", "icon": "Bug" },
-        { "label": "Events", "href": "/observe/events", "icon": "Zap" },
-        { "label": "Traces", "href": "/observe/traces", "icon": "GitBranch" },
-        { "label": "Logs", "href": "/observe/logs", "icon": "ScrollText" },
-        { "label": "Uptime", "href": "/observe/uptime", "icon": "HeartPulse" },
-        { "label": "Alerts", "href": "/observe/alerts", "icon": "BellRing" },
-        { "label": "Infrastructure", "href": "/observe/infrastructure", "icon": "Server" },
-        { "label": "Search", "href": "/observe/search", "icon": "Search" }
+        {
+          "label": "Dashboard",
+          "href": "/observe",
+          "icon": "LayoutDashboard"
+        },
+        {
+          "label": "Issues",
+          "href": "/observe/issues",
+          "icon": "Bug"
+        },
+        {
+          "label": "Events",
+          "href": "/observe/events",
+          "icon": "Zap"
+        },
+        {
+          "label": "Traces",
+          "href": "/observe/traces",
+          "icon": "GitBranch"
+        },
+        {
+          "label": "Logs",
+          "href": "/observe/logs",
+          "icon": "ScrollText"
+        },
+        {
+          "label": "Uptime",
+          "href": "/observe/uptime",
+          "icon": "HeartPulse"
+        },
+        {
+          "label": "Alerts",
+          "href": "/observe/alerts",
+          "icon": "BellRing"
+        },
+        {
+          "label": "Infrastructure",
+          "href": "/observe/infrastructure",
+          "icon": "Server"
+        },
+        {
+          "label": "Search",
+          "href": "/observe/search",
+          "icon": "Search"
+        }
       ]
     }
   ],
@@ -25,7 +61,10 @@
     "prefix": "/api/observe",
     "target": "http://localhost:8001",
     "auth": "api-key",
-    "rateLimit": { "requests": 1000, "window": 60 }
+    "rateLimit": {
+      "requests": 1000,
+      "window": 60
+    }
   },
   "entrypoints": {
     "api": {

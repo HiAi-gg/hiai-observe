@@ -38,7 +38,7 @@
 - `README.md` — обзор, quick start, интеграция (Mastra / Sentry / OTLP)
 - `AGENTS.md` — этот файл: правила + указатель на канонические документы + индекс документов
 - `todo.md` — живой статус задач (Wave 5/6 backlog)
-- `CHANGELOG.md` — история релизов (v0.2.2 active)
+- `CHANGELOG.md` — история релизов (v0.2.3 active)
 - `RELEASE_PROCESS.md` — процесс релиза
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` — стандартные OSS
 
@@ -103,7 +103,7 @@ OBS2 — `docs/EMBED.md`, plugin manifest, per-tenant/per-site scope, embed in a
 Unified, self-hosted observability platform for AI Agents and TypeScript backends. Replaces Bugsink + Uptime Kuma + Beszel + Dozzle + basic LLM tracing with one lightweight container.
 
 **What agents should know before working here:**
-- Production status: **v0.2.2** — isolation/SSRF/headers/CI-E2E in-tree; remaining Wave 5: PM-INF-1, PM-RBAC (SSO)
+- Production status: **v0.2.3** — isolation/SSRF/headers/CI-E2E in-tree; remaining Wave 5: PM-INF-1, PM-RBAC (SSO)
 - Sentry SDK compatibility is a hard requirement for error tracking (drop-in replacement)
 - Mastra native integration is the differentiator — traces, workflows, tools, token usage, latency
 - Must run comfortably on small VPS (<512MB RAM target)

@@ -57,7 +57,7 @@ async function resolveProjectId(explicit?: string): Promise<string> {
   return id;
 }
 
-const server = new McpServer({ name: "hiai-observe", version: "0.2.2" });
+const server = new McpServer({ name: "hiai-observe", version: "0.2.3" });
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;

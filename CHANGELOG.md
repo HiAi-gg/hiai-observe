@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-03
+
 ### Fixed
 - E2E/integration tests and CI: project create uses `ADMIN_API_KEY`; integration fixtures create projects via the admin API so ingest lookup succeeds under Vitest's Node environment.
 - Sentry ingest no longer 500s when `breadcrumbs` is a raw array instead of `{ values: [...] }`.
+
+### Changed
+- Frontend package version aligned to 0.2.3.
 
 ## [0.2.2] - 2026-08-22
 
@@ -393,6 +398,7 @@ None — this is the initial release.
 - Docker socket required for container monitoring
 - PostgreSQL only (no ClickHouse/TimescaleDB)
 
+[0.2.3]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/HiAi-gg/hiai-observe/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/HiAi-gg/hiai-observe/compare/v0.1.9...v0.2.0

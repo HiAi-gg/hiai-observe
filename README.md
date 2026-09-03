@@ -428,7 +428,7 @@ For production setup with TLS, security hardening, and operational best practice
 
 ## Changelog
 
-Current: **v0.2.2** — security/isolation hardening (see CHANGELOG breaking notes):
+Current: **v0.2.3** — e2e/tenant-isolation test alignment and Sentry breadcrumbs ingest fix (see CHANGELOG):
 [`@hiai-gg/hiai-observe`](https://www.npmjs.com/package/@hiai-gg/hiai-observe) on
 npm (SDK + `hiai-observe` CLI + `hiai-observe-mcp` MCP server + `hiai-observe-agent`),
 multi-arch Docker images at [`vgalibov/hiai-observe`](https://hub.docker.com/r/vgalibov/hiai-observe),

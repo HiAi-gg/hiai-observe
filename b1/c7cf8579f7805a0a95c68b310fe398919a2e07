@@ -1,0 +1,32 @@
+.github/notes/v0.2.3.md
+  h_c4ebb69e7d3702 1-8
+AGENTS.md
+  h_c4ebb69e7d3702 41,106
+CHANGELOG.md
+  h_c4ebb69e7d3702 10-11,16-18,401
+README.md
+  h_c4ebb69e7d3702 431
+frontend/package.json
+  h_c4ebb69e7d3702 3
+package.json
+  h_c4ebb69e7d3702 3
+packages/hiai-observe/package.json
+  h_c4ebb69e7d3702 3
+packages/hiai-observe/src/mastra/index.ts
+  h_c4ebb69e7d3702 36
+packages/hiai-observe/src/mcp.ts
+  h_c4ebb69e7d3702 60
+plugin.json
+  h_c4ebb69e7d3702 4,12-56,64-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "b1c7cf8579f7805a0a95c68b310fe398919a2e07",
+  "prompts": {},
+  "humans": {
+    "h_c4ebb69e7d3702": {
+      "author": "vlgalib <vlgalib@users.noreply.github.com>"
+    }
+  }
+}

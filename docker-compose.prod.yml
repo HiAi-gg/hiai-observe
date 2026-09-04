@@ -1,3 +1,4 @@
+# Production compose for HiAi Observe (uses shared host infrastructure)
 services:
   app:
     build:
@@ -5,16 +6,14 @@ services:
       dockerfile: Dockerfile
     env_file: .env
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       docker-socket-proxy:
         condition: service_healthy
     restart: unless-stopped
     ports:
       - "8001:8001"
     environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://observe:${POSTGRES_PASSWORD}@hiai-postgres:5432/hiai_observe}
+      REDIS_URL: ${REDIS_URL:-redis://hiai-redis:6379/1}
       DOCKER_HOST: "tcp://docker-socket-proxy:2375"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
@@ -29,47 +28,7 @@ services:
         reservations:
           memory: 128M
     networks:
-      - observe
-
-  postgres:
-    image: postgres:18-alpine
-    environment:
-      POSTGRES_USER: observe
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      POSTGRES_DB: hiai_observe
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U observe -d hiai_observe"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - observe
-
-  redis:
-    image: redis:8-alpine
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - observe
+      - coolify
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -106,29 +65,8 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - observe
-
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-    restart: unless-stopped
-    networks:
-      - observe
-
-volumes:
-  pgdata:
-  redisdata:
-  caddy_data:
-  caddy_config:
+      - coolify
 
 networks:
-  observe:
-    driver: bridge
+  coolify:
+    external: true

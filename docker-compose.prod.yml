@@ -1,4 +1,4 @@
-# Production compose for HiAi Observe (uses shared host infrastructure)
+# Production compose for HiAi Observe on INFRA-01 (shared host Postgres/Redis/Seaweed).
 services:
   app:
     build:
@@ -9,11 +9,9 @@ services:
       docker-socket-proxy:
         condition: service_healthy
     restart: unless-stopped
-    ports:
-      - "8001:8001"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://observe:${POSTGRES_PASSWORD}@hiai-postgres:5432/hiai_observe}
-      REDIS_URL: ${REDIS_URL:-redis://hiai-redis:6379/1}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point at shared Postgres}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL must point at shared Redis}
       DOCKER_HOST: "tcp://docker-socket-proxy:2375"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]

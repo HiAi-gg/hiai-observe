@@ -1,5 +1,5 @@
 # ── Stage 1: Build frontend ────────────────────────────────────────────
-FROM oven/bun:1-alpine AS frontend-build
+FROM oven/bun:1.4.0-alpine AS frontend-build
 WORKDIR /app
 COPY frontend/package.json frontend/bun.lock* ./
 RUN bun install --frozen-lockfile
@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN bun run build
 
 # ── Stage 2: Build backend ─────────────────────────────────────────────
-FROM oven/bun:1-alpine AS backend-build
+FROM oven/bun:1.4.0-alpine AS backend-build
 WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
@@ -18,7 +18,7 @@ COPY tsconfig.json ./
 RUN bun build src/index.ts --outdir dist --target bun
 
 # ── Stage 3: Production deps only ─────────────────────────────────────
-FROM oven/bun:1-alpine AS deps-production
+FROM oven/bun:1.4.0-alpine AS deps-production
 WORKDIR /app
 COPY package.json bun.lock* ./
 # Workspace manifests are needed so bun can resolve the workspace graph
@@ -26,7 +26,7 @@ COPY packages/ ./packages/
 RUN HUSKY=0 bun install --production --frozen-lockfile
 
 # ── Stage 4: Runtime ──────────────────────────────────────────────────
-FROM oven/bun:1-alpine AS runtime
+FROM oven/bun:1.4.0-alpine AS runtime
 WORKDIR /app
 RUN apk add --no-cache curl
 

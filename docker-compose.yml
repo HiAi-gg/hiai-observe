@@ -1,48 +1,16 @@
-# HiAi Observe — Docker Compose (quick start)
+# App-only. Postgres, Redis, and SeaweedFS are the shared INFRA-01 / DEV-01 host services.
+# Do not add postgres/redis/seaweed/minio/caddy here.
+# Set DATABASE_URL and REDIS_URL to the shared instance (Coolify env on INFRA-01).
+
 services:
-  postgres:
-    image: pgvector/pgvector:pg18
-    profiles:
-      - dev
-    restart: unless-stopped
-    mem_limit: 256m
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-observe}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
-      POSTGRES_DB: ${POSTGRES_DB:-hiai_observe}
-    volumes:
-      - pg_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-observe} -d ${POSTGRES_DB:-hiai_observe}"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  redis:
-    image: redis:8-alpine
-    profiles:
-      - dev
-    restart: unless-stopped
-    mem_limit: 256m
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-observe_local}"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     restart: unless-stopped
     mem_limit: 64m
     environment:
-      # Read-only access to Docker API
       CONTAINERS: 1
       EVENTS: 1
       SYSTEM: 1
-      # Disable write operations
       POST: 0
       BUILD: 0
       COMMIT: 0
@@ -69,6 +37,8 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - coolify
 
   app:
     image: vgalibov/hiai-observe:latest
@@ -79,20 +49,16 @@ services:
     depends_on:
       docker-socket-proxy:
         condition: service_healthy
-    ports:
-      - "${PORT:-8001}:8001"
-    volumes:
-      - ./drizzle:/app/drizzle
+    env_file: .env
     environment:
-      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-observe}:${POSTGRES_PASSWORD:-observe}@hiai-postgres:5432/${POSTGRES_DB:-hiai_observe}}"
-      REDIS_URL: "${REDIS_URL:-redis://hiai-redis:6379/1}"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point at shared Postgres}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL must point at shared Redis}
       PORT: ${PORT:-8001}
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-false}
       HIAI_OBSERVE_API_KEY: ${HIAI_OBSERVE_API_KEY:-}
       RETENTION_DAYS: ${RETENTION_DAYS:-30}
-      # Connect to Docker via socket proxy (TCP) instead of direct socket mount
       DOCKER_HOST: "http://docker-socket-proxy:2375"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/api/health"]
@@ -100,7 +66,9 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    networks:
+      - coolify
 
-volumes:
-  pg_data:
-  redis_data:
+networks:
+  coolify:
+    external: true

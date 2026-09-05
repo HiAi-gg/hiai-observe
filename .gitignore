@@ -13,6 +13,7 @@ packages/*/dist/
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # Internal planning / audit files (not for open-source)
 todo.md

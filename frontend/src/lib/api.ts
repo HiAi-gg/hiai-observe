@@ -1,6 +1,7 @@
 import { apiKey, currentProject } from "./stores.svelte";
 
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "http://localhost:8001";
+const APP_BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const DEFAULT_TIMEOUT = 10_000;
 
 async function fetchWithAuth(path: string, init?: RequestInit): Promise<Response> {
@@ -39,7 +40,7 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    return await fetch(`${BASE_URL}${path}`, {
+    return await fetch(`${BASE_URL}${APP_BASE}${path}`, {
       ...init,
       signal: controller.signal,
     });
@@ -207,7 +208,7 @@ export async function getLogVolume(params?: {
   if (params?.containerId) qs.set("containerId", params.containerId);
   if (params?.from) qs.set("from", params.from);
   if (params?.to) qs.set("to", params.to);
-  return apiFetch<{ data: LogVolumeBucket[] }>("/api/logs/volume?" + qs);
+  return apiFetch<{ data: LogVolumeBucket[] }>(`/api/logs/volume?${qs}`);
 }
 
 export interface SavedSearch {
@@ -252,7 +253,7 @@ export function getLogsDownloadUrl(params: {
   qs.set("format", params.format ?? "csv");
   if (params.container) qs.set("container", params.container);
   if (params.level) qs.set("level", params.level);
-  return `${BASE_URL}/api/export/logs?${qs}`;
+  return `${BASE_URL}${APP_BASE}/api/export/logs?${qs}`;
 }
 
 export async function getTraces(params?: {

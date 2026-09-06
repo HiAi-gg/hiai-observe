@@ -8,6 +8,8 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "dev": "bun run --watch src/index.ts",
+    "dev:api": "bun run --watch src/index.ts",
+    "dev:ui": "cd frontend && bun run dev",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "build:frontend": "cd frontend && bun run build",
     "build:all": "bun run build && bun run build:frontend",

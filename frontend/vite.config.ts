@@ -32,16 +32,32 @@ function hiaiDefinePlugin(apiKey: string): Plugin {
   };
 }
 
+const LAN_UI_BASE = "/hiai-observe";
+const BASE = (process.env.PUBLIC_BASE_PATH ?? LAN_UI_BASE).replace(/\/$/, "");
+
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit(), hiaiDefinePlugin(hiaiApiKey)],
   define: {
     __HIAI_OBSERVE_API_KEY__: JSON.stringify(hiaiApiKey),
   },
   server: {
-    port: 5174,
+    host: "0.0.0.0",
+    port: 5197,
+    strictPort: true,
+    allowedHosts: true,
     proxy: {
-      "/api": "http://localhost:8001",
-      "/ws": { target: "ws://localhost:8001", ws: true },
+      ...(BASE
+        ? {
+            [`${BASE}/api`]: {
+              target: "http://127.0.0.1:8001",
+              changeOrigin: true,
+              rewrite: (path) => path.replace(BASE, "") || "/",
+            },
+            [`${BASE}/ws`]: { target: "ws://127.0.0.1:8001", ws: true },
+          }
+        : {}),
+      "/api": "http://127.0.0.1:8001",
+      "/ws": { target: "ws://127.0.0.1:8001", ws: true },
     },
   },
   // Vite tries to pre-bundle deps via esbuild, but esbuild has no

@@ -167,7 +167,7 @@ $effect(() => {
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if page.url.pathname.startsWith(resolve("/status"))}
+{#if page.url.pathname.startsWith(resolve("/status")) || page.url.pathname.startsWith(resolve("/login"))}
   <div class="min-h-screen bg-slate-50 text-slate-900 overflow-y-auto">
     {@render children()}
   </div>

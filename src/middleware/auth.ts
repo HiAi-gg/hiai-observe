@@ -40,6 +40,8 @@ export const PUBLIC_PREFIXES = [
   "/ws/logs",
   "/api/admin",
   "/api/tenant",
+  "/api/auth",
+  "/login",
 ];
 
 export const PUBLIC_PATHS = [...PUBLIC_EXACT, ...PUBLIC_PREFIXES];

@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.2.0",
+    "better-auth": "1.7.2",
     "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.30",
     "ioredis": "^5.11.1",

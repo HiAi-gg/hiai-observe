@@ -4,6 +4,7 @@ import { startAlertWorker, stopAlertWorker } from "./alerts/worker.js";
 import { adminBridgeRoutes } from "./api/admin-bridge.js";
 import { agentIngestPlugin } from "./api/agent-ingest.js";
 import { alertsRoutes } from "./api/alerts.js";
+import { authRoutes } from "./api/auth-routes.js";
 import { badgesRoutes } from "./api/badges.js";
 import { commentsRoutes } from "./api/comments.js";
 import { dashboardRoutes } from "./api/dashboard.js";
@@ -40,6 +41,7 @@ import { config, formatConfigSummary, summarizeConfig } from "./lib/config.js";
 import { badRequest, internal, notFound } from "./lib/errors.js";
 import { logger } from "./lib/logger.js";
 import { openapiRoutes } from "./lib/openapi.js";
+import { gateStaffUi } from "./lib/staff-ui-gate.js";
 import { authGuard, resolveProjectId } from "./middleware/auth.js";
 import { metricsPlugin } from "./middleware/metrics.js";
 import { rateLimiterPlugin } from "./middleware/rate-limiter.js";
@@ -157,6 +159,7 @@ const app = new Elysia()
   .onBeforeHandle(authGuard)
   .use(rateLimiterPlugin)
   .use(tenantScopePlugin)
+  .use(authRoutes)
   .use(healthPlugin)
   .use(sentryIngestPlugin)
   .use(issuesPlugin)
@@ -195,7 +198,11 @@ const app = new Elysia()
   .use(subscribersPlugin)
   .use(tenantHealthPlugin)
   .use(openapiRoutes)
-  .onRequest(({ request, set }) => tryServeSpa(request, set))
+  .onRequest(async ({ request, set }) => {
+    const denied = await gateStaffUi(request);
+    if (denied) return denied;
+    return tryServeSpa(request, set);
+  })
   .onError(({ code, error, set }) => {
     logger.error(`${code}`, { error: String(error) });
     const isProd = config.NODE_ENV === "production";

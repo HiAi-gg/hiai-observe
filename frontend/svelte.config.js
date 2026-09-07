@@ -12,6 +12,11 @@ const config = {
       precompress: false,
       strict: false,
     }),
+    paths: {
+      base:
+        process.env.PUBLIC_BASE_PATH ??
+        (process.env.NODE_ENV === "development" ? "/hiai-observe" : ""),
+    },
   },
 };
 

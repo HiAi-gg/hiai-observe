@@ -18,7 +18,7 @@ async function handleSubmit(event: SubmitEvent) {
   }
   submitting = true;
   try {
-    const res = await fetch(`${window.location.origin}/api/auth/sign-in/email`, {
+    const res = await fetch("/api/auth/sign-in/email", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

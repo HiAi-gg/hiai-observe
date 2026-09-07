@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Staff UI API client no longer concatenates Vite's relative `BASE_URL` (`./`) onto `location.origin`, which produced `https://host:8449./api/dashboard` and crashed `fetch`. Browser calls use same-origin `/api/...`.
+
 ## [0.2.3] - 2026-09-03
 
 ### Fixed

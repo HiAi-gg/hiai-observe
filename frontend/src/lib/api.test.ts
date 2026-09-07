@@ -280,7 +280,8 @@ describe("API client", () => {
       const result = await getDashboard();
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/dashboard");
+      expect(fetchSpy.mock.calls[0]![0]).toBe("/api/dashboard");
+      expect(String(fetchSpy.mock.calls[0]![0])).not.toMatch(/:\d+\./);
       expect(result).toEqual(data);
     });
   });

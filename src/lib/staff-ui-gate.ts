@@ -2,6 +2,10 @@ import { staffAuth } from "./better-auth.js";
 
 const SKIP_PREFIXES = ["/api", "/v1", "/ws", "/metrics", "/embed", "/status", "/health", "/login"];
 
+function loginRedirect(): Response {
+  return new Response(null, { status: 302, headers: { location: "/login" } });
+}
+
 export function isStaffUiPath(pathname: string): boolean {
   const path = pathname.split("?")[0] ?? pathname;
   if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return false;
@@ -16,10 +20,10 @@ export async function gateStaffUi(request: Request): Promise<Response | undefine
   if (!isStaffUiPath(url.pathname)) return undefined;
 
   if (!staffAuth) {
-    return Response.redirect(new URL("/login", url.origin), 302);
+    return loginRedirect();
   }
 
   const session = await staffAuth.api.getSession({ headers: request.headers });
   if (session?.user) return undefined;
-  return Response.redirect(new URL("/login", url.origin), 302);
+  return loginRedirect();
 }

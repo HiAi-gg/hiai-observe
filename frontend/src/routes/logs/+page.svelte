@@ -1,4 +1,5 @@
 <script lang="ts">
+import { base } from "$app/paths";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -10,6 +11,7 @@ import {
   type LogEntry,
   type LogStats,
   type LogVolumeBucket,
+  logTraceId,
   type SavedSearch,
 } from "$lib/api";
 import AnsiText from "$lib/components/AnsiText.svelte";
@@ -743,6 +745,7 @@ function formatBucketLabel(time: string): string {
           {#each logs as log (log.id)}
             {@const isJsonMsg = isJson(stripAnsi(log.message))}
             {@const isStack = isStackTrace(stripAnsi(log.message))}
+            {@const tid = logTraceId(log)}
             <tr class="border-b border-[var(--border)] {levelBg(log.level)} align-top">
               <td class="whitespace-nowrap px-3 py-1 text-[var(--muted-foreground)]">
                 {new Date(log.timestamp).toLocaleTimeString()}
@@ -786,6 +789,9 @@ function formatBucketLabel(time: string): string {
                   {/if}
                 {:else}
                   {@html ansiToHtml(log.message)}
+                {/if}
+                {#if tid}
+                  <a href="{base}/traces/{tid}" class="ml-2 text-xs text-[var(--primary)] hover:underline">trace</a>
                 {/if}
               </td>
             </tr>

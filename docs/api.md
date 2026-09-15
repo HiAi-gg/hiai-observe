@@ -70,17 +70,40 @@ Authentication: Bearer token or Basic auth (`apikey:`) in `Authorization` header
 
 ## Health
 
-### GET /health
+Public probes return `{ status, version }` only. `status` is `ok`, `degraded`
+(Postgres or Redis down, but not both), or `error`. HTTP 503 only when both
+Postgres and Redis are down. Full internals are admin-only.
 
-Unauthenticated health check.
+### GET /api/health
+
+Canonical unauthenticated health check (HiAi ecosystem contract).
 
 **Response:**
 ```json
-{ "status": "ok", "version": "0.1.0", "uptime": 12345 }
+{ "status": "ok", "version": "0.2.3" }
 ```
 
 ```bash
-curl http://localhost:8001/health
+curl -fsS http://localhost:8001/api/health
+```
+
+### GET /health
+
+Legacy alias. Identical JSON and status codes to `GET /api/health`. Kept for
+existing monitors, Sentry DSN healthchecks, and older Docker healthchecks.
+
+```bash
+curl -fsS http://localhost:8001/health
+```
+
+### GET /api/health/details
+
+Admin key (`ADMIN_API_KEY`). Returns uptime, memory, disk, dependencies,
+workers, and lastError. Public monitors must not call this path.
+
+```bash
+curl -fsS -H "Authorization: Bearer $ADMIN_API_KEY" \
+  http://localhost:8001/api/health/details
 ```
 
 ---

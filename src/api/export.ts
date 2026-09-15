@@ -61,7 +61,12 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         30,
       );
 
-      const conditions = [gte(issues.lastSeen, from), lte(issues.lastSeen, to)];
+      // `timestamp` columns store session-local wall time (defaultNow()). A JS
+      // Date upper bound is UTC, so `lte(lastSeen, now)` drops rows written
+      // after UTC midnight while local time is already the next day. Only
+      // apply the upper bound when the caller passed `to`.
+      const conditions = [gte(issues.lastSeen, from)];
+      if (query.to) conditions.push(lte(issues.lastSeen, to));
       if (scope.projectId) conditions.push(eq(issues.projectId, scope.projectId));
 
       const rows = await db
@@ -118,7 +123,8 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         7,
       );
 
-      const conditions = [gte(traces.startTime, from), lte(traces.startTime, to)];
+      const conditions = [gte(traces.startTime, from)];
+      if (query.to) conditions.push(lte(traces.startTime, to));
       if (scope.projectId) conditions.push(eq(traces.projectId, scope.projectId));
 
       const rows = await db
@@ -176,7 +182,8 @@ export const exportRoutes = new Elysia({ prefix: "/api/export" })
         7,
       );
 
-      const conditions = [gte(logs.timestamp, from), lte(logs.timestamp, to)];
+      const conditions = [gte(logs.timestamp, from)];
+      if (query.to) conditions.push(lte(logs.timestamp, to));
       if (scope.projectId) conditions.push(eq(logs.projectId, scope.projectId));
       if (query.level) conditions.push(eq(logs.level, query.level));
       if (query.container) conditions.push(eq(logs.containerId, query.container));

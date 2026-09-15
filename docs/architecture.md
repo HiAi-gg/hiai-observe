@@ -126,7 +126,7 @@ The Elysia API layer exposes 50+ endpoints organized into 32 plugins:
 
 | Plugin | Prefix | Endpoints |
 |---|---|---|
-| `healthPlugin` | `/api/health`, `/health` | Health check (canonical + legacy alias) |
+| `healthPlugin` | `/api/health`, `/health`, `/api/health/details` | Public `{ status, version }` (canonical + legacy alias); admin details |
 | `sentryIngestPlugin` | `/api` | Sentry SDK ingestion |
 | `agentIngestPlugin` | `/api/agent` | Agent-specific ingestion |
 | `issuesPlugin` | `/api/issues` | Issue CRUD |

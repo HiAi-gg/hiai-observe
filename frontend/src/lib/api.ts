@@ -165,6 +165,7 @@ export async function getLogs(params?: {
   level?: string;
   search?: string;
   regex?: string;
+  traceId?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -173,6 +174,7 @@ export async function getLogs(params?: {
   if (params?.level) qs.set("level", params.level);
   if (params?.search) qs.set("search", params.search);
   if (params?.regex) qs.set("regex", params.regex);
+  if (params?.traceId) qs.set("traceId", params.traceId);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
   return apiFetch<{
@@ -575,9 +577,21 @@ export interface GpuStat {
 export interface LogEntry {
   id: string;
   container: string;
+  containerName?: string;
   level: "info" | "warn" | "error" | "debug";
   message: string;
   timestamp: string;
+  traceId?: string | null;
+  spanId?: string | null;
+  raw?: { traceId?: string; spanId?: string } | null;
+}
+
+/** Resolve a log row's OTLP trace id from the first-class column or `raw`. */
+export function logTraceId(log: LogEntry): string | undefined {
+  if (typeof log.traceId === "string" && log.traceId.length > 0) return log.traceId;
+  const rawId = log.raw?.traceId;
+  if (typeof rawId === "string" && rawId.length > 0) return rawId;
+  return undefined;
 }
 
 export interface Trace {

@@ -234,11 +234,37 @@ export function summarizeConfig(): ConfigSummary {
       missing.push(key);
     }
 
-    const value = readEnvValue(key);
+    const value = publicConfigValue(key, readEnvValue(key));
     fields.push({ key, status, value });
   }
 
   return { set, defaulted, missing, fields };
+}
+
+/** Keys whose values must never appear in operator-facing summaries. */
+const REDACTED_CONFIG_KEYS = new Set([
+  "HIAI_OBSERVE_API_KEY",
+  "ADMIN_API_KEY",
+  "ENCRYPTION_KEY",
+  "DATABASE_URL",
+  "REDIS_URL",
+  "SMTP_PASS",
+  "TELEGRAM_BOT_TOKEN",
+  "WEBHOOK_SECRET",
+  "PAGERDUTY_ROUTING_KEY",
+  "GOTIFY_TOKEN",
+  "PUSHOVER_USER_KEY",
+  "PUSHOVER_TOKEN",
+  "DISCORD_WEBHOOK_URL",
+  "SLACK_WEBHOOK_URL",
+  "WEBHOOK_URL",
+  "TEAMS_WEBHOOK_URL",
+]);
+
+function publicConfigValue(key: string, value: unknown): unknown {
+  if (!REDACTED_CONFIG_KEYS.has(key)) return value;
+  if (value === undefined || value === null || value === "") return value;
+  return "[redacted]";
 }
 
 /**

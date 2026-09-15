@@ -248,6 +248,8 @@ export const rateLimiterPlugin = new Elysia()
     if (
       path === "/api/health" ||
       path === "/health" ||
+      path === "/api/ready" ||
+      path === "/ready" ||
       path === "/metrics" ||
       path === "/status" ||
       path.startsWith("/status/") ||

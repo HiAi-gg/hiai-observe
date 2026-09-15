@@ -272,6 +272,26 @@ describe("summarizeConfig", () => {
     expect(port?.value).toBe(12345);
     expect(typeof port?.value).toBe("number");
   });
+
+  it("redacts secret field values so they never appear in the summary", async () => {
+    applyBaseEnv();
+    process.env.HIAI_OBSERVE_API_KEY = "ho_super_secret_key_do_not_leak";
+    process.env.ADMIN_API_KEY = "admin-secret-key-value";
+    process.env.SMTP_PASS = "smtp-password-value";
+
+    const { summarizeConfig, formatConfigSummary } = await import("../../src/lib/config.js");
+    const summary = summarizeConfig();
+    const apiKey = summary.fields.find((f) => f.key === "HIAI_OBSERVE_API_KEY");
+    const adminKey = summary.fields.find((f) => f.key === "ADMIN_API_KEY");
+    const smtpPass = summary.fields.find((f) => f.key === "SMTP_PASS");
+
+    expect(apiKey?.value).toBe("[redacted]");
+    expect(adminKey?.value).toBe("[redacted]");
+    expect(smtpPass?.value).toBe("[redacted]");
+    expect(JSON.stringify(summary)).not.toContain("ho_super_secret_key_do_not_leak");
+    expect(JSON.stringify(summary)).not.toContain("admin-secret-key-value");
+    expect(formatConfigSummary(summary)).not.toContain("ho_super_secret_key_do_not_leak");
+  });
 });
 
 describe("formatConfigSummary", () => {

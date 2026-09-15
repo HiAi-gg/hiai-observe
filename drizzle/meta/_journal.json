@@ -22,6 +22,13 @@
       "when": 1787370000000,
       "tag": "0002_logs_project_id",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789370000000,
+      "tag": "0005_logs_trace_correlation",
+      "breakpoints": true
     }
   ]
 }

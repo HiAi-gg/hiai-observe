@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
@@ -59,18 +60,25 @@ jobs:
     env:
       DATABASE_URL: postgresql://observe:observe@localhost:5432/hiai_observe
       REDIS_URL: redis://localhost:6379
-      # NOTE: INTEGRATION is intentionally unset — the e2e/integration suites
-      # require a running server on :8001, which this job does not boot. They
-      # skip by default (see test headers). A dedicated job that starts the app
-      # and runs them with INTEGRATION=1 is a follow-up.
+      TENANT_SCOPE_LIVE_DB: "1"
+      # INTEGRATION unset: e2e/integration need a booted :8001 and are excluded
+      # from this job. Live tenant-scope inserts require TENANT_SCOPE_LIVE_DB=1
+      # plus this disposable service DSN (GITHUB_ACTIONS=true). Local runs use
+      # observe_test@127.0.0.1/hiai_observe_test instead of app_hiai_observe.
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.0"
       - run: bun install --frozen-lockfile
+      - name: Isolated 0003 old-new apply
+        env:
+          OBSERVE_MIGRATE_LIVE: "1"
+        run: bunx vitest run tests/migrations/0003-apply.test.ts
       - name: Run migrations
         run: bun run scripts/migrate.ts
+      - name: Live tenant-scope DB tests
+        run: bunx vitest run tests/middleware/tenant-scope.test.ts
       - name: Run tests with coverage
         run: bunx vitest run --coverage
 
@@ -107,6 +115,7 @@ jobs:
       HIAI_OBSERVE_API_KEY: test-api-key-e2e-00000000000000000000
       ADMIN_API_KEY: test-admin-key-e2e-00000000000000000
       INTEGRATION: "1"
+      TENANT_SCOPE_LIVE_DB: "1"
       PORT: "8001"
     steps:
       - uses: actions/checkout@v5
@@ -125,8 +134,8 @@ jobs:
             sleep 1
           done
           exit 1
-      - name: Run e2e and integration tests
-        run: bunx vitest run tests/e2e tests/integration
+      - name: Run e2e, integration, and tenant-scope DB tests
+        run: bunx vitest run tests/e2e tests/integration tests/middleware/tenant-scope.test.ts
 
   frontend-test:
     name: Frontend tests
@@ -141,6 +150,35 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run test
+
+  vite-health:
+    name: Vite staff UI health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - name: Install frontend
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+      - name: Start Vite on port 5197
+        working-directory: frontend
+        run: bun run dev > /tmp/vite-dev.log 2>&1 &
+      - name: Probe /hiai-observe health gate
+        env:
+          VITE_HEALTH_URL: http://127.0.0.1:5197/hiai-observe/
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS "$VITE_HEALTH_URL" >/dev/null; then
+              bun scripts/vite-health-gate.ts
+              exit $?
+            fi
+            sleep 2
+          done
+          echo "Vite did not become ready on :5197 /hiai-observe/"
+          tail -50 /tmp/vite-dev.log || true
+          exit 1
 
   build:
     name: Build Backend
@@ -172,7 +210,7 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [build, build-frontend]
+    needs: [build, build-frontend, e2e, frontend-test, vite-health]
     services:
       postgres:
         image: pgvector/pgvector:pg18

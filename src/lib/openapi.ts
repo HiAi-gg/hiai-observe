@@ -459,16 +459,16 @@ function buildPaths(): Record<string, unknown> {
         tags: ["Health"],
         summary: "Health check (canonical HiAi ecosystem endpoint)",
         description:
-          "Canonical HiAi ecosystem health endpoint. Returns service status, " +
-          "version, uptime, memory, disk, dependencies (postgres/redis/disk), " +
-          "worker health, and last error. Returns 503 when both postgres and " +
-          "redis are unavailable.",
+          "Canonical public health endpoint. Returns `{ status, version }` only. " +
+          "`status` is `ok`, `degraded` (Postgres or Redis down, but not both), " +
+          "or `error`. HTTP 503 only when both Postgres and Redis are down. " +
+          "Identical to GET /health. Full dependency/worker payload: GET /api/health/details.",
         security: [],
         responses: {
           200: {
-            description: "Service healthy or degraded (at least one dependency is up)",
+            description: "Service healthy or degraded (at least one of Postgres/Redis is up)",
           },
-          503: { description: "Service error — all critical dependencies are down" },
+          503: { description: "Service error — Postgres and Redis are both down" },
         },
       },
     },
@@ -477,11 +477,28 @@ function buildPaths(): Record<string, unknown> {
         tags: ["Health"],
         summary: "Health check (legacy alias)",
         description:
-          "Legacy alias for /api/health, kept for backwards compatibility with " +
-          "existing monitors, Sentry DSN healthchecks, and Docker healthchecks. " +
+          "Legacy alias for GET /api/health. Same `{ status, version }` JSON. " +
+          "Kept for existing monitors, Sentry DSN healthchecks, and older Docker healthchecks. " +
           "New integrations should use /api/health.",
         security: [],
-        responses: { 200: { description: "Service healthy" } },
+        responses: {
+          200: { description: "Identical payload to /api/health" },
+          503: { description: "Identical to /api/health when both critical deps are down" },
+        },
+      },
+    },
+    "/api/health/details": {
+      get: {
+        tags: ["Health"],
+        summary: "Detailed health (admin)",
+        description:
+          "Admin-key-only full health payload: uptime, memory, disk, dependencies, " +
+          "workers, lastError. Public monitors must use /api/health.",
+        responses: {
+          200: { description: "Full health details" },
+          401: { description: "Missing or invalid admin key" },
+          403: { description: "ADMIN_API_KEY is not configured" },
+        },
       },
     },
     "/metrics": {
@@ -904,6 +921,7 @@ function buildPaths(): Record<string, unknown> {
           queryStr("search"),
           queryStr("regex"),
           queryStr("fuzzy"),
+          queryStr("traceId"),
           queryStr("from"),
           queryStr("to"),
           param("limit", "query", { type: "number" }),

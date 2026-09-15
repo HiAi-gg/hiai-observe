@@ -6,8 +6,6 @@
  */
 
 import { eq } from "drizzle-orm";
-import { db } from "../../src/store/db.js";
-import { events, issues, projects, traces } from "../../src/store/schema.js";
 
 export const TEST_PROJECT_NAME = "integration-test-project";
 export const TEST_PROJECT_SLUG = "integration-test-project";
@@ -54,7 +52,9 @@ export async function cleanupTestData(): Promise<void> {
   createdProjectId = null;
   if (!projectId) return;
 
-  // Delete in FK order
+  const { db } = await import("../../src/store/db.js");
+  const { events, issues, projects, traces } = await import("../../src/store/schema.js");
+  // Delete in FK order. Only call from liveIntegrationFixture suites.
   await db.delete(events).where(eq(events.projectId, projectId));
   await db.delete(traces).where(eq(traces.projectId, projectId));
   await db.delete(issues).where(eq(issues.projectId, projectId));

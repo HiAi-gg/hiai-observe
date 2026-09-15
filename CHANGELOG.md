@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Prod compose healthcheck uses canonical `GET /api/health`. Legacy `GET /health` remains an identical public alias.
+- Public health docs (API, EMBED, OpenAPI) match the `{ status, version }` contract. Full payload stays on `GET /api/health/details` (admin).
+- Docker Hub workflow publishes only after the CI workflow succeeds on a push (no parallel main/latest race). PR and workflow_dispatch stay build-only. Immutable tags use `workflow_run.head_sha`; `latest` only if that SHA is still `origin/main`.
+- Tenant-scope live DB inserts require `TENANT_SCOPE_LIVE_DB=1` and an isolated fixture. GitHub Actions may use `observe@localhost/hiai_observe`; local runs must use `observe_test@127.0.0.1/hiai_observe_test`. Shared `app_hiai_observe` is rejected. Generic `bun run test` excludes e2e/integration and does not insert.
+- Test `NODE_ENV` without `DATABASE_URL` no longer falls back to the shared `hiai_observe` DSN (unreachable `127.0.0.1:1` sentinel). Pool-stat timers do not start in test.
+- CI Test job runs live tenant-scope DB tests as an explicit step after migrate (`TENANT_SCOPE_LIVE_DB=1` on the disposable GitHub Actions Postgres). Local inserts still require `observe_test` / `hiai_observe_test`.
+- CI `vite-health` job boots the staff UI and probes `http://127.0.0.1:5197/hiai-observe/` (`scripts/vite-health-gate.ts`). Docker Hub publication is unchanged: only after a successful CI `workflow_run` on push; this pass does not publish.
+
+### Added
+- Optional `logs.trace_id` / `logs.span_id` for OTLP log-to-trace correlation (additive `drizzle/0005_logs_trace_correlation.sql`, after Better Auth 0003/0004 on main). Isolated old→new apply is gated by `OBSERVE_MIGRATE_LIVE=1` on a disposable fixture; not applied to `app_hiai_observe` or production. Logs UI links a row to `/traces/:id` when a trace id is present.
+- Config summary redacts secret field values (`[redacted]`).
+- Prometheus counters `hiai_observe_otlp_accepted_total{signal=}` and `hiai_observe_retention_deleted_total`.
+- Retention worker includes `gpu_stats` (`collected_at`) with the other 7 tables.
+
 ## [0.2.3] - 2026-09-03
 
 ### Fixed

@@ -126,29 +126,16 @@ Authorization: Bearer ho_xxx
 
 | Метод | Путь | Аутентификация | Описание |
 |-------|------|----------------|----------|
-| `GET` | `/api/health` | Публичный | Каноническая проверка здоровья экосистемы HiAi. Возвращает статус, версию, аптайм, состояние зависимостей (PostgreSQL, Redis, диск), здоровье воркеров и последнюю ошибку. Возвращает 503 только если и PostgreSQL, и Redis недоступны. |
-| `GET` | `/health` | Публичный | Legacy-алиас для `/api/health` (для обратной совместимости). |
+| `GET` | `/api/health` | Публичный | Каноническая проверка здоровья. Возвращает только `{ status, version }`. `status`: `ok` / `degraded` (Postgres или Redis недоступен, но не оба) / `error`. HTTP 503 только если и PostgreSQL, и Redis недоступны. |
+| `GET` | `/health` | Публичный | Legacy-алиас для `/api/health` (тот же JSON и те же коды). |
+| `GET` | `/api/health/details` | Admin key | Полный payload: uptime, memory, disk, dependencies, workers, lastError. |
 | `GET` | `/metrics` | Публичный | Prometheus-метрики в формате OpenMetrics. |
 
-**Пример ответа `/api/health`:**
+**Пример ответа `/api/health` (и `/health`):**
 ```json
 {
   "status": "ok",
-  "version": "0.1.8",
-  "uptime": 123456,
-  "memory": { "usedMb": 256, "totalMb": 1024 },
-  "disk": { "usedGb": 45.2, "totalGb": 100 },
-  "dependencies": {
-    "postgres": "up",
-    "redis": "up",
-    "disk": "up"
-  },
-  "workers": {
-    "uptime": "up",
-    "retention": "up",
-    "maintenance": "up"
-  },
-  "lastError": null
+  "version": "0.2.3"
 }
 ```
 

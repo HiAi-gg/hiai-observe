@@ -187,10 +187,12 @@ export function parseOTLPMetrics(resourceMetrics: unknown[], projectId: string):
 //   timestamp     → timeUnixNano (ms), observedTimeUnixNano as fallback
 //   raw           → full { body, severityText, severityNumber, attributes,
 //                    resource, scope, traceId, spanId, observedTimeUnixNano }
+//   traceId       → first-class logs.trace_id (optional; omitted when absent)
+//   spanId        → first-class logs.span_id (optional)
 //
 // This preserves the existing table contract (so searchLogs / getLogContainers
 // continue to work) while keeping the original OTLP envelope accessible
-// through `raw` for future triage UIs.
+// through `raw`. Indexed log↔trace filter uses the first-class columns.
 
 const SEVERITY_NUMBER_TO_TEXT: Record<number, string> = {
   1: "TRACE",
@@ -227,6 +229,10 @@ export interface ParsedOtlpLogRow {
   message: string;
   level: string | undefined;
   timestamp: Date;
+  /** First-class `logs.trace_id` — optional; Docker logs leave this unset. */
+  traceId?: string;
+  /** First-class `logs.span_id` — optional. */
+  spanId?: string;
   raw: unknown;
 }
 
@@ -308,6 +314,8 @@ export function parseOTLPLogs(resourceLogs: unknown[], projectId: string): Parse
         const attrs = parseAttributes(
           rec.attributes as Array<{ key: string; value: Record<string, unknown> }>,
         );
+        const traceId = hexBytesOrUndefined(rec.traceId);
+        const spanId = hexBytesOrUndefined(rec.spanId);
 
         rows.push({
           projectId,
@@ -317,6 +325,8 @@ export function parseOTLPLogs(resourceLogs: unknown[], projectId: string): Parse
           message: body,
           level,
           timestamp: ts,
+          traceId,
+          spanId,
           raw: {
             body: rec.body,
             severityText: typeof severityText === "string" ? severityText : null,
@@ -329,8 +339,8 @@ export function parseOTLPLogs(resourceLogs: unknown[], projectId: string): Parse
             attributes: attrs,
             resource: resourceAttrs,
             scope: scopeName ? { name: scopeName } : null,
-            traceId: hexBytesOrUndefined(rec.traceId),
-            spanId: hexBytesOrUndefined(rec.spanId),
+            traceId,
+            spanId,
             observedTimeUnixNano: longToStringSafe(rec.observedTimeUnixNano),
           },
         });

@@ -40,6 +40,17 @@ describe("drizzle migration journal", () => {
     expect(sql).not.toMatch(/\bDROP\b/i);
     expect(sql).not.toMatch(/\bTRUNCATE\b/i);
     expect(sql).not.toMatch(/\bDELETE FROM\b/i);
+    // migrate.ts splits files on ';' — comments must not contain one.
+    const uncommented = sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    const commentOnly = sql
+      .split("\n")
+      .filter((line) => line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(uncommented).toContain(";");
+    expect(commentOnly).not.toContain(";");
   });
 
   it("0002 remains the project_id backfill and is also non-destructive", () => {

@@ -16,10 +16,11 @@ describe("staff UI subpath and port", () => {
     expect(src).toMatch(/PUBLIC_BASE_PATH/);
   });
 
-  it("sveltekit paths.base uses PUBLIC_BASE_PATH or /hiai-observe in development", () => {
+  it("sveltekit paths.base uses PUBLIC_BASE_PATH or /hiai-observe unless production", () => {
     const src = readFileSync("frontend/svelte.config.js", "utf8");
     expect(src).toMatch(/PUBLIC_BASE_PATH/);
     expect(src).toMatch(/"\/hiai-observe"/);
+    expect(src).toMatch(/NODE_ENV === "production"/);
   });
 
   it("vite API proxy strips the staff base before forwarding to :8001", () => {

@@ -164,10 +164,15 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Start Vite on port 5197
         working-directory: frontend
+        env:
+          NODE_ENV: development
+          PUBLIC_BASE_PATH: /hiai-observe
         run: bun run dev > /tmp/vite-dev.log 2>&1 &
       - name: Probe /hiai-observe health gate
         env:
           VITE_HEALTH_URL: http://127.0.0.1:5197/hiai-observe/
+          NODE_ENV: development
+          PUBLIC_BASE_PATH: /hiai-observe
         run: |
           for i in $(seq 1 60); do
             if curl -fsS "$VITE_HEALTH_URL" >/dev/null; then

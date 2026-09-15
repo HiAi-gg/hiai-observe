@@ -239,6 +239,8 @@ describe("isPublicPath", () => {
     "/embed/dashboard",
     "/api/admin/cleanup",
     "/api/tenant/acme/health",
+    "/api/auth/get-session",
+    "/login",
   ])("allows public path: %s", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });

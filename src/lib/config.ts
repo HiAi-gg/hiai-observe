@@ -35,6 +35,10 @@ const ConfigSchema = z.object({
   // ── Auth ────────────────────────────────────────────────────────────────
   HIAI_OBSERVE_API_KEY: z.string().optional(),
   ADMIN_API_KEY: z.string().optional(),
+  /** Staff UI Better Auth (same system as Admin/Post/Kit). Optional in tests. */
+  BETTER_AUTH_SECRET: z.string().min(32).optional(),
+  BETTER_AUTH_URL: z.string().url().default("http://localhost:8001"),
+  BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
 
   // ── Plugin / host integration ────────────────────────────────────────────
   /** URL for the observe backend when consumed via the plugin proxy. */

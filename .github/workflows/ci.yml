@@ -71,10 +71,10 @@ jobs:
         with:
           bun-version: "1.4.0"
       - run: bun install --frozen-lockfile
-      - name: Isolated 0003 old-new apply
+      - name: Isolated 0005 old-new apply
         env:
           OBSERVE_MIGRATE_LIVE: "1"
-        run: bunx vitest run tests/migrations/0003-apply.test.ts
+        run: bunx vitest run tests/migrations/0005-apply.test.ts
       - name: Run migrations
         run: bun run scripts/migrate.ts
       - name: Live tenant-scope DB tests

@@ -57,6 +57,17 @@ describe("joinApiUrl", () => {
     );
   });
 
+  it("prefixes staff sign-in and websocket paths for the LAN base", () => {
+    expect(joinApiUrl("/api/auth/sign-in/email", { appBase: "/hiai-observe" })).toBe(
+      "/hiai-observe/api/auth/sign-in/email",
+    );
+    expect(joinApiUrl("/ws/logs", { appBase: "/hiai-observe" })).toBe("/hiai-observe/ws/logs");
+    expect(joinApiUrl("/api/auth/sign-in/email", { appBase: "./" })).toBe(
+      "/api/auth/sign-in/email",
+    );
+    expect(joinApiUrl("/ws/logs", { appBase: "./" })).toBe("/ws/logs");
+  });
+
   it("drops a trailing empty query", () => {
     expect(joinApiUrl("/api/dashboard?")).toBe("/api/dashboard");
   });

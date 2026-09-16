@@ -100,3 +100,47 @@ SQL 0005 is additive `IF NOT EXISTS`. Isolated test DB only. Shared `app_hiai_ob
 ## Deploy candidate
 
 Hand to the single controller: branch `grok/next-night-20260915`, GitHub PR to `main`, CI must be green. Do not mark accepted-live without controller scenario evidence on INFRA-01.
+
+## Readiness follow-up 2026-09-16
+
+Not accepted-live. No merge, DNS, Coolify, or production mutation. Codex still reviews PR 6.
+
+### Defects found and fixed
+
+1. Staff login, infrastructure history fetches, and log WebSockets used root `/api` and `/ws` instead of `joinApiUrl` / kit.paths.base. LAN `/hiai-observe` would miss Caddy/Vite subpath routing. Vite `${BASE}/ws` also lacked the rewrite that `/api` already had.
+2. Browser sign-in from Vite `:5197` returned Better Auth `Invalid origin` because trusted origins were only `BETTER_AUTH_URL` (`:8001`). Non-production now allows `http://127.0.0.1:5197` and `http://localhost:5197`. Production stays explicit.
+3. TEAM_BACKLOG / ROADMAP still said correlation SQL was 0003 and snapshots 0000/0001 only. Journal is 0005 + snapshots 0002–0005. `docs/configuration.md` now documents Better Auth env.
+
+### Evidence (this follow-up)
+
+Named session `hiai-observe-readiness-followup`. Isolated API on `:8001` used disposable `hiai_observe_test` (not `app_hiai_observe`). Vite `:5197` restarted so the WS rewrite loaded.
+
+| Probe | Result |
+|---|---|
+| `GET :8001/api/health` | 200 `{status, version}` |
+| `GET :8001/` | 302 `/login` (staff gate) |
+| `GET :8001/api/dashboard` | 401 |
+| Vite `GET /hiai-observe/api/dashboard` | **401 Unauthorized** (was 502 last night) |
+| Vite dashboard UI | `Error loading dashboard: Unauthorized` + Retry |
+| Theme toggle | `theme-observe dark` → `theme-observe` |
+| Logs | Pause / Auto-refresh / search `trace` |
+| Login POST `/hiai-observe/api/auth/sign-in/email` Origin `:5197` | 401 `INVALID_EMAIL_OR_PASSWORD` (after origin fix; no invented identity) |
+| Keyboard | Email filled, Tab focuses `#password` |
+| Mobile 390×844 | dark screenshot |
+
+PNGs: `docs/acceptance/next-night-20260915/followup/`.
+
+### Production (read-only)
+
+INFRA-01 Coolify **service** `hiai-observe` uuid `2qjewz01tlcowk3pikdkjchn`, container `app-2qjewz01tlcowk3pikdkjchn` healthy 6 days. Image revision **`c7ba81dc2463f24f35a4b6e69acf296879eef419`** (origin/main Better Auth, 2026-09-09). Not this PR. `GET /` 302 `/login`, `GET /api/dashboard` 401. `service_applications.fqdn` empty. Inventory: `observe.hiai.gg` **not created**; must stay private/access-controlled. No public A/AAAA this pass.
+
+### Checks
+
+- `bun --no-env-file run typecheck` 0
+- `env -u DATABASE_URL … bun --no-env-file run test` **70 files / 667 passed / 5 skipped** (before staff-trusted-origins file); focused follow-up tests 12 passed
+- `bun --no-env-file run --cwd frontend test` **4 files, 165 passed**
+- `bun scripts/vite-health-gate.ts` ok `:5197/hiai-observe/`
+
+### Rollback
+
+Revert the follow-up commit on `grok/next-night-20260915` or close PR 6. Isolated `observe_test` password was aligned to the documented local fixture DSN; `app_hiai_observe` and production DBs were not migrated. Kill any leftover DEV-01 `:8001` isolated API; shared Caddy was not edited.

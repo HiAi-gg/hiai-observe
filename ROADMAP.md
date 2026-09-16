@@ -27,7 +27,7 @@ Folded from `docs/PLAN.md` (2026-09-05): `PM-OTLP-LOGS` and `PM-AI-ENRICH` are d
 
 ## Next
 1. **Seat DEV-01 Vite** (`frontend` `paths.base`, Caddy handle, hub `LAN_WEB_PORTS`, free 52xx). Source config is on 5197/`/hiai-observe`; runtime process not started in this pass.
-2. **Drizzle snapshots:** `drizzle/meta/` still has `0000`/`0001` only. 0002/0003 remain handwritten SQL. Isolated 0003 old→new passed on `hiai_observe_test`; do not apply to `app_hiai_observe` or production from DEV-01.
+2. **Drizzle snapshots:** journal 0000–0005 with snapshots 0002–0005 committed on the next-night RC. Correlation SQL is **0005** (Better Auth already used 0003/0004). Isolated 0005 old→new passed on `hiai_observe_test`; do not apply to `app_hiai_observe` or production from DEV-01.
 3. **Ops:** confirm Coolify INFRA-01 `:8001` image 0.2.3 + shared DB/Redis, not embedded-DB compose. `GET /api/health` on prod (from INFRA, not DEV-01).
 4. **SI-TRACE-CORR UI:** log↔trace jump is in source; needs runtime UI confirmation.
 5. **PM-INF-1** mature remote agent (disk/net/containers/optional GPU).

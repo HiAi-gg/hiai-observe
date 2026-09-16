@@ -27,6 +27,28 @@ describe("staff UI subpath and port", () => {
     const src = readFileSync("frontend/vite.config.ts", "utf8");
     expect(src).toContain("http://127.0.0.1:8001");
     expect(src).toMatch(/\$\{BASE\}\/api/);
+    expect(src).toMatch(/\$\{BASE\}\/ws/);
+    expect(src).toMatch(
+      /\[`\$\{BASE\}\/ws`\]: \{[\s\S]*?rewrite:\s*\(path\)\s*=>\s*path\.replace\(BASE/,
+    );
+  });
+
+  it("staff UI fetches keep kit.paths.base instead of root /api and /ws", () => {
+    const login = readFileSync("frontend/src/routes/login/+page.svelte", "utf8");
+    expect(login).toContain("joinApiUrl");
+    expect(login).toContain("/api/auth/sign-in/email");
+    expect(login).not.toMatch(/fetch\("\/api\/auth\/sign-in\/email"/);
+
+    const infra = readFileSync("frontend/src/routes/infrastructure/+page.svelte", "utf8");
+    expect(infra).toContain("joinApiUrl");
+    expect(infra).not.toMatch(/fetch\(`\/api\/infrastructure/);
+
+    const logs = readFileSync("frontend/src/routes/logs/+page.svelte", "utf8");
+    expect(logs).toContain('joinApiUrl("/ws/logs"');
+    expect(logs).not.toMatch(/\$\{proto\}\/\/\$\{window\.location\.host\}\/ws\/logs/);
+
+    const ws = readFileSync("frontend/src/lib/ws.ts", "utf8");
+    expect(ws).toContain("joinApiUrl");
   });
 
   it("does not bake a staff API key; empty string is the public sentinel", () => {

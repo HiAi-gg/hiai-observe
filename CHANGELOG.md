@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI Test job runs live tenant-scope DB tests as an explicit step after migrate (`TENANT_SCOPE_LIVE_DB=1` on the disposable GitHub Actions Postgres). Local inserts still require `observe_test` / `hiai_observe_test`.
 - CI `vite-health` job boots the staff UI and probes `http://127.0.0.1:5197/hiai-observe/` (`scripts/vite-health-gate.ts`). Docker Hub publication is unchanged: only after a successful CI `workflow_run` on push; this pass does not publish.
 - Vite staff UI does not bake `HIAI_OBSERVE_API_KEY` into client modules; empty string is the public sentinel.
+- Staff login, infrastructure history, and live log WebSockets use `joinApiUrl` so LAN `/hiai-observe` keeps API/WS on the Vite proxy (which now strips the base from `/ws` as well as `/api`). Production `paths.base=""` is unchanged.
+- Non-production Better Auth `trustedOrigins` includes the LAN Vite origin (`:5197`) so staff sign-in is not rejected as `Invalid origin` when the API is on `:8001`. Production stays explicit.
 
 ### Added
 - Optional `logs.trace_id` / `logs.span_id` for OTLP log-to-trace correlation (additive `drizzle/0005_logs_trace_correlation.sql`, after Better Auth 0003/0004). Isolated old→new apply is gated by `OBSERVE_MIGRATE_LIVE=1` on a disposable fixture; not applied to `app_hiai_observe` or production. Logs UI links a row to `/traces/:id` when a trace id is present.

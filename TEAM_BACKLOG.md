@@ -43,7 +43,7 @@ Effort is a planning estimate, not a deadline. Confirm the first task baseline b
 - [x] **P1** · status: **review** · owner: **grok** · effort: M: about 0.5-1 day
 - Depends on: current baseline and cited source inspection.
 - Acceptance: 5197/base-path configuration confirmed in runtime; unauthorized project access rejected; no secret embedded in public output.
-- Evidence: 2026-09-14 independent re-review. Live Vite `:5197/hiai-observe/` HTTP 200; empty-key sentinel in compiled stores; unauthenticated `/api/dashboard` 401 (direct and Vite proxy). CI `vite-health` job + `scripts/vite-health-gate.ts`. Lightpanda markdown dump shows staff shell + Unauthorized. See `docs/acceptance/RECOVERY-20260914.md`.
+- Evidence: 2026-09-16 follow-up. Live Vite `:5197/hiai-observe/` HTTP 200; empty-key sentinel; unauthenticated `/hiai-observe/api/dashboard` **401** (not 502) with isolated API. Login/infra/WS use `joinApiUrl`; Vite `${BASE}/ws` rewrite; non-prod Better Auth trusts LAN `:5197`. See `docs/acceptance/NEXT-NIGHT-20260915.md`.
 - Delivery: dated acceptance report, reviewable diff if needed, and remaining IDs.
 
 ### HIAI-OBSERVE-T02 — Assess log-to-trace correlation and migration consistency
@@ -51,7 +51,7 @@ Effort is a planning estimate, not a deadline. Confirm the first task baseline b
 - [x] **P2** · status: **review** · owner: **grok** · effort: M-L: about 1-2 days
 - Depends on: HIAI-OBSERVE-T01.
 - Acceptance: Distinguish trace schema from log schema; implement only verified missing link; migration journal checked without generating/applying destructive changes.
-- Evidence: 0003 additive SQL in journal. Isolated old→new apply passed on disposable `hiai_observe_test` (`OBSERVE_MIGRATE_LIVE=1`). Not applied to `app_hiai_observe` or production. See `docs/acceptance/GROK-20260913.md`.
+- Evidence: 0005 additive SQL in journal (`drizzle/0005_logs_trace_correlation.sql`; 0003/0004 are Better Auth on origin/main). Snapshots 0002–0005 committed. Isolated old→new apply passed on disposable `hiai_observe_test` (`OBSERVE_MIGRATE_LIVE=1`). Not applied to `app_hiai_observe` or production. See `docs/acceptance/GROK-20260913.md` and `docs/acceptance/NEXT-NIGHT-20260915.md`.
 - Delivery: dated acceptance report, reviewable diff if needed, and remaining IDs.
 
 ### HIAI-OBSERVE-T03 — Reconcile healthcheck and observability gates

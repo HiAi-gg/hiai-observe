@@ -127,9 +127,26 @@ async function getPublicHealth({ set }: { set: { status?: number | string } }) {
   return { status: full.status, version: full.version };
 }
 
+/**
+ * Traffic-gating probe. Postgres is required to ingest and query.
+ * Redis down does not fail readiness (rate limiter fail-open).
+ * Docker HEALTHCHECK stays on `/api/health` so a DB outage does not
+ * restart-loop the process.
+ */
+async function getPublicReady({ set }: { set: { status?: number | string } }) {
+  const postgres = await checkPostgres();
+  if (postgres !== "ok") {
+    set.status = 503;
+    return { status: "not_ready", version };
+  }
+  return { status: "ready", version };
+}
+
 export const healthPlugin = new Elysia()
   .get("/api/health", getPublicHealth)
   .get("/health", getPublicHealth)
+  .get("/api/ready", getPublicReady)
+  .get("/ready", getPublicReady)
   .get("/api/health/details", async ({ request, set }) => {
     const { adminKeyFromRequest } = await import("../lib/admin-auth.js");
     const admin = adminKeyFromRequest(request);

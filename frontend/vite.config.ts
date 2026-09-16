@@ -4,17 +4,16 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
-// Read API key from the project root .env at config load time.
-// This is the same env value the backend (`HIAI_OBSERVE_API_KEY`) uses,
-// so the frontend can pre-fill the apiKey store from build-time config.
-const hiaiApiKey = process.env.HIAI_OBSERVE_API_KEY || "";
+// Staff API keys stay on the server. Never bake HIAI_OBSERVE_API_KEY (or any
+// other secret) into client modules — the apiKey store is localStorage-backed
+// via the settings page. Empty string is the public sentinel.
+const hiaiApiKey = "";
 
 /**
  * SvelteKit's pipeline runs Svelte's own compiler for `.svelte.ts` files,
- * which bypasses Vite's `define` substitution. We add a `transform` hook
- * that runs after Svelte's compile and substitutes `__HIAI_OBSERVE_API_KEY__`
- * with the build-time value. The plugin only touches the modules that
- * reference the placeholder, so it's safe to register globally.
+ * which bypasses Vite's `define` substitution. The transform replaces
+ * `__HIAI_OBSERVE_API_KEY__` with the empty sentinel after Svelte compiles.
+ * The plugin only touches modules that reference the placeholder.
  */
 function hiaiDefinePlugin(apiKey: string): Plugin {
   const placeholder = "__HIAI_OBSERVE_API_KEY__";
@@ -53,7 +52,11 @@ export default defineConfig({
               changeOrigin: true,
               rewrite: (path) => path.replace(BASE, "") || "/",
             },
-            [`${BASE}/ws`]: { target: "ws://127.0.0.1:8001", ws: true },
+            [`${BASE}/ws`]: {
+              target: "ws://127.0.0.1:8001",
+              ws: true,
+              rewrite: (path) => path.replace(BASE, "") || "/",
+            },
           }
         : {}),
       "/api": "http://127.0.0.1:8001",

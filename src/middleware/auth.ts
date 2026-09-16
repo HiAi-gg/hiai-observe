@@ -23,6 +23,8 @@ export const PUBLIC_EXACT = new Set([
   "/",
   "/api/health",
   "/health",
+  "/api/ready",
+  "/ready",
   "/metrics",
   "/api/openapi.json",
 ]);

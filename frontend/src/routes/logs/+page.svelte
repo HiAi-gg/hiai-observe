@@ -1,4 +1,5 @@
 <script lang="ts">
+import { base } from "$app/paths";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -10,13 +11,16 @@ import {
   type LogEntry,
   type LogStats,
   type LogVolumeBucket,
+  logTraceId,
   type SavedSearch,
 } from "$lib/api";
+import { joinApiUrl } from "$lib/api-url";
 import AnsiText from "$lib/components/AnsiText.svelte";
 import LiveIndicator from "$lib/components/LiveIndicator.svelte";
 import { apiKey } from "$lib/stores.svelte";
 import { debounce, highlightJson, isJson, isStackTrace, stripAnsi } from "$lib/utils";
-import { wsManager } from "$lib/ws";
+
+const APP_BASE = import.meta.env.BASE_URL as string | undefined;
 
 const MAX_LIVE_LOGS = 1000;
 const PAGE_SIZE = 100;
@@ -216,7 +220,8 @@ $effect(() => {
 
   const key = apiKey.current;
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${proto}//${window.location.host}/ws/logs`);
+  const wsPath = joinApiUrl("/ws/logs", { appBase: APP_BASE });
+  const ws = new WebSocket(`${proto}//${window.location.host}${wsPath}`);
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ action: "auth", key }));
@@ -743,6 +748,7 @@ function formatBucketLabel(time: string): string {
           {#each logs as log (log.id)}
             {@const isJsonMsg = isJson(stripAnsi(log.message))}
             {@const isStack = isStackTrace(stripAnsi(log.message))}
+            {@const tid = logTraceId(log)}
             <tr class="border-b border-[var(--border)] {levelBg(log.level)} align-top">
               <td class="whitespace-nowrap px-3 py-1 text-[var(--muted-foreground)]">
                 {new Date(log.timestamp).toLocaleTimeString()}
@@ -786,6 +792,9 @@ function formatBucketLabel(time: string): string {
                   {/if}
                 {:else}
                   {@html ansiToHtml(log.message)}
+                {/if}
+                {#if tid}
+                  <a href="{base}/traces/{tid}" class="ml-2 text-xs text-[var(--primary)] hover:underline">trace</a>
                 {/if}
               </td>
             </tr>

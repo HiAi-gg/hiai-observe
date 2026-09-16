@@ -27,6 +27,8 @@ vi.mock("../../src/store/schema.js", () => ({
     level: "level",
     timestamp: "timestamp",
     raw: "raw",
+    traceId: "trace_id",
+    spanId: "span_id",
   },
 }));
 
@@ -50,6 +52,7 @@ describe("logs data access", () => {
       container: "c1",
       level: "error",
       search: "timeout",
+      traceId: "abc123def456",
       from: new Date("2026-01-01"),
       to: new Date("2026-12-31"),
       limit: 25,

@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
+import { redactDeep, redactSecrets } from "../lib/redact.js";
 import { db } from "./db.js";
 import type { NewLogEntry } from "./schema.js";
 import { logs } from "./schema.js";
@@ -10,6 +11,8 @@ interface SearchLogsParams {
   container?: string;
   level?: string;
   search?: string;
+  /** OTLP correlation id — filters `logs.trace_id`, not `traces.trace_id`. */
+  traceId?: string;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -31,6 +34,8 @@ export async function insertLogs(
      * so downstream consumers can rely on `raw` always being `unknown | null`.
      */
     raw?: unknown;
+    traceId?: string | null;
+    spanId?: string | null;
   }>,
 ): Promise<void> {
   if (entries.length === 0) return;
@@ -40,14 +45,16 @@ export async function insertLogs(
     containerId: e.containerId,
     containerName: e.containerName,
     stream: e.stream,
-    message: e.message,
+    message: redactSecrets(e.message),
     timestamp: e.timestamp,
     level: e.level ?? null,
     // Coerce undefined → null so the JSONB column always receives a value.
     // The schema column is `jsonb("raw")` (nullable), and a literal `null`
     // is semantically clearer than `undefined` slipping through the ORMs
-    // type check.
-    raw: e.raw ?? null,
+    // type check. Nested strings are redacted the same way as `message`.
+    raw: e.raw === undefined || e.raw === null ? null : redactDeep(e.raw),
+    traceId: e.traceId ?? null,
+    spanId: e.spanId ?? null,
   }));
 
   for (let i = 0; i < rows.length; i += 500) {
@@ -68,12 +75,13 @@ function projectScopeConditions(params: { projectId?: string; includeHostLogs?: 
 }
 
 export async function searchLogs(params: SearchLogsParams) {
-  const { container, level, search, from, to, limit = 100, offset = 0 } = params;
+  const { container, level, search, traceId, from, to, limit = 100, offset = 0 } = params;
 
   const conditions = [...projectScopeConditions(params)];
   if (container) conditions.push(eq(logs.containerId, container));
   if (level) conditions.push(eq(logs.level, level));
   if (search) conditions.push(ilike(logs.message, `%${search.replace(/[%_]/g, "\\$&")}%`));
+  if (traceId) conditions.push(eq(logs.traceId, traceId));
   if (from) conditions.push(gte(logs.timestamp, from));
   if (to) conditions.push(lte(logs.timestamp, to));
 
@@ -122,6 +130,7 @@ interface SearchLogsRegexParams {
   pattern: string;
   container?: string;
   level?: string;
+  traceId?: string;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -129,7 +138,7 @@ interface SearchLogsRegexParams {
 }
 
 export async function searchLogsRegex(params: SearchLogsRegexParams) {
-  const { pattern, container, level, from, to, limit = 100, offset = 0 } = params;
+  const { pattern, container, level, traceId, from, to, limit = 100, offset = 0 } = params;
 
   if (pattern.length > 300) {
     return { logs: [], total: 0, limit, offset };
@@ -148,6 +157,7 @@ export async function searchLogsRegex(params: SearchLogsRegexParams) {
   conditions.push(sql`${logs.message} ~ ${pattern}`);
   if (container) conditions.push(eq(logs.containerId, container));
   if (level) conditions.push(eq(logs.level, level));
+  if (traceId) conditions.push(eq(logs.traceId, traceId));
   if (from) conditions.push(gte(logs.timestamp, from));
   if (to) conditions.push(lte(logs.timestamp, to));
 
@@ -167,6 +177,7 @@ interface SearchLogsFuzzyParams {
   term: string;
   container?: string;
   level?: string;
+  traceId?: string;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -175,13 +186,24 @@ interface SearchLogsFuzzyParams {
 }
 
 export async function searchLogsFuzzy(params: SearchLogsFuzzyParams) {
-  const { term, container, level, from, to, limit = 100, offset = 0, threshold = 0.1 } = params;
+  const {
+    term,
+    container,
+    level,
+    traceId,
+    from,
+    to,
+    limit = 100,
+    offset = 0,
+    threshold = 0.1,
+  } = params;
 
   const conditions = [...projectScopeConditions(params)];
   // Use pg_trgm similarity() for fuzzy matching — requires CREATE EXTENSION IF NOT EXISTS pg_trgm
   conditions.push(sql`similarity(${logs.message}, ${term}) > ${threshold}`);
   if (container) conditions.push(eq(logs.containerId, container));
   if (level) conditions.push(eq(logs.level, level));
+  if (traceId) conditions.push(eq(logs.traceId, traceId));
   if (from) conditions.push(gte(logs.timestamp, from));
   if (to) conditions.push(lte(logs.timestamp, to));
 

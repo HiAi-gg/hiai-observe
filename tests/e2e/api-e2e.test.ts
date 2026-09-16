@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { liveIntegrationFixture } from "../lib/isolated-db.js";
 import {
   ADMIN_KEY,
   apiFetch,
@@ -19,7 +20,7 @@ import {
   waitFor,
 } from "./helpers.js";
 
-const enabled = !!process.env.INTEGRATION;
+const enabled = liveIntegrationFixture();
 
 describe.skipIf(!enabled)("E2E API — Full Lifecycle", () => {
   let projectId: string;

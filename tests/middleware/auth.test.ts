@@ -222,6 +222,8 @@ describe("isPublicPath", () => {
     "/",
     "/api/health",
     "/health",
+    "/api/ready",
+    "/ready",
     "/metrics",
     "/api/status",
     "/api/status/overview",

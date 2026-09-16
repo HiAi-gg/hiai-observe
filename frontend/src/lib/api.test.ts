@@ -43,6 +43,7 @@ import {
   getTeamMembers,
   getTrace,
   getTraces,
+  logTraceId,
   rotateApiKey,
   searchAll,
   testAlert,
@@ -405,6 +406,57 @@ describe("API client", () => {
       expect(url).toContain("regex=%5Eerr"); // URL encoded ^
       expect(url).toContain("limit=50");
       expect(url).toContain("offset=10");
+    });
+
+    it("includes traceId filter for log-to-trace correlation", async () => {
+      const data = { data: { logs: [], total: 0 } };
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(data));
+
+      await getLogs({ traceId: "abc123def456" });
+
+      const url = fetchSpy.mock.calls[0]![0] as string;
+      expect(url).toContain("traceId=abc123def456");
+    });
+  });
+
+  describe("logTraceId", () => {
+    it("prefers the first-class column over raw", () => {
+      expect(
+        logTraceId({
+          id: "1",
+          container: "app",
+          level: "info",
+          message: "hi",
+          timestamp: "2026-01-01",
+          traceId: "column-id",
+          raw: { traceId: "raw-id" },
+        }),
+      ).toBe("column-id");
+    });
+
+    it("falls back to raw.traceId when the column is empty", () => {
+      expect(
+        logTraceId({
+          id: "1",
+          container: "app",
+          level: "info",
+          message: "hi",
+          timestamp: "2026-01-01",
+          raw: { traceId: "raw-id" },
+        }),
+      ).toBe("raw-id");
+    });
+
+    it("returns undefined when neither column nor raw has a trace id", () => {
+      expect(
+        logTraceId({
+          id: "1",
+          container: "app",
+          level: "info",
+          message: "hi",
+          timestamp: "2026-01-01",
+        }),
+      ).toBeUndefined();
     });
   });
 

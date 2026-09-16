@@ -2,17 +2,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { config } from "../lib/config.js";
 import { setDbPoolStats } from "../middleware/metrics.js";
+import { resolveConnectionString } from "./connection-string.js";
 import * as schema from "./schema.js";
 
-const DEFAULT_DEV_DATABASE_URL = "postgresql://observe:observe@localhost:5432/hiai_observe";
-
-const connectionString =
-  config.DATABASE_URL ??
-  (config.NODE_ENV === "production"
-    ? (() => {
-        throw new Error("DATABASE_URL is required in production");
-      })()
-    : DEFAULT_DEV_DATABASE_URL);
+const connectionString = resolveConnectionString({
+  databaseUrl: config.DATABASE_URL,
+  nodeEnv: config.NODE_ENV,
+});
 
 export const client = postgres(connectionString, {
   max: 20,
@@ -51,7 +47,9 @@ async function collectPoolStats() {
   }
 }
 
-// Collect every 15 seconds
-setInterval(collectPoolStats, 15_000);
-// Initial collection after 1 second (let app start first)
-setTimeout(collectPoolStats, 1_000);
+if (config.NODE_ENV !== "test") {
+  // Collect every 15 seconds
+  setInterval(collectPoolStats, 15_000);
+  // Initial collection after 1 second (let app start first)
+  setTimeout(collectPoolStats, 1_000);
+}

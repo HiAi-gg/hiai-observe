@@ -21,7 +21,10 @@ export function normalizeAppBase(raw: string | undefined): string {
 /** Strip a trailing `/` or a stray `.` after the port (`:8449.`). */
 export function normalizeOrigin(raw: string | undefined): string {
   if (!raw) return "";
-  return raw.trim().replace(/:(\d+)\.$/, ":$1").replace(/\/+$/, "");
+  return raw
+    .trim()
+    .replace(/:(\d+)\.$/, ":$1")
+    .replace(/\/+$/, "");
 }
 
 export function joinApiUrl(

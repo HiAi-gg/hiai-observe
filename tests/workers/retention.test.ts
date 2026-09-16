@@ -78,10 +78,10 @@ beforeEach(() => {
 // ── Batch deletion ───────────────────────────────────────────────────────
 describe("batch deletion", () => {
   it("stops after one batch when deleted < BATCH_SIZE", async () => {
-    // 7 tables: each getRetentionDays returns [] (default 30 days)
-    selectQueue = Array(7).fill([]);
-    // 7 tables: each batchDelete execute returns 100 rows (< 5000)
-    executeResults = Array(7).fill(Array(100).fill({ id: "x" }));
+    // 8 tables: each getRetentionDays returns [] (default 30 days)
+    selectQueue = Array(8).fill([]);
+    // 8 tables: each batchDelete execute returns 100 rows (< 5000)
+    executeResults = Array(8).fill(Array(100).fill({ id: "x" }));
 
     process.env.ADMIN_API_KEY = "test-admin-key";
     const { adminRoutes } = await import("../../src/workers/retention.js");
@@ -106,8 +106,8 @@ describe("batch deletion", () => {
     const fullBatch = Array(5000).fill({ id: "x" });
     const partialBatch = Array(200).fill({ id: "y" });
 
-    // 7 tables: getRetentionDays returns [] (default 30 days)
-    selectQueue = Array(7).fill([]);
+    // 8 tables: getRetentionDays returns [] (default 30 days)
+    selectQueue = Array(8).fill([]);
     // First table: full batch (5000) then partial (200). Others: single partial.
     executeResults = [
       fullBatch, // table 1, batch 1 (5000 → continue)
@@ -118,6 +118,7 @@ describe("batch deletion", () => {
       partialBatch, // table 5
       partialBatch, // table 6
       partialBatch, // table 7
+      partialBatch, // table 8
     ];
 
     const { adminRoutes } = await import("../../src/workers/retention.js");
@@ -131,14 +132,14 @@ describe("batch deletion", () => {
     );
 
     expect(res.status).toBe(200);
-    // First table used 2 execute calls, others 1 each = 8 total
-    expect(db.execute).toHaveBeenCalledTimes(8);
+    // First table used 2 execute calls, others 1 each = 9 total
+    expect(db.execute).toHaveBeenCalledTimes(9);
   });
 
   it("handles zero deletions gracefully", async () => {
-    selectQueue = Array(7).fill([]);
+    selectQueue = Array(8).fill([]);
     // Each execute returns empty (0 rows deleted → stop immediately)
-    executeResults = Array(7).fill([]);
+    executeResults = Array(8).fill([]);
 
     const { adminRoutes } = await import("../../src/workers/retention.js");
     process.env.ADMIN_API_KEY = "test-admin-key";
@@ -153,6 +154,25 @@ describe("batch deletion", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message).toBe("Cleanup complete");
+  });
+
+  it("continues batching from result.count when the row list is empty", async () => {
+    selectQueue = Array(8).fill([]);
+    const full = Object.assign([], { count: 5000 });
+    const partial = Object.assign([], { count: 10 });
+    executeResults = [full, partial, partial, partial, partial, partial, partial, partial, partial];
+
+    process.env.ADMIN_API_KEY = "test-admin-key";
+    const { adminRoutes } = await import("../../src/workers/retention.js");
+    const res = await new Elysia().use(adminRoutes).handle(
+      new Request("http://localhost/api/admin/cleanup", {
+        method: "POST",
+        headers: { Authorization: "Bearer test-admin-key" },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.execute).toHaveBeenCalledTimes(9);
   });
 });
 
@@ -174,7 +194,7 @@ describe("per-table retention config", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.defaultDays).toBe(30);
-    expect(body.tables).toHaveLength(7);
+    expect(body.tables).toHaveLength(8);
     expect(body.tables[0].retentionDays).toBe(30);
   });
 
@@ -196,7 +216,7 @@ describe("per-table retention config", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.tables).toHaveLength(7);
+    expect(body.tables).toHaveLength(8);
 
     const eventsConfig = body.tables.find((t: { tableName: string }) => t.tableName === "events");
     const tracesConfig = body.tables.find((t: { tableName: string }) => t.tableName === "traces");
@@ -207,7 +227,7 @@ describe("per-table retention config", () => {
     expect(logsConfig.retentionDays).toBe(30); // falls back to default
   });
 
-  it("lists all 7 tables", async () => {
+  it("lists all 8 tables including gpu_stats", async () => {
     selectQueue = [[]];
 
     const { adminRoutes } = await import("../../src/workers/retention.js");
@@ -230,6 +250,7 @@ describe("per-table retention config", () => {
       "host_stats",
       "uptime_checks",
       "alert_history",
+      "gpu_stats",
     ]);
   });
 });
@@ -290,8 +311,8 @@ describe("admin endpoint auth", () => {
   });
 
   it("accepts correct Bearer token", async () => {
-    selectQueue = Array(7).fill([]);
-    executeResults = Array(7).fill([]);
+    selectQueue = Array(8).fill([]);
+    executeResults = Array(8).fill([]);
 
     process.env.ADMIN_API_KEY = "correct-key";
     const { adminRoutes } = await import("../../src/workers/retention.js");
@@ -307,8 +328,8 @@ describe("admin endpoint auth", () => {
   });
 
   it("accepts raw token without Bearer prefix", async () => {
-    selectQueue = Array(7).fill([]);
-    executeResults = Array(7).fill([]);
+    selectQueue = Array(8).fill([]);
+    executeResults = Array(8).fill([]);
 
     process.env.ADMIN_API_KEY = "raw-token";
     const { adminRoutes } = await import("../../src/workers/retention.js");

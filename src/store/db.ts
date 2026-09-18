@@ -14,11 +14,38 @@ const connectionString =
       })()
     : DEFAULT_DEV_DATABASE_URL);
 
-export const client = postgres(connectionString, {
-  max: 20,
-  idle_timeout: 30,
-  connect_timeout: 5,
-});
+/**
+ * postgres.js 3.4 forwards `?host=/path` as a Postgres GUC
+ * (`unrecognized configuration parameter "host"`). When the URL query host is
+ * a unix socket directory, connect with `path` and do not pass that URL.
+ */
+function unixSocketClientOptions(url: string): {
+  path: string;
+  user: string;
+  database: string;
+  pass: string;
+} | undefined {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.searchParams.get("host");
+    if (!host?.startsWith("/")) return undefined;
+    return {
+      path: `${host.replace(/\/$/, "")}/.s.PGSQL.5432`,
+      user: decodeURIComponent(parsed.username || "postgres"),
+      database: (parsed.pathname || "").replace(/^\//, "") || "hiai_observe",
+      pass: decodeURIComponent(parsed.password || ""),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const socketOpts = unixSocketClientOptions(connectionString);
+const clientOptions = { max: 20, idle_timeout: 30, connect_timeout: 5 } as const;
+
+export const client = socketOpts
+  ? postgres({ ...socketOpts, ...clientOptions })
+  : postgres(connectionString, clientOptions);
 
 export const db = drizzle(client, { schema });
 

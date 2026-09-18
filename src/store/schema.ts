@@ -148,7 +148,7 @@ export const traces = pgTable(
     status: text("status").default("ok"),
     startTime: timestamp("start_time").notNull(),
     endTime: timestamp("end_time"),
-    durationMs: integer("duration_ms"),
+    durationMs: bigint("duration_ms", { mode: "number" }),
     attributes: jsonb("attributes").$type<Record<string, unknown>>(),
     tokenUsage: jsonb("token_usage").$type<{ prompt: number; completion: number; total: number }>(),
     model: text("model"),

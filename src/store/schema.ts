@@ -354,12 +354,18 @@ export const logs = pgTable(
     level: varchar("level", { length: 16 }),
     timestamp: timestamp("timestamp", { mode: "date" }).notNull(),
     raw: jsonb("raw"),
+    // Optional OTLP correlation. Distinct from `traces.trace_id` / `span_id`
+    // (required on the trace table). Null for Docker stdout/stderr rows.
+    traceId: text("trace_id"),
+    spanId: text("span_id"),
   },
   (t) => [
     index("logs_container_id_idx").on(t.containerId),
     index("logs_timestamp_idx").on(t.timestamp),
     index("logs_container_timestamp_idx").on(t.containerId, t.timestamp),
     index("logs_project_timestamp_idx").on(t.projectId, t.timestamp),
+    index("logs_trace_id_idx").on(t.traceId),
+    index("logs_project_trace_idx").on(t.projectId, t.traceId),
   ],
 );
 

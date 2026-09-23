@@ -24,6 +24,7 @@
     "seed:extras": "bun run scripts/seed-extras.ts",
     "reset": "bun run scripts/reset-demo.ts",
     "gen-key": "bun run scripts/generate-api-key.ts",
+    "vite:health": "bun scripts/vite-health-gate.ts",
     "docker:prod": "docker compose -f docker-compose.prod.yml up -d",
     "docker:dev": "docker compose up -d",
     "prepare": "husky || true"

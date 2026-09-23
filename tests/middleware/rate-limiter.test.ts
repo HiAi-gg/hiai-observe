@@ -370,4 +370,47 @@ describe("public-path bypass (embed + status)", () => {
     expect(res.status).toBe(200);
     expect(multiSpy).not.toHaveBeenCalled();
   });
+
+  it("does NOT call redis.multi() for canonical /api/health", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia().use(rateLimiterPlugin).get("/api/health", () => ({ status: "ok" }));
+
+    const res = await app.handle(makeRequest("/api/health"));
+    expect(res.status).toBe(200);
+    expect(multiSpy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call redis.multi() for legacy /health", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia().use(rateLimiterPlugin).get("/health", () => ({ status: "ok" }));
+
+    const res = await app.handle(makeRequest("/health"));
+    expect(res.status).toBe(200);
+    expect(multiSpy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call redis.multi() for /api/ready", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia().use(rateLimiterPlugin).get("/api/ready", () => ({ status: "ready" }));
+
+    const res = await app.handle(makeRequest("/api/ready"));
+    expect(res.status).toBe(200);
+    expect(multiSpy).not.toHaveBeenCalled();
+  });
+
+  it("DOES rate-limit /api/health/details (admin path is not a public probe)", async () => {
+    const multiSpy = vi.spyOn(redis, "multi");
+    mockExecResults = [[[null, 1]]];
+    const { rateLimiterPlugin } = await import("../../src/middleware/rate-limiter.js");
+    const app = new Elysia()
+      .use(rateLimiterPlugin)
+      .get("/api/health/details", () => ({ status: "ok" }));
+
+    const res = await app.handle(makeRequest("/api/health/details"));
+    expect(res.status).toBe(200);
+    expect(multiSpy).toHaveBeenCalled();
+  });
 });

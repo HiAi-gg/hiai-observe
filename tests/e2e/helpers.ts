@@ -6,20 +6,6 @@
  */
 
 import { eq } from "drizzle-orm";
-import { db } from "../../src/store/db.js";
-import {
-  alertHistory,
-  alerts,
-  containerStats,
-  events,
-  hostStats,
-  issues,
-  logs,
-  projects,
-  traces,
-  uptimeChecks,
-  uptimeMonitors,
-} from "../../src/store/schema.js";
 
 export const BASE_URL = process.env.HIAI_OBSERVE_URL || "http://localhost:8001";
 export const MASTER_KEY = process.env.HIAI_OBSERVE_API_KEY || "test-api-key";
@@ -71,7 +57,21 @@ export async function createTestProjectViaApi(
  * Delete a project and all related data directly via DB (cleanup).
  */
 export async function cleanupProject(projectId: string): Promise<void> {
-  // Delete in FK order
+  const { db } = await import("../../src/store/db.js");
+  const {
+    alertHistory,
+    alerts,
+    containerStats,
+    events,
+    hostStats,
+    issues,
+    logs,
+    projects,
+    traces,
+    uptimeChecks,
+    uptimeMonitors,
+  } = await import("../../src/store/schema.js");
+  // Delete in FK order. Only call from liveIntegrationFixture suites.
   await db.delete(alertHistory).where(eq(alertHistory.alertId, projectId));
   await db.delete(events).where(eq(events.projectId, projectId));
   await db.delete(traces).where(eq(traces.projectId, projectId));

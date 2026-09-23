@@ -8,6 +8,7 @@ import {
   isProtobufContentType,
 } from "../ingestion/otlp-proto.js";
 import { lookupProject, resolveApiKey } from "../lib/auth.js";
+import { recordOtlpAccepted } from "../middleware/metrics.js";
 import { insertLogs } from "../store/logs.js";
 import { insertTraces } from "../store/traces.js";
 
@@ -321,6 +322,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
         const traces = parseOTLPTraces(resourceSpans, auth.projectId);
         if (traces.length > 0) {
           await insertTraces(traces);
+          recordOtlpAccepted("traces", traces.length);
         }
 
         // OTLP expects empty 200 on success
@@ -396,6 +398,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
         const traces = parseOTLPMetrics(resourceMetrics, auth.projectId);
         if (traces.length > 0) {
           await insertTraces(traces);
+          recordOtlpAccepted("metrics", traces.length);
         }
 
         return {};
@@ -469,6 +472,7 @@ export const otlpRoutes = new Elysia({ prefix: "/v1" })
         const logs = parseOTLPLogs(resourceLogs, auth.projectId);
         if (logs.length > 0) {
           await insertLogs(logs);
+          recordOtlpAccepted("logs", logs.length);
         }
 
         return {};

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Staff UI API client no longer concatenates Vite's relative `BASE_URL` (`./`) onto `location.origin`, which produced `https://host:8449./api/dashboard` and crashed `fetch`. Browser calls use same-origin `/api/...`.
+- Prod compose healthcheck uses canonical `GET /api/health`. Legacy `GET /health` remains an identical public alias.
+- Public health docs (API, EMBED, OpenAPI) match the `{ status, version }` contract. Full payload stays on `GET /api/health/details` (admin).
+- Docker Hub workflow publishes only after the CI workflow succeeds on a push (no parallel main/latest race). PR and workflow_dispatch stay build-only. Immutable tags use `workflow_run.head_sha`; `latest` only if that SHA is still `origin/main`.
+- Tenant-scope live DB inserts require `TENANT_SCOPE_LIVE_DB=1` and an isolated fixture. GitHub Actions may use `observe@localhost/hiai_observe`; local runs must use `observe_test@127.0.0.1/hiai_observe_test`. Shared `app_hiai_observe` is rejected. Generic `bun run test` excludes e2e/integration and does not insert.
+- Test `NODE_ENV` without `DATABASE_URL` no longer falls back to the shared `hiai_observe` DSN (unreachable `127.0.0.1:1` sentinel). Pool-stat timers do not start in test.
+- CI Test job runs live tenant-scope DB tests as an explicit step after migrate (`TENANT_SCOPE_LIVE_DB=1` on the disposable GitHub Actions Postgres). Local inserts still require `observe_test` / `hiai_observe_test`.
+- CI `vite-health` job boots the staff UI and probes `http://127.0.0.1:5197/hiai-observe/` (`scripts/vite-health-gate.ts`). Docker Hub publication is unchanged: only after a successful CI `workflow_run` on push; this pass does not publish.
+- Vite staff UI does not bake `HIAI_OBSERVE_API_KEY` into client modules; empty string is the public sentinel.
+- Staff login, infrastructure history, and live log WebSockets use `joinApiUrl` so LAN `/hiai-observe` keeps API/WS on the Vite proxy (which now strips the base from `/ws` as well as `/api`). Production `paths.base=""` is unchanged.
+- Non-production Better Auth `trustedOrigins` includes the LAN Vite origin (`:5197`) so staff sign-in is not rejected as `Invalid origin` when the API is on `:8001`. Production stays explicit.
+
+### Added
+- Optional `logs.trace_id` / `logs.span_id` for OTLP log-to-trace correlation (additive `drizzle/0005_logs_trace_correlation.sql`, after Better Auth 0003/0004). Isolated old→new apply is gated by `OBSERVE_MIGRATE_LIVE=1` on a disposable fixture; not applied to `app_hiai_observe` or production. Logs UI links a row to `/traces/:id` when a trace id is present.
+- Config summary redacts secret field values (`[redacted]`).
+- Prometheus counters `hiai_observe_otlp_accepted_total{signal=}` and `hiai_observe_retention_deleted_total`.
+- Retention worker includes `gpu_stats` (`collected_at`) with the other 7 tables.
+- Drizzle snapshots for handwritten 0002–0005 so `drizzle-kit generate` has a complete chain.
 
 ## [0.2.3] - 2026-09-03
 

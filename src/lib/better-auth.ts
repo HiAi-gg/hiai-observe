@@ -3,20 +3,17 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../store/db.js";
 import { account, session, user, verification } from "../store/schema.js";
 import { config } from "./config.js";
-
-function trustedOrigins(): string[] {
-  const extra = (config.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return [config.BETTER_AUTH_URL, ...extra];
-}
+import { resolveStaffTrustedOrigins } from "./staff-trusted-origins.js";
 
 export const staffAuth = config.BETTER_AUTH_SECRET
   ? betterAuth({
       secret: config.BETTER_AUTH_SECRET,
       baseURL: config.BETTER_AUTH_URL,
-      trustedOrigins: trustedOrigins(),
+      trustedOrigins: resolveStaffTrustedOrigins({
+        betterAuthUrl: config.BETTER_AUTH_URL,
+        extra: config.BETTER_AUTH_TRUSTED_ORIGINS,
+        nodeEnv: config.NODE_ENV,
+      }),
       database: drizzleAdapter(db, {
         provider: "pg",
         schema: { user, session, account, verification },

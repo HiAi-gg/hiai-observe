@@ -1,6 +1,9 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
+import { joinApiUrl } from "$lib/api-url";
+
+const APP_BASE = import.meta.env.BASE_URL as string | undefined;
 
 let email = $state("");
 let password = $state("");
@@ -18,7 +21,7 @@ async function handleSubmit(event: SubmitEvent) {
   }
   submitting = true;
   try {
-    const res = await fetch("/api/auth/sign-in/email", {
+    const res = await fetch(joinApiUrl("/api/auth/sign-in/email", { appBase: APP_BASE }), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

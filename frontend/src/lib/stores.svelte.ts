@@ -1,10 +1,9 @@
 declare const __HIAI_OBSERVE_API_KEY__: string;
 
 function getInjectedApiKey(): string {
-  // Vite replaces `__HIAI_OBSERVE_API_KEY__` with the build-time value at
-  // transform time (via the `hiai-observe-api-key-define` plugin in
-  // vite.config.ts, since SvelteKit's pipeline bypasses Vite's `define`).
-  // The `typeof` guard keeps SSR safe when no value is provided.
+  // Vite replaces `__HIAI_OBSERVE_API_KEY__` with the empty public sentinel.
+  // Staff keys are never baked into client modules; operators paste a key
+  // on the settings page (localStorage-backed apiKey store).
   if (typeof __HIAI_OBSERVE_API_KEY__ !== "undefined" && __HIAI_OBSERVE_API_KEY__) {
     return __HIAI_OBSERVE_API_KEY__;
   }

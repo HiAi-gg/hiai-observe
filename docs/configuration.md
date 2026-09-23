@@ -20,6 +20,18 @@ All configuration is done through environment variables. Copy `.env.example` to 
 | `HIAI_DISABLE_LOG_WORKER` | No | — | Set `1` to disable the Docker log stream worker |
 | `OBSERVE_URL` | No | `http://localhost:8001` | Public URL of this instance (plugin/host integration) |
 
+### Staff UI (Better Auth)
+
+Same email/password gate as Admin / Post / Kit. Without `BETTER_AUTH_SECRET` the API still 302s browser navigations to `/login` (fail closed). Project ingest stays on API keys.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `BETTER_AUTH_SECRET` | Production staff UI | — | Cookie signing secret. Minimum 32 characters. Leave unset in tests |
+| `BETTER_AUTH_URL` | No | `http://localhost:8001` | Public origin of this instance (cookie `baseURL`) |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | No | — | Extra comma-separated origins allowed to complete the staff sign-in POST. Non-production also allows `http://127.0.0.1:5197` and `http://localhost:5197` (LAN Vite). Production does not. |
+
+Do not publish `observe.hiai.gg` (or any public A/AAAA) until this gate is configured. Internal access control is the session cookie plus project API keys — `noindex` is not a substitute.
+
 ### Docker Monitoring
 
 | Variable | Required | Default | Description |

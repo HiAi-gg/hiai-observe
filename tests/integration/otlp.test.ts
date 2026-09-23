@@ -11,8 +11,7 @@
 
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../../src/store/db.js";
-import { traces } from "../../src/store/schema.js";
+import { liveIntegrationFixture } from "../lib/isolated-db.js";
 import {
   cleanupTestData,
   createTestProject,
@@ -22,13 +21,17 @@ import {
   waitForCondition,
 } from "./helpers.js";
 
-const SKIP = !(process.env.INTEGRATION === "1");
+const SKIP = !liveIntegrationFixture();
 
 describe.skipIf(SKIP)("OTLP Integration", () => {
   let projectId: string;
   let serverOk: boolean;
+  let db: typeof import("../../src/store/db.js").db;
+  let traces: typeof import("../../src/store/schema.js").traces;
 
   beforeAll(async () => {
+    ({ db } = await import("../../src/store/db.js"));
+    ({ traces } = await import("../../src/store/schema.js"));
     serverOk = await isServerReachable();
     if (!serverOk) return;
     projectId = await createTestProject("otlp-integration");

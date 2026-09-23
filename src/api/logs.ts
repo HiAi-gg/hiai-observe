@@ -95,7 +95,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         set,
       });
       if (!isScope(scope)) return scope;
-      const { container, level, search, regex, fuzzy, from, to, limit, offset } = query;
+      const { container, level, search, regex, fuzzy, traceId, from, to, limit, offset } = query;
       const scoped = {
         projectId: scope.projectId,
         includeHostLogs: scope.admin && !scope.projectId,
@@ -109,6 +109,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
             pattern: regex,
             container: container || undefined,
             level: level || undefined,
+            traceId: traceId || undefined,
             from: from ? new Date(from) : undefined,
             to: to ? new Date(to) : undefined,
             limit: limit ? Math.min(Number(limit), 1000) : 100,
@@ -131,6 +132,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
             term: fuzzy,
             container: container || undefined,
             level: level || undefined,
+            traceId: traceId || undefined,
             from: from ? new Date(from) : undefined,
             to: to ? new Date(to) : undefined,
             limit: limit ? Math.min(Number(limit), 1000) : 100,
@@ -144,6 +146,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
             container: container || undefined,
             level: level || undefined,
             search: fuzzy,
+            traceId: traceId || undefined,
             from: from ? new Date(from) : undefined,
             to: to ? new Date(to) : undefined,
             limit: limit ? Math.min(Number(limit), 1000) : 100,
@@ -158,6 +161,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         container: container || undefined,
         level: level || undefined,
         search: search || undefined,
+        traceId: traceId || undefined,
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
         limit: limit ? Math.min(Number(limit), 1000) : 100,
@@ -173,6 +177,7 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
         search: t.Optional(t.String()),
         regex: t.Optional(t.String()),
         fuzzy: t.Optional(t.String()),
+        traceId: t.Optional(t.String()),
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         limit: t.Optional(t.Numeric()),

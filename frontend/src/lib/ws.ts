@@ -1,3 +1,7 @@
+import { joinApiUrl } from "./api-url";
+
+const APP_BASE = import.meta.env.BASE_URL as string | undefined;
+
 type MessageCallback = (data: unknown) => void;
 
 interface WsState {
@@ -26,8 +30,8 @@ function createWsManager() {
 
   function getUrl(path: string): string {
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const base = path.startsWith("/") ? `${proto}//${window.location.host}` : "";
-    return `${base}${path}`;
+    const joined = joinApiUrl(path, { appBase: APP_BASE });
+    return `${proto}//${window.location.host}${joined}`;
   }
 
   function connect(path: string, containerId?: string) {
@@ -68,7 +72,11 @@ function createWsManager() {
 
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as { type?: string; channel?: string; data?: unknown };
+        const msg = JSON.parse(event.data as string) as {
+          type?: string;
+          channel?: string;
+          data?: unknown;
+        };
         if (msg.type === "pong") return;
 
         const channel = msg.channel ?? "default";
@@ -170,7 +178,9 @@ function createWsManager() {
     subscribe,
     unsubscribe,
     disconnect,
-    get connected() { return state.connected; },
+    get connected() {
+      return state.connected;
+    },
   };
 }
 

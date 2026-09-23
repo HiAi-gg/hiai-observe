@@ -13,9 +13,11 @@ const config = {
       strict: false,
     }),
     paths: {
+      // Unset NODE_ENV (GitHub Actions `vite dev`) is not "development".
+      // Treat anything except production as the LAN staff base.
       base:
         process.env.PUBLIC_BASE_PATH ??
-        (process.env.NODE_ENV === "development" ? "/hiai-observe" : ""),
+        (process.env.NODE_ENV === "production" ? "" : "/hiai-observe"),
     },
   },
 };

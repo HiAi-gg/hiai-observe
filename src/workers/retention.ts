@@ -3,6 +3,7 @@ import { Elysia, t } from "elysia";
 import { requireAdminKey } from "../lib/admin-auth.js";
 import { config } from "../lib/config.js";
 import { logger } from "../lib/logger.js";
+import { recordRetentionDeleted } from "../middleware/metrics.js";
 import { client, db } from "../store/db.js";
 import { retentionConfig } from "../store/schema.js";
 import { recordWorkerRun } from "./health.js";
@@ -20,6 +21,7 @@ const TABLE_DEFS: Array<{ tableName: string; timeColumn: string }> = [
   { tableName: "host_stats", timeColumn: "collected_at" },
   { tableName: "uptime_checks", timeColumn: "checked_at" },
   { tableName: "alert_history", timeColumn: "triggered_at" },
+  { tableName: "gpu_stats", timeColumn: "collected_at" },
 ];
 
 async function getRetentionDays(tableName: string): Promise<number> {
@@ -37,7 +39,10 @@ async function batchDelete(tableName: string, timeColumn: string, cutoff: Date):
     const result = await db.execute(
       sql`DELETE FROM ${sql.identifier(tableName)} WHERE id IN (SELECT id FROM ${sql.identifier(tableName)} WHERE ${sql.identifier(timeColumn)} < ${cutoff.toISOString()} LIMIT ${BATCH_SIZE})`,
     );
-    const deleted = result.length;
+    const deleted =
+      typeof (result as { count?: number }).count === "number"
+        ? (result as { count: number }).count
+        : result.length;
     totalDeleted += deleted;
     if (deleted < BATCH_SIZE) break;
   }
@@ -67,6 +72,7 @@ async function cleanupOldData() {
 
   if (totalCleaned > 0) {
     logger.info("Retention cleanup complete", { totalDeleted: totalCleaned });
+    recordRetentionDeleted(totalCleaned);
   } else {
     logger.debug("Retention cleanup: no old data to clean");
   }

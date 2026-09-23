@@ -24,6 +24,29 @@ export function recordRateLimiterFallOpen(): void {
   metrics.rateLimiterFallOpenCount++;
 }
 
+const otlpAccepted: Record<"logs" | "traces" | "metrics", number> = {
+  logs: 0,
+  traces: 0,
+  metrics: 0,
+};
+let retentionDeletedTotal = 0;
+
+export function recordOtlpAccepted(signal: "logs" | "traces" | "metrics", n = 1): void {
+  otlpAccepted[signal] += n;
+}
+
+export function recordRetentionDeleted(n: number): void {
+  retentionDeletedTotal += n;
+}
+
+/** Test-only: reset operational counters so /metrics assertions are deterministic. */
+export function resetOperationalCountersForTests(): void {
+  otlpAccepted.logs = 0;
+  otlpAccepted.traces = 0;
+  otlpAccepted.metrics = 0;
+  retentionDeletedTotal = 0;
+}
+
 /** DB pool stats — updated externally via `setDbPoolStats`. */
 let dbPoolStats = { active: 0, idle: 0, waiting: 0 };
 
@@ -108,6 +131,16 @@ export const metricsPlugin = new Elysia().use(metricsMiddleware).get("/metrics",
   );
   lines.push("# TYPE hiai_observe_rate_limiter_fall_open_total counter");
   lines.push(`hiai_observe_rate_limiter_fall_open_total ${metrics.rateLimiterFallOpenCount}`);
+
+  lines.push("# HELP hiai_observe_otlp_accepted_total OTLP records accepted by signal");
+  lines.push("# TYPE hiai_observe_otlp_accepted_total counter");
+  for (const signal of ["logs", "traces", "metrics"] as const) {
+    lines.push(`hiai_observe_otlp_accepted_total{signal="${signal}"} ${otlpAccepted[signal]}`);
+  }
+
+  lines.push("# HELP hiai_observe_retention_deleted_total Rows deleted by the retention worker");
+  lines.push("# TYPE hiai_observe_retention_deleted_total counter");
+  lines.push(`hiai_observe_retention_deleted_total ${retentionDeletedTotal}`);
 
   return `${lines.join("\n")}\n`;
 });

@@ -7,10 +7,13 @@ import {
   getHostStats,
   type HostStats,
 } from "$lib/api";
+import { joinApiUrl } from "$lib/api-url";
 import { drawTimeSeriesChart } from "$lib/chart-utils";
 import TimeSeriesChart from "$lib/components/TimeSeriesChart.svelte";
 import { apiKey } from "$lib/stores.svelte";
 import { formatBytes } from "$lib/utils";
+
+const APP_BASE = import.meta.env.BASE_URL as string | undefined;
 
 let containers = $state<ContainerStats[]>([]);
 let host = $state<HostStats | null>(null);
@@ -61,9 +64,12 @@ async function loadHistory() {
     const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const key = apiKey.current;
 
-    const hostRes = await fetch(`/api/infrastructure/host/history?from=${from}`, {
-      headers: { Authorization: `Bearer ${key}` },
-    });
+    const hostRes = await fetch(
+      joinApiUrl(`/api/infrastructure/host/history?from=${from}`, { appBase: APP_BASE }),
+      {
+        headers: { Authorization: `Bearer ${key}` },
+      },
+    );
     if (hostRes.ok) {
       const data = (await hostRes.json()) as { data: HostHistoryRow[] };
       hostHistory = data.data.map((r: HostHistoryRow) => ({
@@ -83,9 +89,12 @@ async function loadHistory() {
     const topContainers = [...containers].sort((a, b) => b.cpu_percent - a.cpu_percent).slice(0, 5);
     const cMap = new Map<string, Array<{ time: Date; value: number }>>();
     for (const c of topContainers) {
-      const cRes = await fetch(`/api/infrastructure/containers/${c.id}?from=${from}`, {
-        headers: { Authorization: `Bearer ${key}` },
-      });
+      const cRes = await fetch(
+        joinApiUrl(`/api/infrastructure/containers/${c.id}?from=${from}`, { appBase: APP_BASE }),
+        {
+          headers: { Authorization: `Bearer ${key}` },
+        },
+      );
       if (cRes.ok) {
         const cData = (await cRes.json()) as { data: ContainerHistoryRow[] };
         cMap.set(

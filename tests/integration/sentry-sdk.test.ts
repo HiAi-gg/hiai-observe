@@ -10,8 +10,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../../src/store/db.js";
-import { events, issues } from "../../src/store/schema.js";
+import { liveIntegrationFixture } from "../lib/isolated-db.js";
 import {
   apiFetch,
   cleanupTestData,
@@ -21,13 +20,18 @@ import {
   waitForCondition,
 } from "./helpers.js";
 
-const SKIP = !(process.env.INTEGRATION === "1");
+const SKIP = !liveIntegrationFixture();
 
 describe.skipIf(SKIP)("Sentry SDK Integration", () => {
   let projectId: string;
   let serverOk: boolean;
+  let db: typeof import("../../src/store/db.js").db;
+  let events: typeof import("../../src/store/schema.js").events;
+  let issues: typeof import("../../src/store/schema.js").issues;
 
   beforeAll(async () => {
+    ({ db } = await import("../../src/store/db.js"));
+    ({ events, issues } = await import("../../src/store/schema.js"));
     serverOk = await isServerReachable();
     if (!serverOk) return;
     projectId = await createTestProject("sentry-sdk-integration");

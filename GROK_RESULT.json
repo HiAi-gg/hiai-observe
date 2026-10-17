@@ -1,0 +1,80 @@
+{
+  "status": "review",
+  "tasks": [
+    {
+      "id": "HIAI-OBSERVE-T01",
+      "status": "review",
+      "summary": "Independent re-review 2026-09-14. Live Vite :5197/hiai-observe HTTP 200, empty-key sentinel, unauthenticated dashboard 401 (direct + proxy). CI vite-health job added. Windows LAN https://192.168.1.111/hiai-observe/ not probed from this host."
+    },
+    {
+      "id": "HIAI-OBSERVE-T02",
+      "status": "review",
+      "summary": "Unchanged this pass. 0003 additive SQL in journal. Isolated old-new apply previously passed on disposable hiai_observe_test. Not applied to app_hiai_observe or production. No 0002/0003 drizzle snapshots."
+    },
+    {
+      "id": "HIAI-OBSERVE-T03",
+      "status": "review",
+      "summary": "CI Test job now has an explicit Live tenant-scope DB tests step after migrate (TENANT_SCOPE_LIVE_DB=1). Default bun --no-env-file run test: 639 passed / 5 skipped. Docker Hub still waits for CI workflow_run; this pass did not publish."
+    }
+  ],
+  "changed_files": [
+    ".github/workflows/ci.yml",
+    "CHANGELOG.md",
+    "GROK_RESULT.json",
+    "TEAM_BACKLOG.md",
+    "docs/acceptance/RECOVERY-20260914.md",
+    "package.json",
+    "scripts/vite-health-gate.ts",
+    "src/api/otlp.ts",
+    "src/middleware/metrics.ts",
+    "src/workers/retention.ts",
+    "tests/middleware/tenant-scope-resolve.test.ts",
+    "tests/staff-ui-config.test.ts",
+    "tests/staff-ui-runtime.test.ts"
+  ],
+  "checks": [
+    {
+      "command": "python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run test tests/staff-ui-config.test.ts tests/staff-ui-runtime.test.ts tests/lib/isolated-db.test.ts tests/lib/unit-suite-imports.test.ts tests/middleware/tenant-scope-resolve.test.ts",
+      "exit_code": 0,
+      "summary": "5 files, 29 passed / 1 skipped."
+    },
+    {
+      "command": "VITE_HEALTH_GATE=1 python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run test tests/staff-ui-runtime.test.ts",
+      "exit_code": 0,
+      "summary": "2 passed. Live Vite :5197 /hiai-observe."
+    },
+    {
+      "command": "python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun scripts/vite-health-gate.ts",
+      "exit_code": 0,
+      "summary": "ok http://127.0.0.1:5197/hiai-observe/ status=200 bytes=1777."
+    },
+    {
+      "command": "env -u DATABASE_URL -u TENANT_SCOPE_LIVE_DB -u OBSERVE_MIGRATE_LIVE -u INTEGRATION -u VITE_HEALTH_GATE python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run test",
+      "exit_code": 0,
+      "summary": "69 files passed / 2 skipped; 639 passed / 5 skipped. No shared DB inserts."
+    },
+    {
+      "command": "python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run typecheck",
+      "exit_code": 0,
+      "summary": "tsc --noEmit clean."
+    },
+    {
+      "command": "python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run build",
+      "exit_code": 0,
+      "summary": "636 modules, dist/index.js 2.27 MB."
+    },
+    {
+      "command": "python3 /mnt/data/work/grok-portfolio-20260913/inplace/run-check.py bun --no-env-file run --cwd frontend test",
+      "exit_code": 0,
+      "summary": "3 files, 154 passed."
+    }
+  ],
+  "remaining": [
+    "Windows LAN https://192.168.1.111/hiai-observe/ not probed from DEV-01; http://127.0.0.1/hiai-observe/ 502 is shared Caddy host-match to :50111.",
+    "Live tenant 3/3 and 0003 apply not re-run locally (observe_test password not read). CI source restored.",
+    "INTEGRATION e2e/otlp/sentry not run (need booted :8001 on disposable fixture, not app_hiai_observe).",
+    "0002/0003 drizzle snapshots still absent (handwritten SQL).",
+    "No Docker Hub / npm publish. No git commit/push.",
+    "Wave leftovers: PM-INF-1, PM-RBAC."
+  ]
+}

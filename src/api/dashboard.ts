@@ -228,7 +228,6 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" }).get(
       // /api/dashboard contract documented in docs/EMBED.md
       errorCount24h: errorCountRow[0]?.value ?? 0,
       uptimePercent,
-      activeContainers,
       traceCount24h: traceCountRow[0]?.value ?? 0,
       recentIssues,
       monitorStatuses: monitors.map((m) => ({
@@ -239,6 +238,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/dashboard" }).get(
         isUp: (uptimeMap.get(m.id) ?? 100) >= 99.9,
       })),
       alertCount: activeAlerts[0]?.value ?? 0,
+      ...(scope.admin ? { activeContainers } : {}),
       errorBuckets: fillBuckets(errorBuckets),
       traceBuckets: fillBuckets(traceBuckets),
     };

@@ -147,7 +147,10 @@ export const logsWsPlugin = new Elysia().ws("/ws/logs", {
         });
         client.unsubscribes.push(unsub);
 
-        const recent = await getRecentLogs(body.containerId, 100);
+        const recent = await getRecentLogs(body.containerId, 100, {
+          projectId: client.admin ? undefined : client.projectId,
+          admin: client.admin,
+        });
         ws.send(JSON.stringify({ type: "recent", data: recent }));
       } catch (subErr) {
         ws.send(

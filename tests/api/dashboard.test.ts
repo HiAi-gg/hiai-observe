@@ -24,6 +24,7 @@ const PROJECT_ID = "660e8400-e29b-41d4-a716-446655440001";
 const MONITOR_UP = "mon-up";
 const MONITOR_DEGRADED = "mon-degraded";
 const MONITOR_DOWN = "mon-down";
+const resolveStaffSessionScope = vi.fn(async () => ({ kind: "anonymous" as const }));
 
 // ── Drizzle chain helpers ────────────────────────────────────────────
 function makeChain(result: any): any {
@@ -92,6 +93,8 @@ vi.mock("../../src/lib/rbac.js", () => ({
   checkWriteAccess: vi.fn(async () => true),
 }));
 
+vi.mock("../../src/lib/staff-session-scope.js", () => ({ resolveStaffSessionScope }));
+
 vi.mock("../../src/middleware/auth.js", async () => {
   const actual = await vi.importActual<any>("../../src/middleware/auth.js");
   return actual;
@@ -124,6 +127,7 @@ function appWithAuth(): Elysia {
 
 beforeEach(() => {
   queue = [];
+  resolveStaffSessionScope.mockResolvedValue({ kind: "anonymous" });
   dbMock.select.mockClear();
   dbMock.selectDistinctOn.mockClear();
 });
@@ -171,6 +175,35 @@ describe("GET /api/dashboard/ (direct plugin)", () => {
     expect(body.monitorStatuses).toEqual([]);
     expect(body.recentIssues).toEqual([]);
     expect(body.recentEvents).toEqual([]);
+  });
+
+  it("redacts the unscoped active container count for a staff session", async () => {
+    resolveStaffSessionScope.mockResolvedValue({
+      kind: "allowed",
+      projectId: PROJECT_ID,
+      projectIds: [PROJECT_ID],
+    });
+    enqueue(
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [],
+      [],
+      [{ value: 0 }],
+      [],
+      [],
+      [],
+      [{ value: 1 }],
+      [{ containerId: "host-c1", status: "running" }],
+    );
+
+    const res = await dashboardRoutes.handle(
+      new Request(`http://localhost/api/dashboard/?projectId=${PROJECT_ID}`, {
+        headers: { cookie: "better-auth.session_token=opaque" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).not.toHaveProperty("activeContainers");
   });
 
   it("returns full payload shape with populated data", async () => {

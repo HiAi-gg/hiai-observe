@@ -4,8 +4,9 @@
  */
 
 import { Elysia, t } from "elysia";
-import { collectDockerStats } from "../monitoring/docker-collector.js";
-import { collectHostStats } from "../monitoring/host-collector.js";
+import { adminKeyFromRequest } from "../lib/admin-auth.js";
+import { collectDockerStats, collectDockerStatsSnapshot } from "../monitoring/docker-collector.js";
+import { collectHostStats, collectHostStatsSnapshot } from "../monitoring/host-collector.js";
 import {
   getContainerLogCounts,
   getContainerStatsByContainer,
@@ -17,7 +18,21 @@ import {
   listHosts,
 } from "../store/infra.js";
 
+/**
+ * Infrastructure data is instance-wide: the backing tables and live
+ * collectors have no project dimension. A project API key therefore cannot
+ * safely authorize these routes, even though the global auth middleware has
+ * already validated that key. Keep this boundary at the route plugin so the
+ * collectors are never reached by project keys or staff sessions.
+ */
 export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" })
+  .onBeforeHandle(({ request, set }) => {
+    const admin = adminKeyFromRequest(request);
+    if (admin.ok) return;
+
+    set.status = admin.status;
+    return { error: admin.error };
+  })
 
   .get(
     "/containers",
@@ -115,20 +130,24 @@ export const infrastructureRoutes = new Elysia({ prefix: "/api/infrastructure" }
       try {
         const hostId = query.hostId ?? undefined;
         const [containers, host, latestContainers, latestHost] = await Promise.all([
-          collectDockerStats().catch(() => []),
-          collectHostStats().catch(() => null),
+          collectDockerStatsSnapshot().catch(() => null),
+          collectHostStatsSnapshot().catch(() => null),
           getLatestContainerStats(hostId).catch(() => []),
           getLatestHostStats(hostId).catch(() => null),
         ]);
 
         return {
           containers: {
-            current: containers,
-            count: containers.length,
+            current: containers?.current ?? null,
+            available: containers !== null,
+            observedAt: containers?.observedAt ?? null,
+            count: containers?.current.length ?? null,
             historical: latestContainers.length,
           },
           host: {
-            current: host,
+            current: host?.current ?? null,
+            available: host !== null,
+            observedAt: host?.observedAt ?? null,
             historical: latestHost,
           },
           hostId: hostId ?? "local",

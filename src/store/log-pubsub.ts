@@ -99,7 +99,12 @@ export async function subscribeAllLogs(callback: (entry: LogEntry) => void): Pro
 /**
  * Get recent logs from Redis for a container (last N entries).
  */
-export async function getRecentLogs(containerId: string, count = 100): Promise<LogEntry[]> {
+export async function getRecentLogs(
+  containerId: string,
+  count = 100,
+  scope: { projectId?: string; admin?: boolean } = {},
+): Promise<LogEntry[]> {
+  if (!scope.projectId && !scope.admin) return [];
   const key = `${LOGS_RECENT_PREFIX}${containerId}`;
   const raw = await redis.lrange(key, 0, count - 1);
 
@@ -111,7 +116,12 @@ export async function getRecentLogs(containerId: string, count = 100): Promise<L
         return null;
       }
     })
-    .filter((e): e is LogEntry => e !== null);
+    .filter((e): e is LogEntry => e !== null)
+    .filter((entry) =>
+      scope.projectId
+        ? (entry as LogEntry & { projectId?: string }).projectId === scope.projectId
+        : scope.admin === true,
+    );
 }
 
 /**

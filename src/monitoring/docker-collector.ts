@@ -25,6 +25,12 @@ export interface ContainerStats {
   health_status: string | null;
 }
 
+export interface DockerStatsSnapshot {
+  current: ContainerStats[];
+  /** Timestamp recorded by the collector after a successful observation. */
+  observedAt: string;
+}
+
 // Track previous network stats for rate calculation
 const prevNetStats = new Map<string, { rx: number; tx: number; time: number }>();
 
@@ -124,6 +130,15 @@ function matchesFilter(name: string): boolean {
 }
 
 export async function collectDockerStats(): Promise<ContainerStats[]> {
+  const { current } = await collectDockerStatsDetailed();
+  return current;
+}
+
+async function collectDockerStatsDetailed(): Promise<{
+  current: ContainerStats[];
+  attempted: number;
+  failed: number;
+}> {
   const containersRes = await dockerFetch("/containers/json");
   if (!containersRes.ok) {
     throw new Error(`Docker API error: ${containersRes.status}`);
@@ -135,12 +150,16 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
     return matchesFilter(name);
   });
 
+  let failed = 0;
   const results = await Promise.all(
     filtered.map(async (container): Promise<ContainerStats | null> => {
       const name = (container.Names[0] || "").replace(/^\//, "");
       try {
         const statsRes = await dockerFetch(`/containers/${container.Id}/stats?stream=false`);
-        if (!statsRes.ok) return null;
+        if (!statsRes.ok) {
+          failed += 1;
+          return null;
+        }
         const stats = (await statsRes.json()) as DockerStats;
 
         const net = calculateNetworkIo(stats);
@@ -185,10 +204,24 @@ export async function collectDockerStats(): Promise<ContainerStats[]> {
           health_status: null,
         };
       } catch {
+        failed += 1;
         return null;
       }
     }),
   );
 
-  return results.filter((r): r is ContainerStats => r !== null);
+  return {
+    current: results.filter((r): r is ContainerStats => r !== null),
+    attempted: filtered.length,
+    failed,
+  };
+}
+
+/** Return a successful observation with its collector completion timestamp. */
+export async function collectDockerStatsSnapshot(): Promise<DockerStatsSnapshot> {
+  const { current, attempted, failed } = await collectDockerStatsDetailed();
+  if (failed > 0) {
+    throw new Error(`Docker stats observation incomplete (${failed}/${attempted} failed)`);
+  }
+  return { current, observedAt: new Date().toISOString() };
 }

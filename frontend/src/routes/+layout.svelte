@@ -10,6 +10,8 @@ import { currentProject, darkMode, dismissToast, getToasts, sidebarOpen } from "
 let { children } = $props();
 
 let projects = $state<Project[]>([]);
+let sessionScoped = $state(false);
+let projectBootstrapReady = $state(false);
 let projectDropdownOpen = $state(false);
 
 const currentProjectName = $derived(
@@ -17,11 +19,40 @@ const currentProjectName = $derived(
 );
 
 $effect(() => {
+  const requestedProjectId = page.url.searchParams.get("projectId");
+  // Route changes can retain this layout instance. Hold child loaders until
+  // the new route's project selector has been validated and applied.
+  projectBootstrapReady = false;
   getProjects()
     .then((res) => {
       projects = res.projects ?? [];
+      sessionScoped = res.sessionScoped === true;
+      // A multi-project staff session must select one project before any
+      // project-scoped dashboard request. Never select a project for the
+      // legacy API-key/admin path, which retains its existing "All Projects"
+      // behavior.
+      if (
+        sessionScoped &&
+        projects.length > 0 &&
+        !projects.some((project) => project.id === requestedProjectId) &&
+        !projects.some((project) => project.id === currentProject.current)
+      ) {
+        const firstProject = projects[0];
+        if (firstProject) currentProject.current = firstProject.id;
+      } else if (
+        sessionScoped &&
+        requestedProjectId &&
+        projects.some((project) => project.id === requestedProjectId)
+      ) {
+        // Deep links carry their project scope; honor it only when the
+        // bootstrap response proves that the session is allowed to read it.
+        currentProject.current = requestedProjectId;
+      }
+      projectBootstrapReady = true;
     })
-    .catch(() => {});
+    .catch(() => {
+      projectBootstrapReady = true;
+    });
 });
 
 function selectProject(id: string) {
@@ -214,12 +245,14 @@ $effect(() => {
         </button>
         {#if projectDropdownOpen}
           <div class="absolute left-3 right-3 z-50 mt-1 rounded-md border border-[var(--border)] bg-[var(--card)] py-1 shadow-lg">
-            <button type="button"
-              onclick={() => selectProject("")}
-              class="flex w-full items-center px-3 py-2 text-sm text-[var(--muted-foreground)] hover:bg-[var(--accent)] {currentProject.current === '' ? 'text-[var(--primary)]' : ''}"
-            >
-              All Projects
-            </button>
+            {#if !sessionScoped}
+              <button type="button"
+                onclick={() => selectProject("")}
+                class="flex w-full items-center px-3 py-2 text-sm text-[var(--muted-foreground)] hover:bg-[var(--accent)] {currentProject.current === '' ? 'text-[var(--primary)]' : ''}"
+              >
+                All Projects
+              </button>
+            {/if}
             {#each projects as project (project.id)}
               <button type="button"
                 onclick={() => selectProject(project.id)}
@@ -228,15 +261,17 @@ $effect(() => {
                 {project.name}
               </button>
             {/each}
-            <div class="border-t border-[var(--border)]">
-              <a
-                href="{resolve('/settings')}#projects"
-                onclick={() => { projectDropdownOpen = false; }}
-                class="flex w-full items-center px-3 py-2 text-sm text-[var(--muted-foreground)] hover:bg-[var(--accent)]"
-              >
-                Manage projects
-              </a>
-            </div>
+            {#if !sessionScoped}
+              <div class="border-t border-[var(--border)]">
+                <a
+                  href="{resolve('/settings')}#projects"
+                  onclick={() => { projectDropdownOpen = false; }}
+                  class="flex w-full items-center px-3 py-2 text-sm text-[var(--muted-foreground)] hover:bg-[var(--accent)]"
+                >
+                  Manage projects
+                </a>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
@@ -300,18 +335,26 @@ $effect(() => {
   </aside>
 
   <!-- Main content -->
-  <main id="main-content" class="flex-1 overflow-y-auto p-6">
-    <svelte:boundary>
-      {@render children()}
-      {#snippet failed(error, reset)}
-        <div class="mx-auto mt-16 max-w-lg rounded-lg border border-[var(--destructive)]/40 bg-[color-mix(in_oklch,var(--destructive)_18%,transparent)] p-6 text-center">
-          <h2 class="text-lg font-semibold text-[var(--destructive)]">Something went wrong on this page</h2>
-          <p class="mt-2 text-sm text-[var(--muted-foreground)]">{error instanceof Error ? error.message : String(error)}</p>
-          <button type="button" onclick={reset} class="mt-4 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium hover:bg-[var(--accent)] transition-colors">Reload section</button>
-        </div>
-      {/snippet}
-    </svelte:boundary>
-  </main>
+  {#if !projectBootstrapReady}
+    <main id="main-content" class="flex-1 overflow-y-auto p-6">
+      <div class="mx-auto mt-16 max-w-lg text-center text-sm text-[var(--muted-foreground)]">
+        Loading projects…
+      </div>
+    </main>
+  {:else}
+    <main id="main-content" class="flex-1 overflow-y-auto p-6">
+      <svelte:boundary>
+        {@render children()}
+        {#snippet failed(error, reset)}
+          <div class="mx-auto mt-16 max-w-lg rounded-lg border border-[var(--destructive)]/40 bg-[color-mix(in_oklch,var(--destructive)_18%,transparent)] p-6 text-center">
+            <h2 class="text-lg font-semibold text-[var(--destructive)]">Something went wrong on this page</h2>
+            <p class="mt-2 text-sm text-[var(--muted-foreground)]">{error instanceof Error ? error.message : String(error)}</p>
+            <button type="button" onclick={reset} class="mt-4 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium hover:bg-[var(--accent)] transition-colors">Reload section</button>
+          </div>
+        {/snippet}
+      </svelte:boundary>
+    </main>
+  {/if}
 </div>
 {/if}
 

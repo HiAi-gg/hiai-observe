@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ── Constants ────────────────────────────────────────────────────────
 const PROJECT_ID = "660e8400-e29b-41d4-a716-446655440001";
 const NONEXISTENT_ID = "770e8400-e29b-41d4-a716-446655440000";
+const resolveStaffSessionScope = vi.fn();
 
 // ── Drizzle chain helper ─────────────────────────────────────────────
 function makeChain(result: any): any {
@@ -57,6 +58,7 @@ const dbMock: any = {
 };
 
 vi.mock("../../src/store/db.js", () => ({ db: dbMock }));
+vi.mock("../../src/lib/staff-session-scope.js", () => ({ resolveStaffSessionScope }));
 
 // ── Auth helpers — keep maskApiKey real; stub resolve/lookup so authGuard
 //    falls through to 401, and stub hashApiKey to avoid Bun.password.hash
@@ -144,6 +146,7 @@ function appWithAuth(): Elysia {
 beforeEach(() => {
   queue = [];
   uuidCounter = 0;
+  resolveStaffSessionScope.mockResolvedValue({ kind: "anonymous" });
   dbMock.select.mockClear();
   dbMock.selectDistinctOn.mockClear();
   dbMock.insert.mockClear();
@@ -211,6 +214,28 @@ describe("GET /api/projects/", () => {
     const res = await projectsRoutes.handle(new Request("http://localhost/api/projects/"));
     const body = await res.json();
     expect(body.projects[0].apiKeyPreview).toBeNull();
+  });
+
+  it("lists only the allowlisted projects for a multi-project staff session", async () => {
+    resolveStaffSessionScope.mockResolvedValue({
+      kind: "allowed",
+      projectIds: [PROJECT_ID, NONEXISTENT_ID],
+    });
+    enqueue([
+      {
+        id: PROJECT_ID,
+        name: "Allowed",
+        slug: "allowed",
+        keyPrefix: null,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ]);
+
+    const res = await projectsRoutes.handle(new Request("http://localhost/api/projects/"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sessionScoped).toBe(true);
+    expect(body.projects.map((project: { id: string }) => project.id)).toEqual([PROJECT_ID]);
   });
 });
 

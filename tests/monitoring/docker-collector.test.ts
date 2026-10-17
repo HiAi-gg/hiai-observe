@@ -97,6 +97,93 @@ describe("collectDockerStats", () => {
     }
   });
 
+  it("rejects a snapshot when any discovered container stats observation fails", async () => {
+    const originalFetch = globalThis.fetch;
+    const validStats = {
+      cpu_stats: {
+        cpu_usage: { total_usage: 200000000 },
+        system_cpu_usage: 10000000000,
+        online_cpus: 4,
+      },
+      precpu_stats: {
+        cpu_usage: { total_usage: 100000000 },
+        system_cpu_usage: 5000000000,
+      },
+      memory_stats: { usage: 268435456, limit: 1073741824 },
+    };
+    globalThis.fetch = vi.fn((url: string | URL | Request) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/containers/json")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                Id: "abc123def456789",
+                Names: ["/test-container"],
+                Image: "nginx:latest",
+                State: "running",
+                Status: "Up 2 hours",
+                StartedAt: new Date().toISOString(),
+              },
+              {
+                Id: "def456abc123789",
+                Names: ["/healthy-container"],
+                Image: "redis:latest",
+                State: "running",
+                Status: "Up 2 hours",
+                StartedAt: new Date().toISOString(),
+              },
+            ]),
+            { status: 200 },
+          ),
+        );
+      }
+      if (urlStr.includes("/stats")) {
+        if (urlStr.includes("abc123def456789")) {
+          return Promise.resolve(new Response("unavailable", { status: 503 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(validStats), { status: 200 }));
+      }
+      return Promise.resolve(new Response("Not Found", { status: 404 }));
+    }) as typeof fetch;
+
+    try {
+      const { collectDockerStatsSnapshot } = await import(
+        "../../src/monitoring/docker-collector.js"
+      );
+      await expect(collectDockerStatsSnapshot()).rejects.toThrow(
+        "Docker stats observation incomplete (1/2 failed)",
+      );
+
+      globalThis.fetch = vi.fn((url: string | URL | Request) => {
+        const urlStr = typeof url === "string" ? url : url.toString();
+        if (urlStr.includes("/containers/json")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify([
+                {
+                  Id: "abc123def456789",
+                  Names: ["/test-container"],
+                  Image: "nginx:latest",
+                  State: "running",
+                  Status: "Up",
+                  StartedAt: new Date().toISOString(),
+                },
+              ]),
+              { status: 200 },
+            ),
+          );
+        }
+        return Promise.resolve(new Response("unavailable", { status: 503 }));
+      }) as typeof fetch;
+      await expect(collectDockerStatsSnapshot()).rejects.toThrow(
+        "Docker stats observation incomplete (1/1 failed)",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("config reads from environment", () => {
     const config = getMonitoringConfig();
     expect(config).toHaveProperty("dockerSocket");

@@ -67,9 +67,13 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
   })
   .get(
     "/volume",
-    async ({ query }) => {
+    async ({ request, query, set }) => {
+      const scope = await applyScope({ request, query: query as Record<string, unknown>, set });
+      if (!isScope(scope)) return scope;
       const { interval, containerId, from, to } = query;
       const result = await getLogVolume({
+        projectId: scope.projectId,
+        includeHostLogs: scope.admin && !scope.projectId,
         interval: interval || "1h",
         containerId: containerId || undefined,
         from: from ? new Date(from) : undefined,
@@ -79,6 +83,8 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     },
     {
       query: t.Object({
+        projectId: t.Optional(t.String()),
+        project_id: t.Optional(t.String()),
         interval: t.Optional(t.String()),
         containerId: t.Optional(t.String()),
         from: t.Optional(t.String()),
@@ -168,6 +174,8 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     },
     {
       query: t.Object({
+        projectId: t.Optional(t.String()),
+        project_id: t.Optional(t.String()),
         container: t.Optional(t.String()),
         level: t.Optional(t.String()),
         search: t.Optional(t.String()),
@@ -259,6 +267,8 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     },
     {
       query: t.Object({
+        projectId: t.Optional(t.String()),
+        project_id: t.Optional(t.String()),
         container: t.Optional(t.String()),
       }),
     },
@@ -299,6 +309,8 @@ export const logsPlugin = new Elysia({ prefix: "/api/logs" })
     },
     {
       query: t.Object({
+        projectId: t.Optional(t.String()),
+        project_id: t.Optional(t.String()),
         before: t.Optional(t.String()),
         confirm: t.Optional(t.String()),
       }),

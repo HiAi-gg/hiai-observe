@@ -44,10 +44,17 @@ export const projectsRoutes = new Elysia({ prefix: "/api/projects" })
         createdAt: projects.createdAt,
       })
       .from(projects)
-      .where(scope.projectId ? eq(projects.id, scope.projectId) : undefined)
+      .where(
+        scope.projectId
+          ? eq(projects.id, scope.projectId)
+          : scope.session && scope.projectIds?.length
+            ? inArray(projects.id, scope.projectIds)
+            : undefined,
+      )
       .orderBy(projects.createdAt);
 
     return {
+      sessionScoped: scope.session === true,
       projects: items.map((p) => ({
         ...p,
         apiKeyPreview: p.keyPrefix ? `${p.keyPrefix}...` : null,

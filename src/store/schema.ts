@@ -64,12 +64,16 @@ export const teamMembers = pgTable(
       .notNull(),
     name: text("name").notNull(),
     email: text("email").notNull(),
+    // Optional immutable Better Auth user binding. Legacy team rows remain
+    // email-address based until explicitly backfilled and verified.
+    staffUserId: text("staff_user_id"),
     role: text("role").default("member").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at"),
   },
   (t) => [
     index("team_members_project_idx").on(t.projectId),
+    index("team_members_staff_user_idx").on(t.staffUserId),
     unique("team_members_project_email_idx").on(t.projectId, t.email),
   ],
 );

@@ -30,6 +30,11 @@ let error = $state<string | null>(null);
 let pageNum = $state(1);
 const perPage = 10;
 
+function issueHref(issue: Pick<Issue, "id" | "projectId">): string {
+  const qs = new URLSearchParams({ projectId: issue.projectId });
+  return `/issues/${issue.id}?${qs}`;
+}
+
 async function loadReleaseData() {
   try {
     loading = true;
@@ -238,8 +243,8 @@ function envBadgeColor(env: string): string {
                     class="cursor-pointer transition-colors hover:bg-[var(--primary)]/5 group"
                     role="link"
                     tabindex="0"
-                    onclick={() => goto(`/issues/${issue.id}`)}
-                    onkeydown={(e) => { if (e.key === 'Enter') goto(`/issues/${issue.id}`); }}
+                    onclick={() => goto(issueHref(issue))}
+                    onkeydown={(e) => { if (e.key === 'Enter') goto(issueHref(issue)); }}
                   >
                     <td class="px-4 py-3.5">
                       <StatusBadge status={issue.status} size="sm" />

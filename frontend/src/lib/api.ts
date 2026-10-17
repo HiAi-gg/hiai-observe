@@ -29,10 +29,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Append projectId from store to search params when set */
-function withProject(qs: URLSearchParams): URLSearchParams {
+/** Append the selected project from the store to search params when set. */
+function withProject(qs: URLSearchParams, key = "projectId"): URLSearchParams {
   const pid = currentProject.current;
-  if (pid) qs.set("projectId", pid);
+  if (pid) qs.set(key, pid);
   return qs;
 }
 
@@ -79,7 +79,9 @@ export async function getIssues(params?: {
 }
 
 export async function getIssue(id: string) {
-  return apiFetch<Issue>(`/api/issues/${id}`);
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<Issue>(`/api/issues/${id}${suffix}`);
 }
 
 export async function updateIssue(id: string, data: { status?: string; assignedTo?: string }) {
@@ -115,16 +117,22 @@ export async function getMonitors(params?: { hours?: number; group?: string }) {
 }
 
 export async function getMonitorGroups() {
-  return apiFetch<{ groups: Array<{ group: string; count: number }> }>(`/api/monitors/groups`);
+  const qs = withProject(new URLSearchParams(), "project_id");
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<{ groups: Array<{ group: string; count: number }> }>(
+    `/api/monitors/groups${suffix}`,
+  );
 }
 
 export async function getMonitorChecks(monitorId: string, limit = 48) {
+  const qs = withProject(new URLSearchParams());
+  qs.set("limit", String(limit));
   return apiFetch<{
     checks: Array<{
       responseTimeMs?: number;
       response_time_ms?: number;
     }>;
-  }>(`/api/monitors/${monitorId}/checks?limit=${limit}`);
+  }>(`/api/monitors/${monitorId}/checks?${qs}`);
 }
 
 export async function getContainerStats() {
@@ -172,7 +180,7 @@ export async function getLogs(params?: {
   limit?: number;
   offset?: number;
 }) {
-  const qs = new URLSearchParams();
+  const qs = withProject(new URLSearchParams());
   if (params?.container) qs.set("container", params.container);
   if (params?.level) qs.set("level", params.level);
   if (params?.search) qs.set("search", params.search);
@@ -193,7 +201,9 @@ export interface LogStats {
 }
 
 export async function getLogStats() {
-  return apiFetch<LogStats>("/api/logs/stats");
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<LogStats>(`/api/logs/stats${suffix}`);
 }
 
 export interface LogVolumeBucket {
@@ -207,7 +217,7 @@ export async function getLogVolume(params?: {
   from?: string;
   to?: string;
 }) {
-  const qs = new URLSearchParams();
+  const qs = withProject(new URLSearchParams());
   if (params?.interval) qs.set("interval", params.interval);
   if (params?.containerId) qs.set("containerId", params.containerId);
   if (params?.from) qs.set("from", params.from);
@@ -227,6 +237,7 @@ export interface SavedSearch {
 export async function getSavedSearches(projectId?: string) {
   const qs = new URLSearchParams();
   if (projectId) qs.set("projectId", projectId);
+  withProject(qs);
   return apiFetch<{ data: SavedSearch[] }>(`/api/saved-searches?${qs}`);
 }
 
@@ -257,6 +268,7 @@ export function getLogsDownloadUrl(params: {
   qs.set("format", params.format ?? "csv");
   if (params.container) qs.set("container", params.container);
   if (params.level) qs.set("level", params.level);
+  withProject(qs);
   return apiUrl(`/api/export/logs?${qs}`);
 }
 
@@ -307,7 +319,9 @@ export async function getTraces(params?: {
 }
 
 export async function getTrace(id: string) {
-  return apiFetch<TraceDetail>(`/api/traces/${id}`);
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<TraceDetail>(`/api/traces/${id}${suffix}`);
 }
 
 export async function getAlerts() {
@@ -388,7 +402,7 @@ export async function getNotificationChannels() {
 // --- Projects ---
 
 export async function getProjects() {
-  return apiFetch<{ projects: Project[] }>("/api/projects");
+  return apiFetch<{ projects: Project[]; sessionScoped?: boolean }>("/api/projects");
 }
 
 export async function createProject(name: string) {
@@ -437,7 +451,7 @@ export interface HourlyBucket {
 export interface DashboardData {
   errorCount24h: number;
   uptimePercent: number;
-  activeContainers: number;
+  activeContainers?: number;
   traceCount24h: number;
   recentIssues: Issue[];
   monitorStatuses: {
@@ -681,6 +695,7 @@ export async function getReleases(params?: {
   if (params?.environment) qs.set("environment", params.environment);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
+  withProject(qs);
   return apiFetch<{ data: Release[]; total: number }>(`/api/releases?${qs}`);
 }
 
@@ -697,7 +712,9 @@ export async function createRelease(data: {
 }
 
 export async function getReleaseHealth(id: string) {
-  return apiFetch<ReleaseHealth>(`/api/releases/${id}/health`);
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<ReleaseHealth>(`/api/releases/${id}/health${suffix}`);
 }
 
 export async function deleteRelease(id: string) {
@@ -725,6 +742,7 @@ export async function getTeamMembers(params?: {
   if (params?.projectId) qs.set("projectId", params.projectId);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
+  withProject(qs);
   return apiFetch<{ data: TeamMember[]; total: number }>(`/api/team?${qs}`);
 }
 
@@ -771,6 +789,7 @@ export async function getIssueComments(
   const qs = new URLSearchParams();
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
+  withProject(qs);
   return apiFetch<{ data: IssueComment[]; total: number }>(`/api/issues/${issueId}/comments?${qs}`);
 }
 
@@ -1005,7 +1024,9 @@ export async function deleteIncident(id: string) {
 // --- Releases (Single & Update) ---
 
 export async function getRelease(id: string) {
-  return apiFetch<Release>(`/api/releases/${id}`);
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<Release>(`/api/releases/${id}${suffix}`);
 }
 
 export async function updateRelease(
@@ -1159,7 +1180,9 @@ export async function getHostHistory(hostId?: string, from?: string, to?: string
 }
 
 export async function getMonitor(id: string) {
-  return apiFetch<{ monitor: Monitor & { uptime24h: number } }>(`/api/monitors/${id}`);
+  const qs = withProject(new URLSearchParams());
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch<{ monitor: Monitor & { uptime24h: number } }>(`/api/monitors/${id}${suffix}`);
 }
 
 export async function createMonitor(data: {

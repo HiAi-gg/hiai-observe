@@ -2,6 +2,10 @@ import type { Context } from "elysia";
 import { adminKeyFromRequest } from "../lib/admin-auth.js";
 import { lookupProject, resolveApiKey } from "../lib/auth.js";
 import { checkWriteAccess } from "../lib/rbac.js";
+import {
+  isStaffSessionReadablePath,
+  resolveStaffSessionScope,
+} from "../lib/staff-session-scope.js";
 
 /**
  * Paths that bypass the Authorization-header middleware check.
@@ -101,9 +105,37 @@ export async function authGuard({
 
   const projectId = await resolveProjectId(request);
   if (!projectId) {
-    set.status = 401;
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
+    const staffScope = await resolveStaffSessionScope(request);
+    if (staffScope.kind === "allowed") {
+      if (!isStaffSessionReadablePath(path)) {
+        set.status = 403;
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            Pragma: "no-cache",
+          },
+        });
+      }
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        set.status = 403;
+        return new Response(JSON.stringify({ error: "Forbidden: staff sessions are read-only" }), {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            Pragma: "no-cache",
+          },
+        });
+      }
+      return undefined;
+    }
+
+    const status = staffScope.kind === "forbidden" ? 403 : 401;
+    set.status = status;
+    return new Response(JSON.stringify({ error: status === 403 ? "Forbidden" : "Unauthorized" }), {
+      status,
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",

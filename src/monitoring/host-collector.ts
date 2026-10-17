@@ -41,6 +41,12 @@ export interface HostStats {
   top_processes: TopProcess[];
 }
 
+export interface HostStatsSnapshot {
+  current: HostStats;
+  /** Timestamp recorded by the collector after a successful observation. */
+  observedAt: string;
+}
+
 // Track per-core CPU deltas
 const prevCpuIdle: Record<string, number> = {};
 const prevCpuTotal: Record<string, number> = {};
@@ -331,4 +337,10 @@ export async function collectHostStats(): Promise<HostStats> {
     network_tx_bytes: net.tx,
     top_processes: procs,
   };
+}
+
+/** Return a successful observation with its collector completion timestamp. */
+export async function collectHostStatsSnapshot(): Promise<HostStatsSnapshot> {
+  const current = await collectHostStats();
+  return { current, observedAt: new Date().toISOString() };
 }

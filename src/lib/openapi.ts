@@ -1506,7 +1506,12 @@ function buildPaths(): Record<string, unknown> {
         summary: "High-level infrastructure overview (current + latest persisted)",
         description:
           "Aggregates current Docker stats + host stats alongside the latest persisted " +
-          "snapshot in a single response — useful for landing-page tiles.",
+          "snapshot in a single response — useful for landing-page tiles. Each current " +
+          "collector includes `available` and a collector-produced `observedAt`; a " +
+          "rejected collector uses `current: null` and `observedAt: null` rather than " +
+          "masquerading as an empty healthy inventory. Live collectors observe the local " +
+          "instance; `hostId` selects persisted historical data and does not retarget " +
+          "the live current fields.",
         parameters: [queryStr("hostId")],
         responses: {
           200: { description: "Infrastructure overview" },

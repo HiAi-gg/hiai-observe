@@ -202,6 +202,8 @@ export async function searchLogsFuzzy(params: SearchLogsFuzzyParams) {
 }
 
 interface LogVolumeParams {
+  projectId?: string;
+  includeHostLogs?: boolean;
   interval?: string;
   containerId?: string;
   from?: Date;
@@ -223,7 +225,7 @@ export async function getLogVolume(params: LogVolumeParams) {
   };
   const unit = truncUnit[interval] ?? "hour";
 
-  const conditions = [];
+  const conditions = [...projectScopeConditions(params)];
   const effectiveFrom = from ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
   const effectiveTo = to ?? new Date();
   conditions.push(gte(logs.timestamp, effectiveFrom));

@@ -8,6 +8,7 @@
 import { adminKeyFromRequest } from "./admin-auth.js";
 import { lookupProject, resolveApiKey } from "./auth.js";
 import { config } from "./config.js";
+import { resolveStaffSessionScope } from "./staff-session-scope.js";
 
 export class ScopeError extends Error {
   readonly status: 401 | 403;
@@ -27,7 +28,11 @@ export interface ResolveScopeOpts {
 
 export interface Scope {
   projectId: string | undefined;
+  /** Allowlist used only by the projects bootstrap list for multi-membership sessions. */
+  projectIds?: string[];
   admin: boolean;
+  /** True only for a Better Auth staff session; such scopes are GET-only. */
+  session?: boolean;
 }
 
 export function resolveScope(opts: ResolveScopeOpts): Scope {
@@ -101,7 +106,35 @@ export async function applyScope(args: {
     const hasCreds = !!(
       args.request.headers.get("authorization") || args.request.headers.get("x-api-key")
     );
-    if (config.NODE_ENV === "test" && !admin.ok && !authProjectId && !hasCreds) {
+    if (!admin.ok && !authProjectId) {
+      const staffScope = await resolveStaffSessionScope(args.request);
+      if (staffScope.kind === "allowed") {
+        if (args.request.method !== "GET" && args.request.method !== "HEAD") {
+          args.set.status = 403;
+          return { error: "Forbidden: staff sessions are read-only" };
+        }
+        return {
+          projectId: staffScope.projectId,
+          projectIds: staffScope.projectIds,
+          admin: false,
+          session: true,
+        };
+      }
+      if (staffScope.kind === "forbidden") {
+        args.set.status = 403;
+        return {
+          error:
+            staffScope.reason === "project_required"
+              ? "Forbidden: projectId is required"
+              : "Forbidden: project mismatch",
+        };
+      }
+    }
+    // Keep the existing test-only unscoped fixture behavior, but never allow
+    // it when a browser cookie is present: a failed staff session must fail
+    // closed rather than become an implicit admin scope.
+    const hasCookie = !!args.request.headers.get("cookie");
+    if (config.NODE_ENV === "test" && !admin.ok && !authProjectId && !hasCreds && !hasCookie) {
       return { projectId: requested, admin: true };
     }
     return resolveScope({

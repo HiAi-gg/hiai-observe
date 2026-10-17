@@ -14,9 +14,9 @@ import {
 } from "$lib/api";
 import AnsiText from "$lib/components/AnsiText.svelte";
 import LiveIndicator from "$lib/components/LiveIndicator.svelte";
-import { apiKey } from "$lib/stores.svelte";
+import { liveLogUnsupportedReason } from "$lib/live-log-availability";
+import { apiKey, currentProject } from "$lib/stores.svelte";
 import { debounce, highlightJson, isJson, isStackTrace, stripAnsi } from "$lib/utils";
-import { wsManager } from "$lib/ws";
 
 const MAX_LIVE_LOGS = 1000;
 const PAGE_SIZE = 100;
@@ -26,6 +26,7 @@ let loading = $state(true);
 let loadingOlder = $state(false);
 let error = $state<string | null>(null);
 let connected = $state(false);
+let liveUnsupportedReason = $state<string | null>(null);
 let containerFilter = $state("");
 let levelFilter = $state("");
 let searchQuery = $state("");
@@ -215,6 +216,15 @@ $effect(() => {
   loadSavedSearches();
 
   const key = apiKey.current;
+  liveUnsupportedReason = liveLogUnsupportedReason({
+    hasApiKey: Boolean(key),
+    selectedProject: currentProject.current,
+  });
+  if (liveUnsupportedReason) {
+    connected = false;
+    return;
+  }
+
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${window.location.host}/ws/logs`);
 
@@ -517,7 +527,13 @@ function formatBucketLabel(time: string): string {
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
       <h1 class="text-2xl font-bold">Logs</h1>
-      <LiveIndicator {connected} />
+      {#if liveUnsupportedReason}
+        <span class="rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs text-[var(--muted-foreground)]" role="status">
+          {liveUnsupportedReason}
+        </span>
+      {:else}
+        <LiveIndicator {connected} />
+      {/if}
       {#if autoRefresh}
         <span class="rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs text-[var(--muted-foreground)]">Auto-refresh</span>
       {/if}

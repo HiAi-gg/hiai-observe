@@ -32,9 +32,13 @@ import {
   getLogs,
   getLogsDownloadUrl,
   getLogVolume,
+  getMonitor,
+  getMonitorChecks,
+  getMonitorGroups,
   getMonitors,
   getNotificationChannels,
   getProjects,
+  getRelease,
   getReleaseHealth,
   getReleases,
   getRetention,
@@ -268,6 +272,72 @@ describe("API client", () => {
       expect(url).toContain("limit=10");
       expect(url).toContain("projectId=p1");
     });
+
+    const selectedProjectReaders = [
+      ["logs", () => getLogs({ limit: 10 }), "projectId"],
+      ["log stats", () => getLogStats(), "projectId"],
+      ["log volume", () => getLogVolume({ interval: "1h" }), "projectId"],
+      ["saved searches", () => getSavedSearches(), "projectId"],
+      ["monitor groups", () => getMonitorGroups(), "project_id"],
+      ["releases", () => getReleases({ limit: 10 }), "projectId"],
+    ] as const;
+
+    it.each(selectedProjectReaders)(
+      "includes the selected project on %s requests without a session API key",
+      async (_name, read, projectKey) => {
+        currentProject.current = "p1";
+        apiKey.current = "";
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+        await read();
+
+        const [url, init] = fetchSpy.mock.calls[0]!;
+        expect(new URL(String(url), "http://localhost").searchParams.get(projectKey)).toBe("p1");
+        expect(new Headers(init?.headers).get("Authorization")).toBeNull();
+      },
+    );
+
+    it.each(selectedProjectReaders)(
+      "preserves API-key authorization while adding the selected project to %s requests",
+      async (_name, read, projectKey) => {
+        currentProject.current = "p1";
+        apiKey.current = "test-key-123";
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+        await read();
+
+        const [url, init] = fetchSpy.mock.calls[0]!;
+        expect(new URL(String(url), "http://localhost").searchParams.get(projectKey)).toBe("p1");
+        expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test-key-123");
+      },
+    );
+
+    it("adds the selected project to the CSV log download URL", () => {
+      currentProject.current = "p1";
+
+      expect(getLogsDownloadUrl({})).toContain("projectId=p1");
+    });
+
+    it.each(selectedProjectReaders)(
+      "does not invent a project on %s requests when the selector is empty",
+      async (_name, read, projectKey) => {
+        currentProject.current = "";
+        apiKey.current = "test-key-123";
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+        await read();
+
+        const [url, init] = fetchSpy.mock.calls[0]!;
+        expect(new URL(String(url), "http://localhost").searchParams.get(projectKey)).toBeNull();
+        expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test-key-123");
+      },
+    );
+
+    it("does not invent a project on the CSV log download URL when the selector is empty", () => {
+      currentProject.current = "";
+
+      expect(getLogsDownloadUrl({})).not.toContain("projectId=");
+    });
   });
 
   // --- Individual API functions ---
@@ -308,6 +378,15 @@ describe("API client", () => {
 
       expect(fetchSpy.mock.calls[0]![0]).toContain("/api/issues/123");
       expect(result).toEqual(data);
+    });
+
+    it("includes the selected project on issue deep-link requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+      await getIssue("123");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/issues/123?projectId=p1");
     });
   });
 
@@ -357,6 +436,28 @@ describe("API client", () => {
 
       const url = fetchSpy.mock.calls[0]![0] as string;
       expect(url).toContain("project_id=proj-1");
+    });
+
+    it("includes the selected project on monitor detail requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ monitor: {} }));
+
+      await getMonitor("m1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/monitors/m1?projectId=p1");
+    });
+
+    it("includes the selected project on monitor check requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ checks: [] }));
+
+      await getMonitorChecks("m1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/monitors/m1/checks?projectId=p1&limit=48");
     });
   });
 
@@ -492,6 +593,17 @@ describe("API client", () => {
 
       expect(fetchSpy.mock.calls[0]![0]).toContain("/api/traces/t1");
       expect(result).toEqual(data);
+    });
+
+    it("includes the selected project on trace detail deep links", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(mockResponse({ id: "t1", spans: [] }));
+
+      await getTrace("t1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/traces/t1?projectId=p1");
     });
   });
 
@@ -663,6 +775,24 @@ describe("API client", () => {
       expect(fetchSpy.mock.calls[0]![0]).toContain("/api/releases/r1/health");
     });
 
+    it("includes the selected project on release deep-link requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+      await getRelease("r1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/releases/r1?projectId=p1");
+    });
+
+    it("includes the selected project on release health requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({}));
+
+      await getReleaseHealth("r1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/releases/r1/health?projectId=p1");
+    });
+
     it("deleteRelease sends DELETE", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(undefined));
 
@@ -728,6 +858,24 @@ describe("API client", () => {
       const url = fetchSpy.mock.calls[0]![0] as string;
       expect(url).toContain("/api/issues/i1/comments");
       expect(url).toContain("limit=10");
+    });
+
+    it("includes the selected project on issue comment deep-link requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ data: [] }));
+
+      await getIssueComments("i1");
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/issues/i1/comments?projectId=p1");
+    });
+
+    it("includes the selected project on team metadata requests", async () => {
+      currentProject.current = "p1";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse({ data: [] }));
+
+      await getTeamMembers({ limit: 10 });
+
+      expect(fetchSpy.mock.calls[0]![0]).toContain("/api/team?limit=10&projectId=p1");
     });
 
     it("createIssueComment sends POST", async () => {
